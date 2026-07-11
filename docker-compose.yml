@@ -1,0 +1,37 @@
+# Local development infrastructure only (Postgres + Redis).
+# In production these are Render Postgres and Render Key Value — nothing here deploys.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nethrasap-postgres
+    environment:
+      POSTGRES_USER: nethrasap
+      POSTGRES_PASSWORD: dev_only_password
+      POSTGRES_DB: nethrasap
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nethrasap -d nethrasap"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: nethrasap-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:

@@ -1,0 +1,163 @@
+/* ===========================================================
+   Animations — page entry, scroll-reveal, hover micro,
+   list staggers, page transitions
+   Drop-in: all customer + admin pages link this stylesheet.
+   =========================================================== */
+
+/* ---------- Keyframes ---------- */
+@keyframes a-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes a-fade-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes a-fade-down { from { opacity: 0; transform: translateY(-18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes a-fade-left { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes a-fade-right { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes a-scale-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes a-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes a-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes a-spin { to { transform: rotate(360deg); } }
+@keyframes a-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(96, 108, 56, 0.45); }
+  70%  { box-shadow: 0 0 0 14px rgba(96, 108, 56, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(96, 108, 56, 0); }
+}
+@keyframes a-skel {
+  0% { background-color: var(--paper-3); }
+  50% { background-color: var(--paper-2); }
+  100% { background-color: var(--paper-3); }
+}
+
+/* ---------- Page-level entry ---------- */
+.page-main, .portal-page, .auth-shell {
+  animation: a-fade .35s var(--ease-out-quint, cubic-bezier(.22,1,.36,1)) both;
+}
+
+/* every <section> on landing pages fades up subtly on load */
+main > section, .portal-page > .panel, .portal-page > .kpi-grid {
+  animation: a-fade-up .55s var(--ease-out-quint, cubic-bezier(.22,1,.36,1)) both;
+}
+main > section:nth-of-type(1) { animation-delay: 0s; }
+main > section:nth-of-type(2) { animation-delay: .06s; }
+main > section:nth-of-type(3) { animation-delay: .12s; }
+main > section:nth-of-type(4) { animation-delay: .18s; }
+main > section:nth-of-type(5) { animation-delay: .24s; }
+main > section:nth-of-type(6) { animation-delay: .30s; }
+
+/* portal page-head + KPI cards stagger */
+.portal-page-head { animation: a-fade-down .45s var(--ease-out-quint) both; }
+.kpi-grid > * { animation: a-fade-up .55s var(--ease-out-quint) both; }
+.kpi-grid > *:nth-child(1) { animation-delay: .04s; }
+.kpi-grid > *:nth-child(2) { animation-delay: .08s; }
+.kpi-grid > *:nth-child(3) { animation-delay: .12s; }
+.kpi-grid > *:nth-child(4) { animation-delay: .16s; }
+.kpi-grid > *:nth-child(5) { animation-delay: .20s; }
+.kpi-grid > *:nth-child(6) { animation-delay: .24s; }
+.kpi-grid > *:nth-child(7) { animation-delay: .28s; }
+.kpi-grid > *:nth-child(8) { animation-delay: .32s; }
+
+/* product / category grid children stagger */
+.prod-grid > *, .cat-grid > *, .cert-grid > *, .trust-grid > *, .cat-feature-grid > * {
+  animation: a-fade-up .55s var(--ease-out-quint) both;
+}
+.prod-grid > *:nth-child(1), .cat-grid > *:nth-child(1), .cert-grid > *:nth-child(1), .trust-grid > *:nth-child(1), .cat-feature-grid > *:nth-child(1) { animation-delay: .02s; }
+.prod-grid > *:nth-child(2), .cat-grid > *:nth-child(2), .cert-grid > *:nth-child(2), .trust-grid > *:nth-child(2), .cat-feature-grid > *:nth-child(2) { animation-delay: .06s; }
+.prod-grid > *:nth-child(3), .cat-grid > *:nth-child(3), .cert-grid > *:nth-child(3), .trust-grid > *:nth-child(3), .cat-feature-grid > *:nth-child(3) { animation-delay: .10s; }
+.prod-grid > *:nth-child(4), .cat-grid > *:nth-child(4), .cert-grid > *:nth-child(4), .trust-grid > *:nth-child(4), .cat-feature-grid > *:nth-child(4) { animation-delay: .14s; }
+.prod-grid > *:nth-child(5), .cat-grid > *:nth-child(5), .cert-grid > *:nth-child(5), .trust-grid > *:nth-child(5) { animation-delay: .18s; }
+.prod-grid > *:nth-child(6), .cat-grid > *:nth-child(6), .cert-grid > *:nth-child(6), .trust-grid > *:nth-child(6) { animation-delay: .22s; }
+.prod-grid > *:nth-child(7), .cat-grid > *:nth-child(7), .cert-grid > *:nth-child(7) { animation-delay: .26s; }
+.prod-grid > *:nth-child(8), .cat-grid > *:nth-child(8), .cert-grid > *:nth-child(8) { animation-delay: .30s; }
+.prod-grid > *:nth-child(n+9) { animation-delay: .32s; }
+
+/* dtable rows stagger gently */
+.dtable tbody tr {
+  animation: a-fade .4s var(--ease-out-quint) both;
+}
+.dtable tbody tr:nth-child(1) { animation-delay: .04s; }
+.dtable tbody tr:nth-child(2) { animation-delay: .07s; }
+.dtable tbody tr:nth-child(3) { animation-delay: .10s; }
+.dtable tbody tr:nth-child(4) { animation-delay: .13s; }
+.dtable tbody tr:nth-child(5) { animation-delay: .16s; }
+.dtable tbody tr:nth-child(6) { animation-delay: .19s; }
+.dtable tbody tr:nth-child(7) { animation-delay: .22s; }
+.dtable tbody tr:nth-child(8) { animation-delay: .25s; }
+.dtable tbody tr:nth-child(n+9) { animation-delay: .28s; }
+
+/* Modal entry (uses existing class) */
+.modal { animation: a-scale-in .25s var(--ease-out-quint) both; }
+.modal-backdrop { animation: a-fade .15s ease both; }
+
+/* Drawers slide in (already animated, just make sure unified) */
+.drawer { animation: drawerSlide .28s var(--ease-out-quint) both; }
+@keyframes drawerSlide { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+
+/* Floating bottom nav lifts in */
+.m-nav { animation: a-fade-up .4s var(--ease-out-quint) both; animation-delay: .25s; }
+
+/* Chatbot FAB gentle float */
+.chat-fab svg { animation: a-float 3s ease-in-out infinite; }
+
+/* ---------- Hover micro-animations ---------- */
+.btn-primary, .btn-ink, .btn-outline, .btn { transition: transform .18s var(--ease-out-quint), background .18s, border-color .18s, color .18s, box-shadow .18s; }
+.btn-primary:hover, .btn-ink:hover { box-shadow: 0 6px 16px -8px rgba(40,54,24,0.4); }
+
+.kpi-card, .panel, .trust-card, .cat-card, .cert-card, .prod-card {
+  transition: transform .22s var(--ease-out-quint), box-shadow .22s, border-color .18s;
+}
+
+.icon-btn { transition: transform .15s, background .15s, color .15s; }
+.icon-btn:active { transform: scale(0.92); }
+
+.cat-card-arrow { transition: transform .25s var(--ease-out-quint), background .2s, color .2s; }
+
+/* Animated underline on text links inside hero/cta */
+.hero a, .cta-banner a, .faq-contact-card a { background-image: linear-gradient(currentColor, currentColor); background-position: 0 100%; background-size: 0 1px; background-repeat: no-repeat; transition: background-size .25s var(--ease-out-quint); }
+.hero a:hover, .cta-banner a:hover, .faq-contact-card a:hover { background-size: 100% 1px; }
+
+/* ---------- Input focus shimmer ---------- */
+.input:focus, .select:focus, .textarea:focus { transition: border-color .15s, box-shadow .2s; }
+
+/* ---------- Pulse for status-live dots ---------- */
+.dot, .meta-dot, .track-status-eyebrow .dot, .hero-tag .dot {
+  /* keeps existing pulseDot/keyframe behaviour */
+}
+
+/* ---------- Counter / number flash ---------- */
+.kpi-card-value { transition: color .2s; }
+
+/* ---------- Animation toggles ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
+  .chat-fab-pulse, .a-pulse-ring { display: none !important; }
+}
+
+/* Helper classes (can be added manually to anything that needs it) */
+.a-fade        { animation: a-fade .5s var(--ease-out-quint) both; }
+.a-fade-up     { animation: a-fade-up .55s var(--ease-out-quint) both; }
+.a-fade-down   { animation: a-fade-down .55s var(--ease-out-quint) both; }
+.a-fade-left   { animation: a-fade-left .55s var(--ease-out-quint) both; }
+.a-fade-right  { animation: a-fade-right .55s var(--ease-out-quint) both; }
+.a-scale-in    { animation: a-scale-in .35s var(--ease-out-quint) both; }
+.a-float       { animation: a-float 3s ease-in-out infinite; }
+.a-pulse       { animation: a-pulse-ring 2s ease-out infinite; }
+.a-delay-1     { animation-delay: .05s; }
+.a-delay-2     { animation-delay: .10s; }
+.a-delay-3     { animation-delay: .15s; }
+.a-delay-4     { animation-delay: .20s; }
+.a-delay-5     { animation-delay: .25s; }
+.a-delay-6     { animation-delay: .30s; }
+.a-delay-7     { animation-delay: .35s; }
+.a-delay-8     { animation-delay: .40s; }
+
+/* Skeleton shimmer */
+.skeleton { animation: a-skel 1.6s ease-in-out infinite; border-radius: 8px; }
+
+/* Hover lift utility */
+.hover-lift { transition: transform .22s var(--ease-out-quint), box-shadow .22s; }
+.hover-lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+
+/* Hover scale on images */
+.cat-feature img { transition: transform .8s var(--ease-out-quint); }
+.cat-feature:hover img { transform: scale(1.05); }

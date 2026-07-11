@@ -1,0 +1,62 @@
+# Render Blueprint — API, background worker, Postgres, Redis.
+# Frontends deploy to Cloudflare Pages (see infra/README.md), not Render.
+services:
+  - type: web
+    name: nethrasap-api
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.backend
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nethrasap-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: nethrasap-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false # set to the Cloudflare Pages domains
+      - key: SMS_PROVIDER
+        value: console # switch to real provider when chosen
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+  - type: worker
+    name: nethrasap-worker
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.backend
+    dockerContext: .
+    dockerCommand: uv run arq app.worker.WorkerSettings
+    plan: starter
+    envVars:
+      - fromGroup: nethrasap-shared # mirror the API env group in the Render UI
+
+  - type: keyvalue
+    name: nethrasap-redis
+    plan: starter
+    ipAllowList: [] # internal-only
+
+databases:
+  - name: nethrasap-db
+    plan: basic-1gb
+    postgresMajorVersion: "16"

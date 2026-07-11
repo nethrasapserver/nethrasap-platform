@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  no-mocks:
+    name: No mock data in app code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep for banned mock markers
+        run: |
+          ! grep -rnE "NETHRA_DATA|NETHRA_PORTAL|mock-adapter|VITE_MOCK_MODE|Demo123!" \
+            apps/storefront/app apps/storefront/lib apps/storefront/components \
+            backend/app packages/api-client/src \
+            || (echo "::error::Mock/demo markers found in app code" && exit 1)
+
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nethrasap
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: nethrasap_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nethrasap" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql://nethrasap:ci_password@localhost:5432/nethrasap_test
+      TEST_DATABASE_URL: postgresql://nethrasap:ci_password@localhost:5432/nethrasap_test
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-only-secret-not-production
+      ENVIRONMENT: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Install
+        working-directory: backend
+        run: uv sync --frozen
+      - name: Lint
+        working-directory: backend
+        run: uv run ruff check .
+      - name: Typecheck
+        working-directory: backend
+        run: uv run mypy app
+      - name: Test
+        working-directory: backend
+        run: uv run pytest -q
+
+  frontends:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck --workspaces --if-present
+      - name: Build
+        run: npm run build --workspaces --if-present
