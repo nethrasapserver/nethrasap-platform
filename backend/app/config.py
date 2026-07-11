@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    environment: Literal["dev", "test", "staging", "prod"] = "dev"
+    environment: Literal["dev", "test", "staging", "production"] = "dev"
     log_level: str = "INFO"
 
     database_url: str
@@ -37,22 +37,54 @@ class Settings(BaseSettings):
 
     # Stored as a comma-separated string in env so pydantic-settings v2.6
     # doesn't try to JSON-decode it. Use `cors_origins_list` to get the list.
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = "http://localhost:3000,http://localhost:3001"
 
-    @field_validator("jwt_secret")
-    @classmethod
-    def reject_placeholder_secret(cls, v: str) -> str:
-        if v.startswith("REPLACE_ME"):
-            # Allow during dev to make first-boot diagnostics easier — we emit a
-            # warning at startup in logging.py instead of crashing.
-            return v
-        if len(v) < 32:
-            raise ValueError("JWT_SECRET must be at least 32 chars long")
-        return v
+    # --- SMS / OTP (phone-first platform; there is deliberately no email) ---
+    sms_provider: Literal["console", "msg91", "exotel", "twilio"] = "console"
+    sms_api_key: str = ""
+    sms_sender_id: str = "NTHRSP"
+    otp_ttl_seconds: int = Field(default=300, ge=60, le=900)
+    otp_max_attempts: int = Field(default=5, ge=1, le=10)
+    otp_resend_cooldown_seconds: int = Field(default=45, ge=10, le=300)
+
+    # --- Object storage (Cloudflare R2, S3-compatible) ---
+    storage_endpoint: str = ""
+    storage_bucket: str = "nethrasap"
+    storage_access_key_id: str = ""
+    storage_secret_access_key: str = ""
+    storage_public_base_url: str = ""
+
+    # --- Payments (Razorpay) ---
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+
+    @model_validator(mode="after")
+    def enforce_production_safety(self) -> Self:
+        """Refuse to boot with dev-grade secrets outside dev/test.
+
+        This is the backstop that keeps a copy-pasted `.env.example` from ever
+        serving traffic in staging/production.
+        """
+        if self.jwt_secret.startswith("REPLACE_ME") or len(self.jwt_secret) < 32:
+            if self.is_dev:
+                # Tolerated during local bring-up; logging.py emits a warning.
+                return self
+            raise ValueError(
+                "JWT_SECRET is a placeholder or under 32 chars — refusing to start "
+                f"with ENVIRONMENT={self.environment}. Generate one with: "
+                "python3 -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+        return self
 
     @property
     def is_dev(self) -> bool:
         return self.environment in ("dev", "test")
+
+    @property
+    def cookie_secure(self) -> bool:
+        """HTTP-only cookies are Secure everywhere except local dev/test."""
+        return not self.is_dev
 
     @property
     def cors_origins_list(self) -> list[str]:

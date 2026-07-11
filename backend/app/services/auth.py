@@ -26,6 +26,8 @@ from ..models.user import (
     UserRole,
     UserStatus,
 )
+from ..phone import mask_phone
+from ..redis import get_role_permission_version
 from ..security import (
     hash_password,
     hash_refresh_token,
@@ -38,7 +40,7 @@ from ..security import (
 settings = get_settings()
 log = get_logger("services.auth")
 
-INVALID_CREDENTIALS: Final = "invalid email or password"
+INVALID_CREDENTIALS: Final = "invalid phone number or password"
 
 
 # --- Public API ------------------------------------------------------------
@@ -48,15 +50,17 @@ async def signup_user(
     db: AsyncSession,
     *,
     role: str,
-    email: str,
+    phone: str,
     password: str,
     name: str,
-    phone: str | None = None,
     ip: str | None = None,
     user_agent: str | None = None,
     cart_session_id: str | None = None,
 ) -> tuple[User, str, str, int]:
     """Create a user + profile + initial refresh session.
+
+    `phone` must already be proven (the router exchanges a signup OTP proof
+    for it), so the account is born phone-verified.
 
     Returns (user, access_token, refresh_token, access_ttl_seconds).
     """
@@ -68,7 +72,7 @@ async def signup_user(
             detail=f"invalid role: {role}",
         ) from None
 
-    # Self-signup is limited to customer/clinician/retailer in Phase 1.
+    # Self-signup is limited to customer/clinician/retailer.
     if user_role in (UserRole.sales, UserRole.manager, UserRole.admin):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -83,8 +87,8 @@ async def signup_user(
     )
 
     user = User(
-        email=email.lower().strip(),
         phone=phone,
+        phone_verified_at=datetime.now(UTC),
         password_hash=hash_password(password),
         role=user_role,
         status=initial_status,
@@ -98,7 +102,7 @@ async def signup_user(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="email or phone already registered",
+            detail="phone number already registered",
         ) from e
 
     access, refresh, ttl = await _issue_token_pair(db, user, ip=ip, user_agent=user_agent)
@@ -127,15 +131,13 @@ async def signup_user(
 async def login_user(
     db: AsyncSession,
     *,
-    email: str,
+    phone: str,
     password: str,
     ip: str | None = None,
     user_agent: str | None = None,
     cart_session_id: str | None = None,
 ) -> tuple[User, str, str, int]:
-    result = await db.execute(
-        select(User).where(User.email == email.lower().strip())
-    )
+    result = await db.execute(select(User).where(User.phone == phone))
     user = result.scalar_one_or_none()
     if user is None or not verify_password(password, user.password_hash):
         raise HTTPException(
@@ -169,6 +171,87 @@ async def login_user(
     await db.commit()
     log.info("user.login", user_id=str(user.id))
     return user, access, refresh, ttl
+
+
+async def login_with_phone_proof(
+    db: AsyncSession,
+    *,
+    phone: str,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    cart_session_id: str | None = None,
+) -> tuple[User, str, str, int]:
+    """Passwordless login: the caller holds a `login`-purpose phone proof."""
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="no account for this phone number — sign up first",
+        )
+    if user.status == UserStatus.suspended:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="account suspended")
+
+    now = datetime.now(UTC)
+    user.last_login_at = now
+    if user.phone_verified_at is None:
+        user.phone_verified_at = now
+    access, refresh, ttl = await _issue_token_pair(db, user, ip=ip, user_agent=user_agent)
+    db.add(
+        AuditLog(
+            actor_user_id=user.id,
+            action="user.login_otp",
+            entity_type="user",
+            entity_id=str(user.id),
+            payload={},
+            ip=ip,
+            user_agent=user_agent,
+        )
+    )
+    if cart_session_id:
+        from . import cart as cart_svc
+        await cart_svc.merge_session_cart_into_user(db, session_id=cart_session_id, user=user)
+    await db.commit()
+    log.info("user.login_otp", user_id=str(user.id))
+    return user, access, refresh, ttl
+
+
+async def reset_password(
+    db: AsyncSession,
+    *,
+    phone: str,
+    new_password: str,
+    ip: str | None = None,
+    user_agent: str | None = None,
+) -> None:
+    """Set a new password for the proven phone and revoke every session."""
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="no account for this phone number",
+        )
+
+    user.password_hash = hash_password(new_password)
+    await db.execute(
+        update(DbSession)
+        .where(DbSession.user_id == user.id, DbSession.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
+    db.add(
+        AuditLog(
+            actor_user_id=user.id,
+            action="user.password_reset",
+            entity_type="user",
+            entity_id=str(user.id),
+            payload={"all_sessions_revoked": True},
+            ip=ip,
+            user_agent=user_agent,
+        )
+    )
+    await db.commit()
+    log.info("user.password_reset", user_id=str(user.id), phone=mask_phone(phone))
 
 
 async def refresh_session(
@@ -264,9 +347,9 @@ async def revoke_session(db: AsyncSession, *, refresh_token: str) -> None:
 async def load_permissions(db: AsyncSession, user: User) -> list[str]:
     """Resolve permission strings (`resource:action`) for the user's role.
 
-    Returns [] if the role has no permission rows seeded yet — handlers that
-    rely on permissions should use the simple `require_role(...)` dep until
-    Phase 6 wires Casbin.
+    Returns [] if the role has no permission rows seeded yet. Enforcement
+    happens in deps.require_permission, which reads the `perm` claim these
+    feed into.
     """
     stmt = (
         select(Permission.resource, Permission.action)
@@ -291,12 +374,14 @@ async def _issue_token_pair(
     user_agent: str | None = None,
 ) -> tuple[str, str, int]:
     permissions = await load_permissions(db, user)
+    permission_version = await get_role_permission_version(user.role.value)
 
     access = make_access_token(
         sub=str(user.id),
         role=user.role.value,
         kyc_status=user.status.value,
         permissions=permissions,
+        permission_version=permission_version,
     )
     raw_refresh, refresh_hash = make_refresh_token()
 

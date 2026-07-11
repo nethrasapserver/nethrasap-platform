@@ -39,8 +39,68 @@ from datetime import UTC  # noqa: E402
 
 from app.config import get_settings  # noqa: E402
 from app.db import _normalise_url, get_session  # noqa: E402
+from app.integrations.sms import ConsoleSmsProvider, get_provider  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
+
+# --- Phone-first auth helpers (shared by every test module) -----------------
+
+
+def phone_for(ident: str) -> str:
+    """Deterministic unique test phone for any string identifier."""
+    import hashlib
+
+    digits = int(hashlib.sha256(ident.encode()).hexdigest(), 16) % 10**9
+    return f"+919{digits:09d}"
+
+
+def last_otp_for(phone: str) -> str:
+    """Read the most recent OTP sent to `phone` from the console SMS outbox."""
+    provider = get_provider()
+    assert isinstance(provider, ConsoleSmsProvider), "tests require SMS_PROVIDER=console"
+    messages = provider.outbox.get(phone)
+    assert messages, f"no SMS sent to {phone}"
+    return messages[-1].split(" ", 1)[0]
+
+
+async def get_otp_token(client, phone: str, purpose: str) -> str:
+    """Run request→verify for `purpose` and return the proof token."""
+    r = await client.post("/api/v1/auth/otp/request", json={"phone": phone, "purpose": purpose})
+    assert r.status_code == 202, r.text
+    r = await client.post(
+        "/api/v1/auth/otp/verify",
+        json={"phone": phone, "purpose": purpose, "code": last_otp_for(phone)},
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["otp_token"]
+
+
+async def signup(
+    client,
+    phone: str,
+    *,
+    role: str = "customer",
+    password: str = "Strongp@ss123",
+    name: str | None = None,
+):
+    """Full phone-first signup (OTP request → verify → signup). Returns the
+    httpx response from POST /auth/signup."""
+    otp_token = await get_otp_token(client, phone, "signup")
+    return await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "role": role,
+            "otp_token": otp_token,
+            "password": password,
+            "name": name or f"User {phone[-4:]}",
+        },
+    )
+
+
+async def signup_token(client, phone: str, *, role: str = "customer", password: str = "Strongp@ss123") -> str:
+    resp = await signup(client, phone, role=role, password=password)
+    assert resp.status_code == 201, resp.text
+    return resp.json()["access_token"]
 
 
 @pytest.fixture(scope="session")

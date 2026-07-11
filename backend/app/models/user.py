@@ -36,8 +36,8 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid_pk]
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    phone: Mapped[str | None] = mapped_column(String(32), unique=True, index=True)
+    # E.164 phone number is THE identity on this platform (no email anywhere).
+    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     role: Mapped[UserRole] = mapped_column(
@@ -52,7 +52,6 @@ class User(Base):
         server_default=UserStatus.active.value,
     )
 
-    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -74,7 +73,7 @@ class User(Base):
     )
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<User {self.email} role={self.role.value}>"
+        return f"<User {self.phone} role={self.role.value}>"
 
 
 class UserProfile(Base):

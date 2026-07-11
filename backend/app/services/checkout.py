@@ -20,8 +20,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..integrations import email as email_stub
 from ..integrations import razorpay as razorpay_stub
+from ..integrations import sms
 from ..logging import get_logger
 from ..models.audit import AuditLog
 from ..models.cart import Cart
@@ -269,7 +269,7 @@ async def place_order(
         rzp = razorpay_stub.create_order(
             amount_paise=totals["grand_total"],
             receipt=order.order_number,
-            notes={"order_number": order.order_number, "user_email": user.email},
+            notes={"order_number": order.order_number, "user_phone": user.phone},
         )
         db.add(
             Payment(
@@ -336,9 +336,9 @@ async def place_order(
             return _build_place_response(retry, gateway_handshake=_gateway_for(retry))
         raise HTTPException(status.HTTP_409_CONFLICT, "could not place order") from e
 
-    # Fire-and-forget email (stub for Phase 3).
-    email_stub.send_order_confirmation(
-        to=user.email,
+    # Fire-and-forget SMS notification (console provider in dev).
+    sms.send_order_confirmation(
+        to=user.phone,
         order_number=order.order_number,
         grand_total_paise=totals["grand_total"],
     )

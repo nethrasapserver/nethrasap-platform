@@ -45,6 +45,7 @@ def make_access_token(
     role: str,
     kyc_status: str,
     permissions: list[str],
+    permission_version: int = 0,
 ) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
@@ -52,6 +53,9 @@ def make_access_token(
         "role": role,
         "kyc": kyc_status,
         "perm": permissions,
+        # Role-permission version at issue time. require_permission compares it
+        # against Redis; a mismatch (role was edited) forces a token refresh.
+        "pv": permission_version,
         "iat": now,
         "exp": now + timedelta(minutes=_settings.access_token_ttl_min),
         "jti": uuid.uuid4().hex,
@@ -66,6 +70,39 @@ def decode_access_token(token: str) -> dict[str, Any]:
         algorithms=[_settings.jwt_alg],
         options={"require": ["exp", "sub"]},
     )
+
+
+# --- Phone-proof tokens -------------------------------------------------------
+# Short-lived JWTs proving "this caller just completed an OTP for this phone,
+# for this purpose". Purpose-bound so a login proof can't reset a password.
+
+PHONE_PROOF_TTL_MIN = 10
+
+
+def make_phone_proof_token(*, phone: str, purpose: str) -> str:
+    now = datetime.now(UTC)
+    payload: dict[str, Any] = {
+        "sub": phone,
+        "typ": "phone_proof",
+        "pur": purpose,
+        "iat": now,
+        "exp": now + timedelta(minutes=PHONE_PROOF_TTL_MIN),
+        "jti": uuid.uuid4().hex,
+    }
+    return jwt.encode(payload, _settings.jwt_secret, algorithm=_settings.jwt_alg)
+
+
+def decode_phone_proof_token(token: str, *, expected_purpose: str) -> str:
+    """Validate a phone-proof token; returns the proven phone number."""
+    payload = jwt.decode(
+        token,
+        _settings.jwt_secret,
+        algorithms=[_settings.jwt_alg],
+        options={"require": ["exp", "sub"]},
+    )
+    if payload.get("typ") != "phone_proof" or payload.get("pur") != expected_purpose:
+        raise jwt.InvalidTokenError("wrong token type or purpose")
+    return str(payload["sub"])
 
 
 # --- Refresh tokens (opaque) ------------------------------------------------

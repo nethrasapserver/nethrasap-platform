@@ -9,24 +9,19 @@ dependencies) and makes future multi-tenancy / per-region instances trivial.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from .api.v1.router import api_router_v1
 from .config import get_settings
 from .logging import configure_logging, get_logger
+from .realtime.hub import hub
+from .redis import close_redis
 
 settings = get_settings()
 configure_logging(environment=settings.environment, level=settings.log_level)
 log = get_logger("app.main")
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,11 +31,15 @@ async def lifespan(app: FastAPI):
         cors_origins=settings.cors_origins_list,
     )
     if settings.jwt_secret.startswith("REPLACE_ME"):
+        # Only reachable in dev/test — config.py refuses to boot otherwise.
         log.warning(
             "jwt_secret is a placeholder — generate a real one with "
             "`python -c 'import secrets; print(secrets.token_urlsafe(64))'`"
         )
+    await hub.start()
     yield
+    await hub.stop()
+    await close_redis()
     log.info("shutdown")
 
 
@@ -64,28 +63,6 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router_v1, prefix="/api/v1")
-
-    # Optional: serve the built SPA so the backend can be the single origin in
-    # staging/prod. In dev the frontend runs separately on :5173 and proxies
-    # /api/* here — see frontend/vite.config.ts.
-    if FRONTEND_DIST.exists():
-        app.mount(
-            "/assets",
-            StaticFiles(directory=FRONTEND_DIST / "assets"),
-            name="frontend-assets",
-        )
-
-        @app.get("/", include_in_schema=False)
-        async def spa_root() -> FileResponse:
-            return FileResponse(FRONTEND_DIST / "index.html")
-
-        @app.exception_handler(404)
-        async def spa_fallback(request: Request, exc) -> FileResponse | JSONResponse:
-            # API 404s stay as JSON. Everything else returns the SPA so
-            # client-side routing can handle the path.
-            if request.url.path.startswith("/api/"):
-                return JSONResponse({"detail": "Not found"}, status_code=404)
-            return FileResponse(FRONTEND_DIST / "index.html")
 
     return app
 

@@ -1,15 +1,17 @@
-"""FastAPI dependencies — auth, pagination, request metadata, cart session."""
+"""FastAPI dependencies — auth, RBAC, pagination, request metadata, cart session."""
 from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Cookie, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy import select
 
+from .config import get_settings
 from .db import DbSession
 from .models.user import User
+from .redis import get_role_permission_version
 from .security import decode_access_token
 
 CART_COOKIE = "nethrasap.session"
@@ -96,11 +98,15 @@ CurrentUser = Annotated[User, Depends(current_user)]
 OptionalUser = Annotated[User | None, Depends(optional_user)]
 
 
-# --- Role guards ----------------------------------------------------------
+# --- Role & permission guards ----------------------------------------------
 
 
 def require_role(*roles: str):
-    """Create a dependency that requires the current user to have one of `roles`."""
+    """Create a dependency that requires the current user to have one of `roles`.
+
+    Prefer `require_permission` for staff endpoints — role checks are only for
+    coarse gates where the permission model genuinely doesn't apply.
+    """
 
     async def _dep(user: CurrentUser) -> User:
         if user.role.value not in roles:
@@ -108,6 +114,70 @@ def require_role(*roles: str):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"requires role: {', '.join(roles)}",
             )
+        return user
+
+    return _dep
+
+
+def permission_matches(granted: list[str], needed: str) -> bool:
+    """`resource:action` matching with wildcards: `*` and `resource:*`."""
+    if "*" in granted or needed in granted:
+        return True
+    resource = needed.split(":", 1)[0]
+    return f"{resource}:*" in granted
+
+
+async def _token_claims(authorization: str | None) -> dict[str, Any]:
+    token = _extract_bearer(authorization)
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="missing bearer token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        return decode_access_token(token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+
+
+def require_permission(needed: str):
+    """Dependency enforcing a `resource:action` permission.
+
+    Permissions ride in the JWT `perm` claim (resolved at login). The claim is
+    trusted only while the role's permission *version* matches Redis — editing
+    a role bumps the version, instantly invalidating stale tokens (401 forces
+    a refresh, which re-resolves permissions).
+    """
+
+    async def _dep(
+        db: DbSession,
+        authorization: Annotated[str | None, Header()] = None,
+    ) -> User:
+        claims = await _token_claims(authorization)
+
+        current_pv = await get_role_permission_version(str(claims.get("role", "")))
+        if int(claims.get("pv", 0)) != current_pv:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="permissions changed — refresh your session",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not permission_matches(list(claims.get("perm", [])), needed):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"requires permission: {needed}",
+            )
+
+        result = await db.execute(select(User).where(User.id == claims["sub"]))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
         return user
 
     return _dep
@@ -148,7 +218,7 @@ def ensure_cart_session(
         max_age=CART_COOKIE_MAX_AGE,
         httponly=True,
         samesite="lax",
-        secure=False,  # set True in prod via env override later
+        secure=get_settings().cookie_secure,
         path="/",
     )
     return token

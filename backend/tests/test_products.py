@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import pytest
 
+from .conftest import phone_for, signup_token
+
 
 @pytest.mark.asyncio
 async def test_list_products_returns_seeded(client, seeded_catalogue):
@@ -47,18 +49,9 @@ async def test_anonymous_sees_customer_price(client, seeded_catalogue):
 @pytest.mark.asyncio
 async def test_retailer_sees_retailer_price(client, seeded_catalogue):
     """Logged-in active retailer -> retailer-tier price (85)."""
-    sign = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "role": "retailer",
-            "email": "ret@example.in",
-            "password": "Strongp@ss123",
-            "name": "Retail Co",
-        },
-    )
     # signup leaves retailer in pending_kyc — pricing gates on active KYC, so
     # this asserts the *pending* retailer falls back to customer pricing.
-    token = sign.json()["access_token"]
+    token = await signup_token(client, phone_for("ret@example.in"), role="retailer")
     resp = await client.get(
         "/api/v1/products?limit=1",
         headers={"Authorization": f"Bearer {token}"},

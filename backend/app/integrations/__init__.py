@@ -1,13 +1,15 @@
 """External-service integrations.
 
-Every module in this package is a **STUB** in Phase 3. Real wiring (Razorpay
-order creation, SES email dispatch, S3/MinIO uploads) lands in a later
-incremental phase — the interfaces here are designed so swapping in the real
-client is a single function-body replacement, not a refactor.
+  * ``sms``      — SMS/OTP dispatch. `console` provider in dev/test (logs the
+                   message); real providers (MSG91/Exotel/Twilio) are selected
+                   via SMS_PROVIDER once credentials exist. There is
+                   deliberately NO email integration on this platform.
+  * ``razorpay`` — payment gateway. STUB until B4 wires the live client +
+                   webhook processing.
+  * ``storage``  — object storage. STUB until B1 wires Cloudflare R2
+                   (KYC documents, product images, invoice PDFs).
 
-Each stub:
-    * Returns deterministic data so the order-placement flow works end-to-end.
-    * Logs every call with structured fields so it's obvious in dev that the
-      stub was hit (and what real call would have happened).
-    * Carries a `# TODO(phase-3.5): replace with real <vendor> client` marker.
+Each remaining stub logs every call with structured fields so it's obvious in
+dev that the stub was hit, and returns deterministic data so flows work
+end-to-end.
 """

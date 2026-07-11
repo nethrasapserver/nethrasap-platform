@@ -3,19 +3,12 @@ from __future__ import annotations
 
 import pytest
 
+from .conftest import phone_for, signup_token
 
-async def _signup_and_token(client, email: str, role: str = "customer") -> str:
-    resp = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "role": role,
-            "email": email,
-            "password": "Strongp@ss123",
-            "name": email.split("@")[0].title(),
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()["access_token"]
+
+async def _signup_and_token(client, ident: str, role: str = "customer") -> str:
+    """Signup via the phone-first OTP flow; `ident` maps to a stable phone."""
+    return await signup_token(client, phone_for(ident), role=role)
 
 
 @pytest.mark.asyncio

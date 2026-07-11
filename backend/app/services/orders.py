@@ -9,8 +9,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..integrations import email as email_stub
 from ..integrations import razorpay as razorpay_stub
+from ..integrations import sms
 from ..logging import get_logger
 from ..models.audit import AuditLog
 from ..models.cart import CartItem
@@ -164,8 +164,8 @@ async def cancel_order(
 
     await db.commit()
 
-    # Email notification (stub)
-    email_stub.send_order_cancelled(to=user.email, order_number=order.order_number)
+    # SMS notification (console provider in dev)
+    sms.send_order_cancelled(to=user.phone, order_number=order.order_number)
     log.info("order.cancel", order_number=order.order_number, user_id=str(user.id))
 
     # Reload with relationships so the response is complete.

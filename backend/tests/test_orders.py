@@ -5,6 +5,8 @@ import uuid
 
 import pytest
 
+from .conftest import phone_for, signup_token
+
 ADDRESS = {
     "full_name": "Test Buyer",
     "phone": "9876543210",
@@ -17,17 +19,9 @@ ADDRESS = {
 }
 
 
-async def _signup_token(client, email: str) -> str:
-    r = await client.post(
-        "/api/v1/auth/signup",
-        json={
-            "role": "customer",
-            "email": email,
-            "password": "Strongp@ss123",
-            "name": email.split("@")[0].title(),
-        },
-    )
-    return r.json()["access_token"]
+async def _signup_token(client, ident: str) -> str:
+    """Signup via the phone-first OTP flow; `ident` maps to a stable phone."""
+    return await signup_token(client, phone_for(ident))
 
 
 async def _place_cod(client, token: str, variant_id: str, quantity: int = 1) -> str:

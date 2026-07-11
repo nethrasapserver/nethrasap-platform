@@ -32,6 +32,7 @@ from .order import (
     Shipment,
     ShipmentStatus,
 )
+from .otp import OtpCode, OtpPurpose
 from .rbac import Permission, Role, RolePermission
 from .user import Address, Session, User, UserProfile, UserRole, UserStatus
 
@@ -63,6 +64,8 @@ __all__ = [
     "Shipment",
     "ShipmentStatus",
     "StockStatus",
+    "OtpCode",
+    "OtpPurpose",
     "Permission",
     "Role",
     "RolePermission",

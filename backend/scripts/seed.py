@@ -5,7 +5,7 @@ Run from `backend/` after `alembic upgrade head`:
     uv run python -m scripts.seed
 
 The script is idempotent — every row is upserted by its natural key (slug for
-categories/products, email for users, name for roles, etc.). Safe to re-run.
+categories/products, phone for users, name for roles, etc.). Safe to re-run.
 """
 from __future__ import annotations
 
@@ -125,13 +125,14 @@ ROLE_PERMISSIONS: dict[str, list[tuple[str, str]]] = {
     "admin": [(p["resource"], p["action"]) for p in PERMISSION_DEFS],
 }
 
+# Dev-only fixtures — phone-first identity (the platform has no email).
 DEMO_USERS = [
-    ("customer@nethrasap.in", UserRole.customer, "Priya Iyer", UserStatus.active),
-    ("clinician@nethrasap.in", UserRole.clinician, "Dr. Arjun Mehta", UserStatus.active),
-    ("retailer@nethrasap.in", UserRole.retailer, "Asha Pharmacy", UserStatus.active),
-    ("sales@nethrasap.in", UserRole.sales, "Ravi Kumar", UserStatus.active),
-    ("manager@nethrasap.in", UserRole.manager, "Neha Verma", UserStatus.active),
-    ("admin@nethrasap.in", UserRole.admin, "Platform Admin", UserStatus.active),
+    ("+919800000001", UserRole.customer, "Priya Iyer", UserStatus.active),
+    ("+919800000002", UserRole.clinician, "Dr. Arjun Mehta", UserStatus.active),
+    ("+919800000003", UserRole.retailer, "Asha Pharmacy", UserStatus.active),
+    ("+919800000004", UserRole.sales, "Ravi Kumar", UserStatus.active),
+    ("+919800000005", UserRole.manager, "Neha Verma", UserStatus.active),
+    ("+919800000006", UserRole.admin, "Platform Admin", UserStatus.active),
 ]
 
 
@@ -232,12 +233,13 @@ async def seed_roles_and_permissions(db) -> None:
 
 async def seed_demo_users(db) -> None:
     created = 0
-    for email, role, full_name, status in DEMO_USERS:
-        existing = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    for phone, role, full_name, status in DEMO_USERS:
+        existing = (await db.execute(select(User).where(User.phone == phone))).scalar_one_or_none()
         if existing is not None:
             continue
         user = User(
-            email=email,
+            phone=phone,
+            phone_verified_at=datetime.now(UTC),
             password_hash=hash_password(DEMO_PASSWORD),
             role=role,
             status=status,
@@ -411,22 +413,22 @@ async def seed_products(db, products: list[dict], cat_lookup: dict[str, Category
 
 
 SEED_REVIEWS = [
-    # (email, rating, title, body)
-    ("customer@nethrasap.in", 5, "Reliable supply", "Always in stock, dispatch on time."),
-    ("clinician@nethrasap.in", 4, "Good clinical fit", "Used across two pharmacies — no issues."),
-    ("retailer@nethrasap.in", 5, "Margin works", "Volume pricing is competitive vs my distributor."),
+    # (phone, rating, title, body)
+    ("+919800000001", 5, "Reliable supply", "Always in stock, dispatch on time."),
+    ("+919800000002", 4, "Good clinical fit", "Used across two pharmacies — no issues."),
+    ("+919800000003", 5, "Margin works", "Volume pricing is competitive vs my distributor."),
 ]
 
 
 async def seed_reviews(db) -> None:
     """Seed a handful of reviews against featured products. Idempotent."""
     user_lookup: dict[str, User] = {}
-    for email, *_ in SEED_REVIEWS:
+    for phone, *_ in SEED_REVIEWS:
         u = (
-            await db.execute(select(User).where(User.email == email))
+            await db.execute(select(User).where(User.phone == phone))
         ).scalar_one_or_none()
         if u:
-            user_lookup[email] = u
+            user_lookup[phone] = u
     if not user_lookup:
         log.warning("seed.reviews.skip_no_demo_users")
         return
@@ -438,8 +440,8 @@ async def seed_reviews(db) -> None:
 
     created = 0
     for product in featured:
-        for email, rating, title, body in SEED_REVIEWS:
-            user = user_lookup.get(email)
+        for phone, rating, title, body in SEED_REVIEWS:
+            user = user_lookup.get(phone)
             if user is None:
                 continue
             existing = (
@@ -507,9 +509,9 @@ async def seed_coupons(db) -> None:
 
 
 async def seed_sample_orders(db) -> None:
-    """Insert one delivered + one in-flight order for retailer@nethrasap.in."""
+    """Insert one delivered + one in-flight order for the demo retailer."""
     retailer = (
-        await db.execute(select(User).where(User.email == "retailer@nethrasap.in"))
+        await db.execute(select(User).where(User.phone == "+919800000003"))
     ).scalar_one_or_none()
     if retailer is None:
         log.warning("seed.sample_orders.skip_no_retailer")
