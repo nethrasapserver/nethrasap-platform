@@ -9,11 +9,11 @@ from .base import Base
 from .cart import Cart, CartItem, Coupon, CouponType
 from .catalogue import (
     Category,
+    PriceRole,
     Product,
     ProductImage,
     ProductPrice,
     ProductVariant,
-    PriceRole,
     Review,
     ScheduleClass,
     StockStatus,

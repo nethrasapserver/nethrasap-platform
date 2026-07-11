@@ -36,7 +36,7 @@ def configure_logging(environment: str = "dev", level: str = "INFO") -> None:
     )
 
     structlog.configure(
-        processors=shared_processors + [renderer],
+        processors=[*shared_processors, renderer],
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(),
@@ -45,4 +45,4 @@ def configure_logging(environment: str = "dev", level: str = "INFO") -> None:
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
-    return structlog.get_logger(name)  # type: ignore[return-value]
+    return structlog.get_logger(name)

@@ -10,16 +10,16 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Integer,
     SmallInteger,
     String,
     Text,
-    UniqueConstraint,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -132,26 +132,26 @@ class Order(Base):
     created_at: Mapped[created_at]
     updated_at: Mapped[updated_at]
 
-    items: Mapped[list["OrderItem"]] = relationship(
+    items: Mapped[list[OrderItem]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
         order_by="OrderItem.created_at",
     )
-    status_history: Mapped[list["OrderStatusHistory"]] = relationship(
+    status_history: Mapped[list[OrderStatusHistory]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
         order_by="OrderStatusHistory.at",
     )
-    payments: Mapped[list["Payment"]] = relationship(
+    payments: Mapped[list[Payment]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
     )
-    invoice: Mapped["Invoice | None"] = relationship(
+    invoice: Mapped[Invoice | None] = relationship(
         back_populates="order",
         uselist=False,
         cascade="all, delete-orphan",
     )
-    shipment: Mapped["Shipment | None"] = relationship(
+    shipment: Mapped[Shipment | None] = relationship(
         back_populates="order",
         uselist=False,
         cascade="all, delete-orphan",

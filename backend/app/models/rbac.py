@@ -31,7 +31,7 @@ class Role(Base):
     created_at: Mapped[created_at]
     updated_at: Mapped[updated_at]
 
-    permissions: Mapped[list["RolePermission"]] = relationship(
+    permissions: Mapped[list[RolePermission]] = relationship(
         back_populates="role", cascade="all, delete-orphan"
     )
 

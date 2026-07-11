@@ -7,7 +7,6 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from ..logging import get_logger
 from ..models.audit import AuditLog

@@ -11,8 +11,7 @@ Phase 3 supports two payment paths end-to-end:
 """
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -25,12 +24,10 @@ from ..integrations import email as email_stub
 from ..integrations import razorpay as razorpay_stub
 from ..logging import get_logger
 from ..models.audit import AuditLog
-from ..models.cart import Cart, Coupon
+from ..models.cart import Cart
 from ..models.catalogue import (
-    Category,
     PriceRole,
     Product,
-    ProductPrice,
     ProductVariant,
 )
 from ..models.order import (
@@ -176,7 +173,7 @@ async def place_order(
     totals = q["totals"]
 
     # Build the order row.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     order_number = await next_order_number(db)
 
     is_cod = payment_method == "cod"

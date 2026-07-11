@@ -8,7 +8,7 @@ key so when real storage is wired up the existing rows can be backfilled.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..logging import get_logger
 
@@ -24,7 +24,7 @@ def put_invoice_pdf(*, invoice_number: str, pdf_bytes: bytes | None = None) -> s
 
     Real call: s3.put_object(Bucket=..., Key=key, Body=pdf_bytes, ContentType='application/pdf')
     """
-    today = datetime.now(timezone.utc).strftime("%Y/%m/%d")
+    today = datetime.now(UTC).strftime("%Y/%m/%d")
     key = f"invoices/{today}/{invoice_number}.pdf"
     log.info(
         "storage.put_invoice_pdf.stub",

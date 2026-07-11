@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -16,7 +16,6 @@ from ..models.catalogue import (
     PriceRole,
     Product,
     ProductImage,
-    ProductPrice,
     ProductVariant,
 )
 from ..models.user import User
@@ -66,7 +65,7 @@ async def get_or_create_cart(
         cart = Cart(
             user_id=user.id if user else None,
             session_id=session_id if user is None else None,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=CART_TTL_DAYS),
+            expires_at=datetime.now(UTC) + timedelta(days=CART_TTL_DAYS),
         )
         db.add(cart)
         await db.flush()
@@ -263,7 +262,7 @@ async def apply_coupon(db: AsyncSession, *, cart: Cart, code: str) -> Coupon:
 
     subtotal = sum(it.unit_price_snapshot * it.quantity for it in cart.items)
     eligible, reason = pricing.is_coupon_eligible(coupon, subtotal)
-    if not eligible:
+    if coupon is None or not eligible:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, reason or "coupon invalid")
 
     # Direct UPDATE — avoids triggering a relationship sync (which would
@@ -272,7 +271,7 @@ async def apply_coupon(db: AsyncSession, *, cart: Cart, code: str) -> Coupon:
         update(Cart).where(Cart.id == cart.id).values(coupon_id=coupon.id)
     )
     await db.flush()
-    return coupon  # type: ignore[return-value]
+    return coupon
 
 
 async def clear_coupon(db: AsyncSession, *, cart: Cart) -> None:
@@ -325,8 +324,8 @@ async def serialise_cart(db: AsyncSession, cart: Cart) -> dict[str, Any]:
         )
         subtotal += line.subtotal
         gst += line.gst_amount
-        v = variants_by_id.get(it.variant_id)
-        product = v.product if v else None
+        variant = variants_by_id.get(it.variant_id)
+        product = variant.product if variant else None
         primary_image = primary_image_by_product.get(product.id) if product else None
         items_out.append(
             {
@@ -341,7 +340,7 @@ async def serialise_cart(db: AsyncSession, cart: Cart) -> dict[str, Any]:
                     "slug": product.slug if product else "",
                     "name": product.name if product else "",
                     "brand": product.brand if product else "",
-                    "unit_label": v.unit_label if v else "",
+                    "unit_label": variant.unit_label if variant else "",
                     "stock_status": product.stock_status.value if product else "in_stock",
                     "image_storage_key": primary_image.storage_key if primary_image else None,
                 },

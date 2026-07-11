@@ -14,12 +14,14 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Integer,
     SmallInteger,
     String,
     UniqueConstraint,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -54,12 +56,12 @@ class Cart(Base):
     created_at: Mapped[created_at]
     updated_at: Mapped[updated_at]
 
-    items: Mapped[list["CartItem"]] = relationship(
+    items: Mapped[list[CartItem]] = relationship(
         back_populates="cart",
         cascade="all, delete-orphan",
         order_by="CartItem.created_at",
     )
-    coupon: Mapped["Coupon | None"] = relationship(lazy="joined")
+    coupon: Mapped[Coupon | None] = relationship(lazy="joined")
 
     __table_args__ = (
         CheckConstraint(

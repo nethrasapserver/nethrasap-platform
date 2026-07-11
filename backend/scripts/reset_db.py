@@ -12,7 +12,6 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-
 from app.config import get_settings
 from app.db import _normalise_url
 from app.logging import configure_logging, get_logger

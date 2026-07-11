@@ -9,7 +9,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
@@ -18,6 +17,9 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+)
+from sqlalchemy import (
+    Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -69,7 +71,7 @@ class Category(Base):
     created_at: Mapped[created_at]
     updated_at: Mapped[updated_at]
 
-    products: Mapped[list["Product"]] = relationship(back_populates="category")
+    products: Mapped[list[Product]] = relationship(back_populates="category")
 
 
 class Product(Base):
@@ -128,12 +130,12 @@ class Product(Base):
     updated_at: Mapped[updated_at]
 
     category: Mapped[Category] = relationship(back_populates="products")
-    variants: Mapped[list["ProductVariant"]] = relationship(
+    variants: Mapped[list[ProductVariant]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
         order_by="ProductVariant.sort_order",
     )
-    images: Mapped[list["ProductImage"]] = relationship(
+    images: Mapped[list[ProductImage]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
         order_by="ProductImage.sort_order",
@@ -165,7 +167,7 @@ class ProductVariant(Base):
     updated_at: Mapped[updated_at]
 
     product: Mapped[Product] = relationship(back_populates="variants")
-    prices: Mapped[list["ProductPrice"]] = relationship(
+    prices: Mapped[list[ProductPrice]] = relationship(
         back_populates="variant", cascade="all, delete-orphan"
     )
 

@@ -40,7 +40,7 @@ async def test_cart_add_and_update_and_remove(client, seeded_catalogue):
     body = add.json()
     assert len(body["items"]) == 1
     assert body["items"][0]["quantity"] == 2
-    assert body["totals"]["subtotal"] == 200  # 2 × 100 paise
+    assert body["totals"]["subtotal"] == 200  # 2 x 100 paise
 
     item_id = body["items"][0]["id"]
     upd = await client.patch(
@@ -73,7 +73,7 @@ async def test_cart_apply_coupon_min_order(client, seeded_catalogue, db_session)
     variant_id = str(seeded_catalogue["variant"].id)
     await client.post(
         "/api/v1/cart/items",
-        json={"variant_id": variant_id, "quantity": 6},  # 6 × 100 paise = 600 paise
+        json={"variant_id": variant_id, "quantity": 6},  # 6 x 100 paise = 600 paise
     )
 
     apply = await client.post(

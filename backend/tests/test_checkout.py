@@ -5,7 +5,6 @@ import uuid
 
 import pytest
 
-
 ADDRESS = {
     "full_name": "Test Buyer",
     "phone": "9876543210",
@@ -65,7 +64,7 @@ async def test_quote_math(client, seeded_catalogue):
     )
     assert r.status_code == 200, r.text
     totals = r.json()["totals"]
-    assert totals["subtotal"] == 300                # 3 × 100
+    assert totals["subtotal"] == 300                # 3 x 100
     assert totals["gst"] == round(300 * 12 / 100)   # 36 paise
     assert totals["shipping"] == 5000               # below threshold
     assert totals["grand_total"] == 300 + 36 + 5000

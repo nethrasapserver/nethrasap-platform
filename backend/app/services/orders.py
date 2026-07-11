@@ -1,8 +1,7 @@
 """Order queries + mutations: list, get, cancel, reorder, track, numbering."""
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -14,13 +13,12 @@ from ..integrations import email as email_stub
 from ..integrations import razorpay as razorpay_stub
 from ..logging import get_logger
 from ..models.audit import AuditLog
-from ..models.cart import Cart, CartItem
+from ..models.cart import CartItem
 from ..models.order import (
     Order,
     OrderItem,
     OrderStatus,
     OrderStatusHistory,
-    Payment,
     PaymentStatus,
     Refund,
     RefundStatus,
@@ -44,7 +42,7 @@ async def next_order_number(db: AsyncSession) -> str:
     The sequence is non-resetting (simpler than daily reset and still readable).
     """
     seq = (await db.execute(select(func.nextval("order_number_seq")))).scalar_one()
-    year = datetime.now(timezone.utc).year
+    year = datetime.now(UTC).year
     return f"NS-{year}-{seq:05d}"
 
 
@@ -110,13 +108,13 @@ async def cancel_order(
             status.HTTP_409_CONFLICT,
             f"order is in status '{order.status.value}' and cannot be cancelled",
         )
-    if order.placed_at < datetime.now(timezone.utc) - CANCELLATION_WINDOW:
+    if order.placed_at < datetime.now(UTC) - CANCELLATION_WINDOW:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "cancellation window has expired (12 hours after placement)",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     order.status = OrderStatus.cancelled
     order.cancelled_at = now
     db.add(

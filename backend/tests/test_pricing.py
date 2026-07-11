@@ -1,9 +1,11 @@
 """Unit tests for the central money math in services/pricing.py."""
 from __future__ import annotations
 
+from datetime import UTC
+
 from app.services.pricing import (
-    coupon_discount,
     compute_line,
+    coupon_discount,
     shipping_for,
 )
 
@@ -80,7 +82,6 @@ def test_coupon_discount_percent():
 
 
 def test_is_coupon_eligible_min_order():
-    from datetime import datetime, timedelta, timezone
 
     from app.models.cart import Coupon, CouponType
     from app.services.pricing import is_coupon_eligible
@@ -97,7 +98,7 @@ def test_is_coupon_eligible_min_order():
 
 
 def test_is_coupon_eligible_expired():
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.cart import Coupon, CouponType
     from app.services.pricing import is_coupon_eligible
@@ -105,7 +106,7 @@ def test_is_coupon_eligible_expired():
     expired = Coupon(
         code="E", type=CouponType.percent, value=10,
         min_order=0, used_count=0, is_active=True,
-        expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+        expires_at=datetime.now(UTC) - timedelta(days=1),
     )
     ok, reason = is_coupon_eligible(expired, 10_000)
     assert ok is False

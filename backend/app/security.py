@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -46,7 +46,7 @@ def make_access_token(
     kyc_status: str,
     permissions: list[str],
 ) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": sub,
         "role": role,
@@ -89,4 +89,4 @@ def hash_refresh_token(raw: str) -> str:
 
 
 def refresh_token_expiry() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(days=_settings.refresh_token_ttl_days)
+    return datetime.now(UTC) + timedelta(days=_settings.refresh_token_ttl_days)

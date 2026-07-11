@@ -96,8 +96,8 @@ async def me(user: CurrentUser, db: DbSession) -> MeResponse:
         id=user.id,
         email=user.email,
         phone=user.phone,
-        role=user.role.value,  # type: ignore[arg-type]
-        status=user.status.value,  # type: ignore[arg-type]
+        role=user.role.value,
+        status=user.status.value,
         email_verified=user.email_verified_at is not None,
         last_login_at=user.last_login_at,
         profile=profile,

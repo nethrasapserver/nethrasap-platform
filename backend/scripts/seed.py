@@ -12,13 +12,9 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
-from sqlalchemy import func, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.db import SessionLocal
@@ -51,6 +47,8 @@ from app.models.rbac import Permission, Role, RolePermission
 from app.models.user import User, UserProfile, UserRole, UserStatus
 from app.security import hash_password
 from app.services.pricing import compute_line
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 SEED_JSON = BACKEND_ROOT / "scripts" / "seed_data.json"
@@ -280,7 +278,7 @@ async def seed_categories(db, categories: list[dict]) -> dict[str, Category]:
 
 
 async def seed_products(db, products: list[dict], cat_lookup: dict[str, Category]) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     created = 0
     for p in products:
         slug = p["slug"]
@@ -551,7 +549,7 @@ async def seed_sample_orders(db) -> None:
         "country": "IN",
     }
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     seq = (await db.execute(select(func.nextval("order_number_seq")))).scalar_one()
     order_number = f"NS-{now.year}-{seq:05d}"
 

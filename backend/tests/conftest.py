@@ -8,6 +8,9 @@ Strategy:
 from __future__ import annotations
 
 import asyncio
+
+# Ensure config sees the test DB before anything else imports app.config.
+import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -20,9 +23,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-# Ensure config sees the test DB before anything else imports app.config.
-import os
-
 os.environ["ENVIRONMENT"] = "test"
 _test_url = os.environ.get("TEST_DATABASE_URL")
 if not _test_url:
@@ -34,6 +34,8 @@ if not _test_url:
 # Force the app to use the test DB — never read the dev DB during tests.
 os.environ["DATABASE_URL"] = _test_url
 os.environ.setdefault("JWT_SECRET", "test-secret-please-do-not-use-in-prod-32-chars")
+
+from datetime import UTC  # noqa: E402
 
 from app.config import get_settings  # noqa: E402
 from app.db import _normalise_url, get_session  # noqa: E402
@@ -151,6 +153,8 @@ async def client(db_session) -> AsyncIterator[AsyncClient]:
 @pytest_asyncio.fixture
 async def seeded_catalogue(db_session) -> dict[str, Any]:
     """Insert a single category + product + variant + retail price for tests."""
+    from datetime import datetime
+
     from app.models.catalogue import (
         Category,
         PriceRole,
@@ -160,7 +164,6 @@ async def seeded_catalogue(db_session) -> dict[str, Any]:
         ScheduleClass,
         StockStatus,
     )
-    from datetime import datetime, timezone
 
     cat = Category(slug="prescription", name="Prescription Rx", sku_prefix="RX", sort_order=0)
     db_session.add(cat)
@@ -184,14 +187,14 @@ async def seeded_catalogue(db_session) -> dict[str, Any]:
 
     variant = ProductVariant(
         product_id=product.id,
-        pack_size="10 × 10 strip",
-        unit_label="10 × 10 strip",
+        pack_size="10 x 10 strip",
+        unit_label="10 x 10 strip",
         is_default=True,
     )
     db_session.add(variant)
     await db_session.flush()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for role, sell in ((PriceRole.customer, 100), (PriceRole.clinician, 90), (PriceRole.retailer, 85)):
         db_session.add(
             ProductPrice(
@@ -210,7 +213,7 @@ async def seeded_catalogue(db_session) -> dict[str, Any]:
 @pytest_asyncio.fixture
 async def multi_catalogue(db_session) -> dict[str, Any]:
     """Insert multiple brands / sub_categories / prices for filter+sort tests."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.models.catalogue import (
         Category,
@@ -235,7 +238,7 @@ async def multi_catalogue(db_session) -> dict[str, Any]:
         ("metformin-500mg", "Metformin 500mg", "Sun Pharma", "Diabetes", 4.0, 120, 80),
     ]
     products: list[Product] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for slug, name, brand, sub, rating, reviews, price in seeds:
         p = Product(
             slug=slug,
@@ -255,7 +258,7 @@ async def multi_catalogue(db_session) -> dict[str, Any]:
         v = ProductVariant(
             product_id=p.id,
             pack_size="10x10",
-            unit_label="10 × 10 strip",
+            unit_label="10 x 10 strip",
             is_default=True,
         )
         db_session.add(v)

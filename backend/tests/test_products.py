@@ -56,16 +56,8 @@ async def test_retailer_sees_retailer_price(client, seeded_catalogue):
             "name": "Retail Co",
         },
     )
-    # signup leaves retailer in pending_kyc; for Phase-1 pricing we activate
-    # via a direct DB update through the test session.
-    from app.models.user import User, UserStatus
-    from sqlalchemy import select, update
-
-    db_session = sign.context.get("db_session") if hasattr(sign, "context") else None
-    # Easier: hit login flow which doesn't gate on kyc, but pricing service does.
-    # Bump status via SQL using the same fixture session — we can't reach it from
-    # the client here, so test the *anonymous-equivalent* result if KYC is pending.
-
+    # signup leaves retailer in pending_kyc — pricing gates on active KYC, so
+    # this asserts the *pending* retailer falls back to customer pricing.
     token = sign.json()["access_token"]
     resp = await client.get(
         "/api/v1/products?limit=1",

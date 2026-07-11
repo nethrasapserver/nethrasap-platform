@@ -1,11 +1,10 @@
 """Catalogue queries — products, categories, role-aware pricing."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,7 +12,6 @@ from ..models.catalogue import (
     Category,
     PriceRole,
     Product,
-    ProductImage,
     ProductPrice,
     ProductVariant,
     ScheduleClass,
@@ -183,7 +181,9 @@ async def list_products(
         try:
             sched_enum = ScheduleClass(schedule.upper())
         except ValueError:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid schedule: {schedule}")
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, f"invalid schedule: {schedule}"
+            ) from None
         base = base.where(Product.schedule == sched_enum)
     if in_stock is True:
         base = base.where(Product.stock_status == StockStatus.in_stock)

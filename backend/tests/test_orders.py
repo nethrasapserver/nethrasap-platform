@@ -5,7 +5,6 @@ import uuid
 
 import pytest
 
-
 ADDRESS = {
     "full_name": "Test Buyer",
     "phone": "9876543210",

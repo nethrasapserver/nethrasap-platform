@@ -5,14 +5,13 @@ the FastAPI dependency `get_session`.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Final
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from ..config import get_settings
 from ..logging import get_logger
@@ -20,6 +19,8 @@ from ..models.audit import AuditLog
 from ..models.rbac import Permission, Role, RolePermission
 from ..models.user import (
     Session as DbSession,
+)
+from ..models.user import (
     User,
     UserProfile,
     UserRole,
@@ -65,7 +66,7 @@ async def signup_user(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"invalid role: {role}",
-        )
+        ) from None
 
     # Self-signup is limited to customer/clinician/retailer in Phase 1.
     if user_role in (UserRole.sales, UserRole.manager, UserRole.admin):
@@ -147,7 +148,7 @@ async def login_user(
             detail="account suspended",
         )
 
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     access, refresh, ttl = await _issue_token_pair(db, user, ip=ip, user_agent=user_agent)
     db.add(
         AuditLog(
@@ -194,7 +195,7 @@ async def refresh_session(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid refresh token",
         )
-    if sess.expires_at < datetime.now(timezone.utc):
+    if sess.expires_at < datetime.now(UTC):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="refresh token expired",
@@ -204,7 +205,7 @@ async def refresh_session(
         await db.execute(
             update(DbSession)
             .where(DbSession.user_id == sess.user_id, DbSession.revoked_at.is_(None))
-            .values(revoked_at=datetime.now(timezone.utc))
+            .values(revoked_at=datetime.now(UTC))
         )
         db.add(
             AuditLog(
@@ -237,7 +238,7 @@ async def refresh_session(
         )
 
     # Revoke the presented token, issue a new pair.
-    sess.revoked_at = datetime.now(timezone.utc)
+    sess.revoked_at = datetime.now(UTC)
     access, new_refresh, ttl = await _issue_token_pair(
         db, user, rotated_from=sess.id, ip=ip, user_agent=user_agent
     )
@@ -255,7 +256,7 @@ async def revoke_session(db: AsyncSession, *, refresh_token: str) -> None:
             DbSession.refresh_token_hash == presented_hash,
             DbSession.revoked_at.is_(None),
         )
-        .values(revoked_at=datetime.now(timezone.utc))
+        .values(revoked_at=datetime.now(UTC))
     )
     await db.commit()
 

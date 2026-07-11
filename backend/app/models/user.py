@@ -6,7 +6,8 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -59,16 +60,16 @@ class User(Base):
     updated_at: Mapped[updated_at]
 
     # Relationships
-    profile: Mapped["UserProfile | None"] = relationship(
+    profile: Mapped[UserProfile | None] = relationship(
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
         lazy="joined",
     )
-    addresses: Mapped[list["Address"]] = relationship(
+    addresses: Mapped[list[Address]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    sessions: Mapped[list["Session"]] = relationship(
+    sessions: Mapped[list[Session]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 

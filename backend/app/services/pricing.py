@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..models.cart import Coupon, CouponType
 from ..models.catalogue import ScheduleClass
@@ -87,7 +87,7 @@ def is_coupon_eligible(coupon: Coupon | None, subtotal: int) -> tuple[bool, str 
         return False, "coupon not found"
     if not coupon.is_active:
         return False, "coupon disabled"
-    if coupon.expires_at is not None and coupon.expires_at < datetime.now(timezone.utc):
+    if coupon.expires_at is not None and coupon.expires_at < datetime.now(UTC):
         return False, "coupon expired"
     if coupon.max_uses is not None and coupon.used_count >= coupon.max_uses:
         return False, "coupon usage limit reached"
