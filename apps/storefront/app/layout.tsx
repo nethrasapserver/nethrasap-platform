@@ -1,11 +1,6 @@
 import type { Metadata } from "next";
-import "@/styles/styles.css";
-import "@/styles/sections.css";
-import "@/styles/pages.css";
-import "@/styles/mobile.css";
-import "@/styles/animations.css";
-import "@/styles/tooltips.css";
-import "@/styles/auth.css";
+import "@/styles/app.css";
+import { Footer, Header } from "@/components/Shell";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
@@ -21,7 +16,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <Header />
+          <main style={{ minHeight: "60vh" }}>{children}</main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );
