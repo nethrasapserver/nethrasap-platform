@@ -259,6 +259,25 @@ async def track_order_public(
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+async def invoice_url(db: AsyncSession, *, order_number: str, user: User) -> dict[str, Any]:
+    """Return a presigned URL for the order's invoice PDF, generating it on
+    demand if a captured payment exists but the PDF isn't ready yet."""
+    from ..integrations import storage
+    from .invoices import generate_for_order
+
+    order = await _load_order_or_404(db, order_number=order_number)
+    _ensure_visible_to_user(order, user)
+
+    invoice = order.invoice
+    key = invoice.pdf_storage_key if invoice else None
+    if key is None:
+        # Lazily generate (e.g. worker hasn't run, or COD order being viewed).
+        key = await generate_for_order(db, order_number)
+    if key is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "invoice not available")
+    return {"url": storage.presigned_get(key), "order_number": order_number}
+
+
 async def _load_order_or_404(db: AsyncSession, *, order_number: str) -> Order:
     order = (
         await db.execute(
@@ -268,6 +287,7 @@ async def _load_order_or_404(db: AsyncSession, *, order_number: str) -> Order:
                 selectinload(Order.status_history),
                 selectinload(Order.payments),
                 selectinload(Order.shipment),
+                selectinload(Order.invoice),
             )
             .where(Order.order_number == order_number)
         )

@@ -107,6 +107,16 @@ def public_url(key: str) -> str:
     return f"{base}/{key}"
 
 
+def put_bytes(key: str, data: bytes, *, content_type: str) -> None:
+    """Upload bytes directly (server-side generated files: invoices, payslips)."""
+    if not is_configured():
+        log.info("storage.put_bytes.stub", key=key, bytes=len(data))
+        return
+    _client().put_object(
+        Bucket=get_settings().storage_bucket, Key=key, Body=data, ContentType=content_type
+    )
+
+
 def delete_object(key: str) -> None:
     """Best-effort delete (image replaced, request withdrawn)."""
     if not is_configured():

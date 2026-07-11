@@ -1,13 +1,17 @@
 """Checkout — quote totals and place an order from a cart.
 
-Phase 3 supports two payment paths end-to-end:
+Two payment paths:
   * COD (`payment_method = 'cod'`) — order is placed in `confirmed` status
     and `payment_status = 'cod_pending'`. No gateway handshake.
-  * UPI / Card / Netbanking / Wallet — the order is placed in `placed`
-    status with `payment_status = 'pending'`. A Razorpay-shaped
-    `gateway_order_id` is generated via the STUB `integrations/razorpay.py`
-    so the frontend's modal-payment flow has a shape to consume; once real
-    Razorpay is wired up in a later phase, only the stub gets swapped.
+  * UPI / Card / Netbanking / Wallet — order is placed in `placed` status with
+    `payment_status = 'pending'`; a real Razorpay order is created and the
+    handshake (key_id, order_id, amount) is returned for the Checkout modal.
+    Capture is confirmed asynchronously via the webhook or /checkout/confirm.
+    When Razorpay credentials are absent the integration falls back to a
+    deterministic stub so the whole flow works in dev and tests.
+
+Stock is reserved inside the place transaction (see services/inventory); a
+payment failure releases it, a dispatch fulfils it.
 """
 from __future__ import annotations
 
@@ -20,8 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..integrations import razorpay as razorpay_stub
-from ..integrations import sms
+from ..integrations import razorpay, sms
 from ..logging import get_logger
 from ..models.audit import AuditLog
 from ..models.cart import Cart
@@ -277,11 +280,12 @@ async def place_order(
             )
         )
     else:
-        rzp = razorpay_stub.create_order(
+        rzp = razorpay.create_order(
             amount_paise=totals["grand_total"],
             receipt=order.order_number,
             notes={"order_number": order.order_number, "user_phone": user.phone},
         )
+        gateway_name = "razorpay" if razorpay.is_configured() else "razorpay-stub"
         db.add(
             Payment(
                 order_id=order.id,
@@ -289,14 +293,14 @@ async def place_order(
                 status=PaymentStatus.pending,
                 amount=totals["grand_total"],
                 currency="INR",
-                gateway="razorpay-stub",
+                gateway=gateway_name,
                 gateway_order_id=rzp["id"],
                 raw_response=rzp,
             )
         )
         gateway_handshake = {
-            "gateway": "razorpay-stub",
-            "gateway_key_id": None,  # set when real Razorpay lands
+            "gateway": gateway_name,
+            "gateway_key_id": razorpay.key_id(),
             "gateway_order_id": rzp["id"],
             "amount": totals["grand_total"],
             "currency": "INR",
@@ -395,7 +399,7 @@ def _gateway_for(order: Order) -> dict[str, Any] | None:
         return None
     return {
         "gateway": p.gateway,
-        "gateway_key_id": None,
+        "gateway_key_id": razorpay.key_id(),
         "gateway_order_id": p.gateway_order_id,
         "amount": p.amount,
         "currency": p.currency,

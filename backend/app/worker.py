@@ -10,6 +10,7 @@ when Redis is down so flows still work before `docker compose up`.
 """
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
 from arq import create_pool
@@ -35,6 +36,10 @@ async def get_arq_pool() -> ArqRedis:
 async def enqueue_job(name: str, *args: Any, **kwargs: Any) -> None:
     """Enqueue a background job; in dev, fall back to running it inline if
     the queue is unreachable (so OTP/notifications work without Redis up)."""
+    if settings.environment == "test":
+        # Tests exercise task bodies directly; don't leak jobs onto a shared
+        # Redis/worker (which would run against the non-test database).
+        return
     try:
         pool = await get_arq_pool()
         await pool.enqueue_job(name, *args, **kwargs)
@@ -54,8 +59,18 @@ async def send_sms_task(ctx: dict, *, to: str, body: str) -> None:
     sms.send_sms(to=to, body=body)
 
 
-_TASKS = {
+async def generate_invoice_pdf(ctx: dict, *, order_number: str) -> None:
+    """Render + store an order's invoice PDF. Opens its own DB session."""
+    from .db import SessionLocal
+    from .services import invoices
+
+    async with SessionLocal() as db:
+        await invoices.generate_for_order(db, order_number)
+
+
+_TASKS: dict[str, Callable[..., Awaitable[None]]] = {
     "send_sms_task": send_sms_task,
+    "generate_invoice_pdf": generate_invoice_pdf,
 }
 
 
@@ -72,7 +87,7 @@ async def shutdown(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions: ClassVar = [send_sms_task]
+    functions: ClassVar = [send_sms_task, generate_invoice_pdf]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)

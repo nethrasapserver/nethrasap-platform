@@ -64,6 +64,12 @@ async def reorder(order_number: str, db: DbSession, user: CurrentUser) -> dict:
     return await svc.reorder(db, order_number=order_number, user=user)
 
 
+@router.get("/{order_number}/invoice")
+async def order_invoice(order_number: str, db: DbSession, user: CurrentUser) -> dict:
+    """Presigned URL to the order's invoice PDF (owner or staff)."""
+    return await svc.invoice_url(db, order_number=order_number, user=user)
+
+
 @router.get("/{order_number}/track", response_model=TrackOrderPublic)
 async def track_order(
     order_number: str,
