@@ -45,6 +45,7 @@ from .order import (
 )
 from .otp import OtpCode, OtpPurpose
 from .rbac import Permission, Role, RolePermission
+from .sales import SalesAssignment, SalesTarget
 from .user import Address, Session, User, UserProfile, UserRole, UserStatus
 from .verification import KycDocType, KycDocument, VerificationRequest, VerificationStatus
 
@@ -111,4 +112,6 @@ __all__ = [
     "Notification",
     "NotificationPriority",
     "NotificationType",
+    "SalesAssignment",
+    "SalesTarget",
 ]

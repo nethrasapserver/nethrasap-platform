@@ -191,6 +191,11 @@ async def _schema():
         )
         # Order-number sequence (raw DDL in migration 0003, invisible to create_all)
         await conn.exec_driver_sql("CREATE SEQUENCE IF NOT EXISTS order_number_seq")
+        # Partial unique index (migration 0009; create_all can't express it).
+        await conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_assignment_active_customer "
+            "ON sales_assignments (customer_id) WHERE ended_at IS NULL"
+        )
         # Default warehouse (migration 0007 seeds it; create_all doesn't).
         # id needs gen_random_uuid() here — the model's uuid_pk default is
         # Python-side and doesn't apply to a raw INSERT.
@@ -260,10 +265,12 @@ _STAFF_PERMS = {
     "sales": [
         ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
         ("orders", "fulfil"), ("enquiries", "manage"), ("chat", "manage"),
+        ("analytics", "read"), ("sales", "read"),
     ],
     "manager": [
         ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
         ("orders", "fulfil"), ("enquiries", "manage"), ("chat", "manage"),
+        ("analytics", "read"), ("sales", "read"), ("sales", "manage"), ("audit", "read"),
     ],
     "admin": [
         ("kyc", "review"),
@@ -277,6 +284,10 @@ _STAFF_PERMS = {
         ("orders", "refund"),
         ("enquiries", "manage"),
         ("chat", "manage"),
+        ("analytics", "read"),
+        ("sales", "read"),
+        ("sales", "manage"),
+        ("audit", "read"),
     ],
 }
 
