@@ -68,9 +68,21 @@ async def generate_invoice_pdf(ctx: dict, *, order_number: str) -> None:
         await invoices.generate_for_order(db, order_number)
 
 
+async def generate_payslips(ctx: dict, *, run_id: str) -> None:
+    """Render + store payslip PDFs for a payroll run."""
+    import uuid
+
+    from .db import SessionLocal
+    from .services import payroll
+
+    async with SessionLocal() as db:
+        await payroll.generate_payslip_pdfs(db, uuid.UUID(run_id))
+
+
 _TASKS: dict[str, Callable[..., Awaitable[None]]] = {
     "send_sms_task": send_sms_task,
     "generate_invoice_pdf": generate_invoice_pdf,
+    "generate_payslips": generate_payslips,
 }
 
 
@@ -87,7 +99,7 @@ async def shutdown(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions: ClassVar = [send_sms_task, generate_invoice_pdf]
+    functions: ClassVar = [send_sms_task, generate_invoice_pdf, generate_payslips]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)

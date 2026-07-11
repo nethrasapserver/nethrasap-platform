@@ -288,6 +288,7 @@ _STAFF_PERMS = {
         ("sales", "read"),
         ("sales", "manage"),
         ("audit", "read"),
+        ("hr", "manage"),
     ],
 }
 

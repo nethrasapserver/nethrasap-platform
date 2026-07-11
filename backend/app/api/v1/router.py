@@ -16,6 +16,7 @@ from . import (
     coupons,
     enquiries,
     health,
+    hr,
     inventory,
     kyc,
     notifications,
@@ -38,6 +39,7 @@ api_router_v1.include_router(enquiries.router, tags=["enquiries"])
 api_router_v1.include_router(chat.router, tags=["chat"])
 api_router_v1.include_router(notifications.router, tags=["notifications"])
 api_router_v1.include_router(analytics.router, tags=["analytics"])
+api_router_v1.include_router(hr.router, tags=["hr"])
 api_router_v1.include_router(cms.router, tags=["cms"])
 api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router_v1.include_router(products.router, prefix="/products", tags=["products"])

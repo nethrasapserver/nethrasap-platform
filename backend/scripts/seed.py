@@ -113,6 +113,7 @@ PERMISSION_DEFS: list[dict] = [
     {"resource": "sales", "action": "read"},
     {"resource": "sales", "action": "manage"},
     {"resource": "audit", "action": "read"},
+    {"resource": "hr", "action": "manage"},
 ]
 
 ROLE_PERMISSIONS: dict[str, list[tuple[str, str]]] = {
@@ -146,6 +147,7 @@ ROLE_PERMISSIONS: dict[str, list[tuple[str, str]]] = {
         ("sales", "read"),
         ("sales", "manage"),
         ("audit", "read"),
+        ("hr", "manage"),
     ],
     "admin": [(p["resource"], p["action"]) for p in PERMISSION_DEFS],
 }

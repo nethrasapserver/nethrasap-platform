@@ -27,6 +27,20 @@ from .enquiry import (
     EnquiryStatus,
     EnquiryStatusHistory,
 )
+from .hr import (
+    AttendanceRecord,
+    AttendanceStatus,
+    Employee,
+    EmployeeStatus,
+    Holiday,
+    LeaveBalance,
+    LeaveRequest,
+    LeaveStatus,
+    LeaveType,
+    PayrollRun,
+    PayrollRunStatus,
+    Payslip,
+)
 from .inventory import StockLedger, StockLevel, StockMovement, Warehouse
 from .notification import Notification, NotificationPriority, NotificationType
 from .order import (
@@ -114,4 +128,16 @@ __all__ = [
     "NotificationType",
     "SalesAssignment",
     "SalesTarget",
+    "AttendanceRecord",
+    "AttendanceStatus",
+    "Employee",
+    "EmployeeStatus",
+    "Holiday",
+    "LeaveBalance",
+    "LeaveRequest",
+    "LeaveStatus",
+    "LeaveType",
+    "PayrollRun",
+    "PayrollRunStatus",
+    "Payslip",
 ]
