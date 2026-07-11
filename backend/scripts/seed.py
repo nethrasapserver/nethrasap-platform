@@ -103,6 +103,7 @@ PERMISSION_DEFS: list[dict] = [
     {"resource": "kyc", "action": "reject"},
     # admin surfaces
     {"resource": "catalogue", "action": "write"},
+    {"resource": "inventory", "action": "write"},
     {"resource": "cms", "action": "write"},
     {"resource": "settings", "action": "write"},
 ]

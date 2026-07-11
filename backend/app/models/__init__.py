@@ -19,6 +19,7 @@ from .catalogue import (
     StockStatus,
 )
 from .cms import AppSetting, CmsBlock, CmsPage, FeatureFlag
+from .inventory import StockLedger, StockLevel, StockMovement, Warehouse
 from .order import (
     Invoice,
     Order,
@@ -85,4 +86,8 @@ __all__ = [
     "KycDocument",
     "VerificationRequest",
     "VerificationStatus",
+    "StockLedger",
+    "StockLevel",
+    "StockMovement",
+    "Warehouse",
 ]

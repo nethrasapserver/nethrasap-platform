@@ -41,6 +41,8 @@ from ..models.order import (
     PaymentStatus,
 )
 from ..models.user import User
+from ..services import inventory as inventory_svc
+from ..services.inventory import LineReservation
 from . import pricing
 from .cart import clear_cart_items
 from .catalogue import _price_role_for_user
@@ -240,6 +242,15 @@ async def place_order(
                 line_total=line.line_total,
             )
         )
+
+    # Reserve stock for tracked variants (409 if any is short). Runs in this
+    # same transaction so a reservation failure rolls the whole order back.
+    await inventory_svc.reserve_for_order(
+        db,
+        lines=[LineReservation(variant_id=it.variant_id, quantity=it.quantity) for it in cart.items],
+        order_number=order.order_number,
+        actor=user,
+    )
 
     # Status history first event.
     db.add(

@@ -12,6 +12,7 @@ from . import (
     cms,
     coupons,
     health,
+    inventory,
     kyc,
     orders,
     products,
@@ -24,6 +25,7 @@ api_router_v1.include_router(health.router, tags=["health"])
 api_router_v1.include_router(realtime.router, tags=["realtime"])
 api_router_v1.include_router(kyc.router, tags=["kyc"])
 api_router_v1.include_router(admin_catalogue.router, tags=["admin-catalogue"])
+api_router_v1.include_router(inventory.router, tags=["inventory"])
 api_router_v1.include_router(cms.router, tags=["cms"])
 api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router_v1.include_router(products.router, prefix="/products", tags=["products"])

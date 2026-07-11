@@ -24,7 +24,9 @@ from ..models.order import (
     RefundStatus,
 )
 from ..models.user import User, UserRole
+from . import inventory as inventory_svc
 from .cart import get_or_create_cart
+from .inventory import LineReservation
 
 log = get_logger("services.orders")
 
@@ -125,6 +127,14 @@ async def cancel_order(
             note=reason or "cancelled by customer",
             at=now,
         )
+    )
+
+    # Return reserved stock to the available pool.
+    await inventory_svc.release_for_order(
+        db,
+        lines=[LineReservation(variant_id=it.variant_id, quantity=it.quantity) for it in order.items],
+        order_number=order.order_number,
+        actor=user,
     )
 
     # If a captured payment exists, initiate a refund. Stubbed for Phase 3.

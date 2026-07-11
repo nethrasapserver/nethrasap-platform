@@ -191,6 +191,14 @@ async def _schema():
         )
         # Order-number sequence (raw DDL in migration 0003, invisible to create_all)
         await conn.exec_driver_sql("CREATE SEQUENCE IF NOT EXISTS order_number_seq")
+        # Default warehouse (migration 0007 seeds it; create_all doesn't).
+        # id needs gen_random_uuid() here — the model's uuid_pk default is
+        # Python-side and doesn't apply to a raw INSERT.
+        await conn.exec_driver_sql(
+            "INSERT INTO warehouses (id, code, name, city, state) "
+            "VALUES (gen_random_uuid(), 'MAIN', 'Main Warehouse', 'Chennai', 'Tamil Nadu') "
+            "ON CONFLICT (code) DO NOTHING"
+        )
     await engine.dispose()
     yield
 
@@ -256,6 +264,7 @@ _STAFF_PERMS = {
         ("kyc", "approve"),
         ("kyc", "reject"),
         ("catalogue", "write"),
+        ("inventory", "write"),
         ("cms", "write"),
         ("settings", "write"),
     ],
