@@ -1,9 +1,17 @@
-# Render Blueprint — Nethrasap backend (API + worker + Redis).
-# Database is Neon (external); frontends deploy to Cloudflare Pages later.
+# Render Blueprint — the WHOLE Nethrasap platform on Render via Docker:
+# API + worker + Redis + storefront + dashboard. Database is Neon (external).
+# Cloudflare (custom domains / CDN / R2) is layered on at the very end.
 #
 # Deploy: Render Dashboard → New → Blueprint → connect the GitHub repo.
 # Render reads this file from the repo root. See infra/DEPLOY.md for the
 # full walkthrough and the env vars you must fill in (the `sync: false` ones).
+#
+# Service URLs are deterministic from the names below:
+#   API        https://nethrasap-api.onrender.com
+#   Storefront https://nethrasap-storefront.onrender.com
+#   Dashboard  https://nethrasap-dashboard.onrender.com
+# If any name is already taken globally, Render appends a suffix — update the
+# NEXT_PUBLIC_API_BASE / CORS_ORIGINS values below to match.
 
 envVarGroups:
   - name: nethrasap-shared
@@ -73,10 +81,10 @@ services:
           type: keyvalue
           name: nethrasap-redis
           property: connectionString
-      # Comma-separated allowed browser origins (the Cloudflare Pages domains).
-      # Set once the frontends have URLs; leave blank until then.
+      # Browser origins allowed to call the API (the two frontend services).
+      # Update if the service names/URLs differ, or add custom domains later.
       - key: CORS_ORIGINS
-        sync: false
+        value: https://nethrasap-storefront.onrender.com,https://nethrasap-dashboard.onrender.com
 
   # --- Background worker (SMS, invoice/payslip PDFs, payroll, webhooks) ---
   - type: worker
@@ -94,3 +102,34 @@ services:
           type: keyvalue
           name: nethrasap-redis
           property: connectionString
+
+  # --- Storefront (customer Next.js app, Docker) ---
+  # APP + NEXT_PUBLIC_API_BASE are declared as ARG in Dockerfile.frontend and
+  # Render passes matching env vars as Docker build args. NEXT_PUBLIC_API_BASE
+  # is baked into the client bundle so the browser calls the API directly.
+  - type: web
+    name: nethrasap-storefront
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.frontend
+    dockerContext: .
+    plan: starter
+    region: singapore
+    envVars:
+      - key: APP
+        value: storefront
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://nethrasap-api.onrender.com
+
+  # --- Dashboard (ops Next.js app, Docker) ---
+  - type: web
+    name: nethrasap-dashboard
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.frontend
+    dockerContext: .
+    plan: starter
+    region: singapore
+    envVars:
+      - key: APP
+        value: dashboard
+      - key: NEXT_PUBLIC_API_BASE
+        value: https://nethrasap-api.onrender.com

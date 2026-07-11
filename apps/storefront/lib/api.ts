@@ -17,15 +17,24 @@ export function setOnUnauthorized(cb: () => void) {
   onUnauthorizedCb = cb;
 }
 
-/** Browser client — same-origin; Next rewrites /api/v1/* to the backend. */
+// Absolute API base for the browser. When NEXT_PUBLIC_API_BASE is set (prod),
+// the browser calls the API directly (needed for WebSockets + cross-origin);
+// when empty (local dev), same-origin "/api/v1/*" is proxied by Next rewrites.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
+export const WS_BASE = API_BASE ? API_BASE.replace(/^http/, "ws") : "";
+
+/** Browser client. */
 export const api = createApiClient({
+  baseUrl: API_BASE,
   getToken: () => accessToken,
   onUnauthorized: () => onUnauthorizedCb?.(),
 });
 
 /** Server client for SSR reads (public catalogue). Talks to the backend
- *  directly via the internal URL so server components can prerender. */
+ *  directly so server components can prerender. Uses the internal proxy
+ *  target if set, else the public API base, else localhost for dev. */
 export function serverApi() {
-  const base = process.env.API_PROXY_TARGET ?? "http://localhost:8000";
+  const base =
+    process.env.API_PROXY_TARGET ?? process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
   return createApiClient({ baseUrl: base });
 }

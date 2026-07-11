@@ -4,7 +4,7 @@ import { connectRealtime, type OrderDetail } from "@nethrasap/api-client";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { WS_BASE, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { inr } from "@/lib/format";
 
@@ -37,7 +37,7 @@ export default function OrderDetailPage() {
     let handle: { close: () => void } | null = null;
     connectRealtime({
       api,
-      wsBase: "",
+      wsBase: WS_BASE,
       onOpen: () => setLive(true),
       onClose: () => setLive(false),
       onEvent: (e) => {

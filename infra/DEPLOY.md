@@ -1,19 +1,26 @@
 # Deploying Nethrasap
 
-Topology at launch:
+Everything runs on **Render via Docker** — one blueprint, five services.
+Cloudflare (custom domains / CDN / R2) is layered on at the very end.
 
 | Component | Where | Notes |
 |---|---|---|
-| API + WebSocket hub | **Render** web service (Docker) | from `render.yaml` |
+| API + WebSocket hub | **Render** web service (Docker) | `infra/Dockerfile.backend` |
 | Background worker (arq) | **Render** worker (same image) | SMS, PDFs, payroll, webhooks |
 | Redis | **Render Key Value** | pub/sub + queue + rate limits |
+| Storefront | **Render** web service (Docker) | `infra/Dockerfile.frontend` (APP=storefront) |
+| Dashboard | **Render** web service (Docker) | `infra/Dockerfile.frontend` (APP=dashboard) |
 | PostgreSQL 16 | **Neon** (external) | already provisioned |
-| Storefront + Dashboard | **Cloudflare Pages** | done last (see bottom) |
-| Object storage | **Cloudflare R2** | done last |
+| Object storage | **Cloudflare R2** | done last (env-only) |
 
-The whole backend is one blueprint. Migrations and the RBAC seed run
-automatically on every deploy (pre-deploy hook), so a deploy is one click after
-the initial setup.
+Migrations and the RBAC seed run automatically on every deploy (API pre-deploy
+hook), so after the one-time setup a deploy is a single click.
+
+**How the frontends reach the API:** each frontend image bakes
+`NEXT_PUBLIC_API_BASE=https://nethrasap-api.onrender.com` into its client
+bundle, so the browser calls the API directly (needed for WebSockets). The API
+allows those origins via `CORS_ORIGINS`. Locally (no `NEXT_PUBLIC_API_BASE`),
+the browser uses same-origin `/api/v1/*` proxied by Next rewrites instead.
 
 ---
 
@@ -28,10 +35,17 @@ the initial setup.
 
 1. Render Dashboard → **New +** → **Blueprint**.
 2. Connect the GitHub account and pick **nethrasap-platform**.
-3. Render reads `render.yaml` and shows: `nethrasap-api`, `nethrasap-worker`,
-   `nethrasap-redis`, and the `nethrasap-shared` env group. Click **Apply**.
+3. Render reads `render.yaml` and shows five services — `nethrasap-api`,
+   `nethrasap-worker`, `nethrasap-redis`, `nethrasap-storefront`,
+   `nethrasap-dashboard` — plus the `nethrasap-shared` env group. Click **Apply**.
 4. Render will prompt for the `sync: false` env vars (see §3). At minimum you
    must provide **DATABASE_URL** for the first deploy to succeed.
+
+> The frontends build from the shared `infra/Dockerfile.frontend`; Render passes
+> each service's `APP` and `NEXT_PUBLIC_API_BASE` env vars as Docker build args
+> (they're declared as `ARG` in the Dockerfile). If your API ends up on a URL
+> other than `https://nethrasap-api.onrender.com`, update `NEXT_PUBLIC_API_BASE`
+> on both frontend services **and** `CORS_ORIGINS` on the API, then redeploy.
 
 ## 3. Environment variables
 
@@ -96,16 +110,33 @@ There is no seeded admin in production. To bootstrap one, either:
 Prefer the first for convenience on a fresh DB; rotate the demo password
 immediately.
 
-## 7. Frontends (Cloudflare — later)
+## 7. Frontends
 
-The two Next.js apps deploy to **Cloudflare Pages** with
-`@cloudflare/next-on-pages` (root dirs `apps/storefront` and `apps/dashboard`).
-Build-time env: `NEXT_PUBLIC_API_BASE=https://nethrasap-api.onrender.com` (add
-API base support to the client) or keep the Next rewrite proxy. Then set the
-API's `CORS_ORIGINS` to the Pages domains. R2 buckets (KYC/invoices/payslips)
-are created in the Cloudflare dashboard and their keys go into the `STORAGE_*`
-env vars.
+The storefront and dashboard deploy as Docker web services in the same
+blueprint (see §2). After the first deploy:
 
-If Pages' `next-on-pages` limits bite, the fallback is deploying the two apps as
-additional Render web services (Docker, `infra/Dockerfile.frontend`,
-`--build-arg APP=storefront|dashboard`) — everything else is unchanged.
+```
+open https://nethrasap-storefront.onrender.com   # customer store
+open https://nethrasap-dashboard.onrender.com     # ops dashboard
+```
+
+Sign into the dashboard with the admin created in §6.
+
+**Known limitation until custom domains:** the anonymous-cart cookie is
+`SameSite=Lax; Secure`. Because the frontend and API sit on different
+`*.onrender.com` sub-domains (cross-site), that cookie isn't sent on
+cross-origin requests, so an anonymous visitor's cart may not persist. **Signed-in
+flows are unaffected** (they use bearer tokens, not cookies). Putting the API and
+frontends under one registrable domain via Cloudflare (below) resolves it.
+
+## 8. Cloudflare (last)
+
+- **Custom domains**: point `api.`, `shop.`/apex, and `admin.` (or similar) at
+  the three Render services; add them as custom domains in Render. Update
+  `NEXT_PUBLIC_API_BASE` + `CORS_ORIGINS` to the custom domains. Same registrable
+  domain fixes the SameSite cookie note above.
+- **R2**: create buckets, generate S3 API keys, and fill `STORAGE_ENDPOINT`,
+  `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`,
+  `STORAGE_PUBLIC_BASE_URL`. KYC docs, invoices and payslips then store for real.
+- **CDN/WAF**: proxy the frontends through Cloudflare; keep `api.` proxied so
+  WebSockets pass through (orange cloud is fine for WS).

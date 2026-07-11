@@ -13,21 +13,29 @@ RUN npm ci
 
 FROM node:20-alpine AS build
 ARG APP
-# Rewrites are serialized into the standalone bundle at BUILD time, so the
-# API proxy target must be baked here (compose sets it to http://api:8000).
+# Both are baked at BUILD time:
+#  - API_PROXY_TARGET: the Next rewrite destination (server-side proxy). Used
+#    for local dev / same-origin. Compose sets http://api:8000.
+#  - NEXT_PUBLIC_API_BASE: absolute API URL inlined into the client bundle so
+#    the browser calls the API directly (HTTP + WebSockets). Set in prod.
 ARG API_PROXY_TARGET=http://localhost:8000
+ARG NEXT_PUBLIC_API_BASE=""
 WORKDIR /repo
 COPY --from=deps /repo/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    API_PROXY_TARGET=${API_PROXY_TARGET}
+    API_PROXY_TARGET=${API_PROXY_TARGET} \
+    NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
 RUN npm run build --workspace "apps/${APP}"
 
 FROM node:20-alpine AS run
 ARG APP
+# NEXT_PUBLIC_API_BASE is also kept at runtime for SSR server components.
+ARG NEXT_PUBLIC_API_BASE=""
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
 WORKDIR /app
 # Standalone output contains a pruned node_modules + server.js, laid out
 # from the monorepo root because of outputFileTracingRoot.
