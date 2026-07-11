@@ -18,8 +18,17 @@ from .catalogue import (
     ScheduleClass,
     StockStatus,
 )
+from .chat import Conversation, ConversationStatus, Message, MessageRead
 from .cms import AppSetting, CmsBlock, CmsPage, FeatureFlag
+from .enquiry import (
+    Enquiry,
+    EnquiryItem,
+    EnquiryMessage,
+    EnquiryStatus,
+    EnquiryStatusHistory,
+)
 from .inventory import StockLedger, StockLevel, StockMovement, Warehouse
+from .notification import Notification, NotificationPriority, NotificationType
 from .order import (
     Invoice,
     Order,
@@ -90,4 +99,16 @@ __all__ = [
     "StockLevel",
     "StockMovement",
     "Warehouse",
+    "Conversation",
+    "ConversationStatus",
+    "Message",
+    "MessageRead",
+    "Enquiry",
+    "EnquiryItem",
+    "EnquiryMessage",
+    "EnquiryStatus",
+    "EnquiryStatusHistory",
+    "Notification",
+    "NotificationPriority",
+    "NotificationType",
 ]

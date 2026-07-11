@@ -257,8 +257,14 @@ STAFF_PASSWORD = "Staff@Pass123"
 STAFF_PHONES = {"sales": "+919700000001", "manager": "+919700000002", "admin": "+919700000003"}
 
 _STAFF_PERMS = {
-    "sales": [("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"), ("orders", "fulfil")],
-    "manager": [("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"), ("orders", "fulfil")],
+    "sales": [
+        ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
+        ("orders", "fulfil"), ("enquiries", "manage"), ("chat", "manage"),
+    ],
+    "manager": [
+        ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
+        ("orders", "fulfil"), ("enquiries", "manage"), ("chat", "manage"),
+    ],
     "admin": [
         ("kyc", "review"),
         ("kyc", "approve"),
@@ -269,6 +275,8 @@ _STAFF_PERMS = {
         ("settings", "write"),
         ("orders", "fulfil"),
         ("orders", "refund"),
+        ("enquiries", "manage"),
+        ("chat", "manage"),
     ],
 }
 

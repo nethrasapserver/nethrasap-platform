@@ -9,12 +9,15 @@ from . import (
     auth,
     cart,
     categories,
+    chat,
     checkout,
     cms,
     coupons,
+    enquiries,
     health,
     inventory,
     kyc,
+    notifications,
     orders,
     payments,
     products,
@@ -30,6 +33,9 @@ api_router_v1.include_router(admin_catalogue.router, tags=["admin-catalogue"])
 api_router_v1.include_router(inventory.router, tags=["inventory"])
 api_router_v1.include_router(payments.router, tags=["payments"])
 api_router_v1.include_router(admin_orders.router, tags=["admin-orders"])
+api_router_v1.include_router(enquiries.router, tags=["enquiries"])
+api_router_v1.include_router(chat.router, tags=["chat"])
+api_router_v1.include_router(notifications.router, tags=["notifications"])
 api_router_v1.include_router(cms.router, tags=["cms"])
 api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router_v1.include_router(products.router, prefix="/products", tags=["products"])
