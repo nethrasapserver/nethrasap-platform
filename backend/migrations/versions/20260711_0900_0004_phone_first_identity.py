@@ -53,7 +53,11 @@ def upgrade() -> None:
             server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column("phone", sa.String(20), nullable=False),
-        sa.Column("purpose", sa.Enum(*OTP_PURPOSE, name="otp_purpose", create_type=False), nullable=False),
+        sa.Column(
+            "purpose",
+            postgresql.ENUM(*OTP_PURPOSE, name="otp_purpose", create_type=False),
+            nullable=False,
+        ),
         sa.Column("code_hash", sa.String(128), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("attempts", sa.Integer(), nullable=False, server_default="0"),

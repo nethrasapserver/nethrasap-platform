@@ -67,6 +67,9 @@ def _normalise_url(url: str) -> tuple[str, dict]:
     for k, v in query_pairs:
         if k == "sslmode":
             sslmode_value = v
+        elif k == "channel_binding":
+            # libpq-only option (Neon appends it); asyncpg doesn't accept it.
+            continue
         else:
             cleaned_query.append((k, v))
 
