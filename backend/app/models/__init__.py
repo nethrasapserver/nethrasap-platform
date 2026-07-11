@@ -18,6 +18,7 @@ from .catalogue import (
     ScheduleClass,
     StockStatus,
 )
+from .cms import AppSetting, CmsBlock, CmsPage, FeatureFlag
 from .order import (
     Invoice,
     Order,
@@ -35,6 +36,7 @@ from .order import (
 from .otp import OtpCode, OtpPurpose
 from .rbac import Permission, Role, RolePermission
 from .user import Address, Session, User, UserProfile, UserRole, UserStatus
+from .verification import KycDocType, KycDocument, VerificationRequest, VerificationStatus
 
 __all__ = [
     "AuditLog",
@@ -75,4 +77,12 @@ __all__ = [
     "UserProfile",
     "UserRole",
     "UserStatus",
+    "AppSetting",
+    "CmsBlock",
+    "CmsPage",
+    "FeatureFlag",
+    "KycDocType",
+    "KycDocument",
+    "VerificationRequest",
+    "VerificationStatus",
 ]

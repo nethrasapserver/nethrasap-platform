@@ -98,10 +98,13 @@ PERMISSION_DEFS: list[dict] = [
     {"resource": "users", "action": "update_role"},
     {"resource": "users", "action": "suspend"},
     # kyc
+    {"resource": "kyc", "action": "review"},
     {"resource": "kyc", "action": "approve"},
     {"resource": "kyc", "action": "reject"},
-    # cms
-    {"resource": "cms", "action": "publish"},
+    # admin surfaces
+    {"resource": "catalogue", "action": "write"},
+    {"resource": "cms", "action": "write"},
+    {"resource": "settings", "action": "write"},
 ]
 
 ROLE_PERMISSIONS: dict[str, list[tuple[str, str]]] = {
@@ -111,6 +114,7 @@ ROLE_PERMISSIONS: dict[str, list[tuple[str, str]]] = {
     "sales": [
         ("products", "read"),
         ("orders", "read_assigned"),
+        ("kyc", "review"),
         ("kyc", "approve"),
         ("kyc", "reject"),
     ],
@@ -118,6 +122,7 @@ ROLE_PERMISSIONS: dict[str, list[tuple[str, str]]] = {
         ("products", "read"),
         ("orders", "read_assigned"),
         ("orders", "read_all"),
+        ("kyc", "review"),
         ("kyc", "approve"),
         ("kyc", "reject"),
         ("users", "read"),

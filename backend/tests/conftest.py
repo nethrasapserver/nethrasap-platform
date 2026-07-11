@@ -245,6 +245,68 @@ async def client(_session_factory) -> AsyncIterator[AsyncClient]:
     app.dependency_overrides.pop(get_session, None)
 
 
+STAFF_PASSWORD = "Staff@Pass123"
+STAFF_PHONES = {"sales": "+919700000001", "manager": "+919700000002", "admin": "+919700000003"}
+
+_STAFF_PERMS = {
+    "sales": [("kyc", "review"), ("kyc", "approve"), ("kyc", "reject")],
+    "manager": [("kyc", "review"), ("kyc", "approve"), ("kyc", "reject")],
+    "admin": [
+        ("kyc", "review"),
+        ("kyc", "approve"),
+        ("kyc", "reject"),
+        ("catalogue", "write"),
+        ("cms", "write"),
+        ("settings", "write"),
+    ],
+}
+
+
+@pytest_asyncio.fixture
+async def staff_tokens(db_session, client) -> dict[str, str]:
+    """Provision RBAC rows + one active user per staff role; log each in via
+    the real API so tokens carry genuine permission claims."""
+    from app.models.rbac import Permission, Role, RolePermission
+    from app.models.user import User, UserProfile, UserRole, UserStatus
+    from app.security import hash_password
+
+    perm_rows: dict[tuple[str, str], Permission] = {}
+    for pairs in _STAFF_PERMS.values():
+        for resource, action in pairs:
+            if (resource, action) not in perm_rows:
+                perm = Permission(resource=resource, action=action)
+                db_session.add(perm)
+                perm_rows[(resource, action)] = perm
+    await db_session.flush()
+
+    for role_name, pairs in _STAFF_PERMS.items():
+        role = Role(name=role_name, description=f"test {role_name}")
+        db_session.add(role)
+        await db_session.flush()
+        for pair in pairs:
+            db_session.add(RolePermission(role_id=role.id, permission_id=perm_rows[pair].id))
+        user = User(
+            phone=STAFF_PHONES[role_name],
+            password_hash=hash_password(STAFF_PASSWORD),
+            role=UserRole(role_name),
+            status=UserStatus.active,
+        )
+        user.profile = UserProfile(full_name=f"Test {role_name.title()}")
+        db_session.add(user)
+    await db_session.flush()
+
+    tokens: dict[str, str] = {}
+    for role_name, phone in STAFF_PHONES.items():
+        r = await client.post("/api/v1/auth/login", json={"phone": phone, "password": STAFF_PASSWORD})
+        assert r.status_code == 200, r.text
+        tokens[role_name] = r.json()["access_token"]
+    return tokens
+
+
+def auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 @pytest_asyncio.fixture
 async def seeded_catalogue(db_session) -> dict[str, Any]:
     """Insert a single category + product + variant + retail price for tests."""
