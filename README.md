@@ -12,15 +12,23 @@ One backend, two frontends, fully realtime. **No mock data anywhere.**
 | [`infra/`](infra/) | Render blueprint, Dockerfile, Cloudflare notes | Render · Cloudflare Pages/R2 |
 | [`docs/PLAN.md`](docs/PLAN.md) | Full build plan, phases, acceptance criteria | |
 
-## Quick start
+## Quick start (host dev — hot reload)
 ```bash
-cp .env.example .env          # fill JWT_SECRET at minimum
-make up                       # Postgres 16 + Redis 7 (docker)
+cp .env.example .env          # fill DATABASE_URL (Neon) + JWT_SECRET at minimum
+make up                       # Redis 7 (+ local Postgres if not using Neon)
 make migrate                  # Alembic → head
-make dev                      # FastAPI on :8000
+make dev                      # FastAPI on :8000 (OTPs print here)
 npm install                   # workspace deps
 make storefront               # Next.js storefront on :3000
 make dashboard                # Next.js dashboard on :3001
+```
+
+## Quick start (everything in Docker)
+```bash
+make stack                    # builds + runs api :8000, worker,
+                              # storefront :3000, dashboard :3001, redis
+make stack-logs               # follow logs (OTP codes appear in api logs)
+make stack-down
 ```
 
 ## Ground rules

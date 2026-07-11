@@ -1,0 +1,40 @@
+# Shared multi-stage Dockerfile for both Next.js apps.
+# Build with:  docker build -f infra/Dockerfile.frontend --build-arg APP=storefront .
+#              docker build -f infra/Dockerfile.frontend --build-arg APP=dashboard .
+
+FROM node:20-alpine AS deps
+ARG APP
+WORKDIR /repo
+COPY package.json package-lock.json ./
+COPY apps/storefront/package.json apps/storefront/
+COPY apps/dashboard/package.json apps/dashboard/
+COPY packages/api-client/package.json packages/api-client/
+RUN npm ci
+
+FROM node:20-alpine AS build
+ARG APP
+# Rewrites are serialized into the standalone bundle at BUILD time, so the
+# API proxy target must be baked here (compose sets it to http://api:8000).
+ARG API_PROXY_TARGET=http://localhost:8000
+WORKDIR /repo
+COPY --from=deps /repo/node_modules ./node_modules
+COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    API_PROXY_TARGET=${API_PROXY_TARGET}
+RUN npm run build --workspace "apps/${APP}"
+
+FROM node:20-alpine AS run
+ARG APP
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0
+WORKDIR /app
+# Standalone output contains a pruned node_modules + server.js, laid out
+# from the monorepo root because of outputFileTracingRoot.
+COPY --from=build /repo/apps/${APP}/.next/standalone ./
+COPY --from=build /repo/apps/${APP}/.next/static ./apps/${APP}/.next/static
+COPY --from=build /repo/apps/${APP}/public ./apps/${APP}/public
+# ARG values aren't visible to CMD at runtime; bake the entry path.
+RUN ln -s "apps/${APP}/server.js" server.js
+EXPOSE 3000
+CMD ["node", "server.js"]

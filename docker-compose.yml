@@ -1,5 +1,14 @@
-# Local development infrastructure only (Postgres + Redis).
-# In production these are Render Postgres and Render Key Value — nothing here deploys.
+# Local development stack.
+#
+#   docker compose up -d                      → infra only (Postgres + Redis);
+#                                               run the apps on the host (make dev, etc.)
+#   docker compose --profile app up -d --build → the FULL platform in containers:
+#                                               API + worker + storefront + dashboard
+#
+# The api/worker read ../.env (Neon DATABASE_URL, JWT, …); REDIS_URL is
+# overridden to reach the redis container over the compose network.
+# In production these map to Render (api/worker/redis) and Cloudflare Pages
+# (frontends) — nothing here deploys.
 services:
   postgres:
     image: postgres:16-alpine
@@ -31,6 +40,66 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.backend
+    container_name: nethrasap-api
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.backend
+    container_name: nethrasap-worker
+    command: ["uv", "run", "arq", "app.worker.WorkerSettings"]
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  storefront:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.frontend
+      args: { APP: storefront, API_PROXY_TARGET: "http://api:8000" }
+    container_name: nethrasap-storefront
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  dashboard:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.frontend
+      args: { APP: dashboard, API_PROXY_TARGET: "http://api:8000" }
+    container_name: nethrasap-dashboard
+    ports:
+      - "3001:3000"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

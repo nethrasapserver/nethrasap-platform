@@ -1,12 +1,17 @@
-.PHONY: help up down logs migrate revision dev worker test lint typecheck \
-        storefront dashboard api-types
+.PHONY: help up down logs stack stack-down stack-logs migrate revision dev worker \
+        test lint typecheck storefront dashboard api-types
 
 help:
 	@echo "Nethrasap platform — dev tasks"
 	@echo ""
-	@echo "  make up            Start local Postgres + Redis"
+	@echo "  make up            Start local Postgres + Redis (apps run on host)"
 	@echo "  make down          Stop containers"
 	@echo "  make logs          Tail container logs"
+	@echo ""
+	@echo "  make stack         Build + run the FULL platform in Docker"
+	@echo "                     (api :8000, storefront :3000, dashboard :3001)"
+	@echo "  make stack-down    Stop the full stack"
+	@echo "  make stack-logs    Tail full-stack logs"
 	@echo ""
 	@echo "  make migrate       Apply Alembic migrations"
 	@echo "  make revision m=…  Autogenerate a new Alembic revision"
@@ -29,6 +34,15 @@ down:
 
 logs:
 	docker compose logs -f --tail=200
+
+stack:
+	docker compose --profile app up -d --build
+
+stack-down:
+	docker compose --profile app down
+
+stack-logs:
+	docker compose --profile app logs -f --tail=200
 
 migrate:
 	cd backend && uv run alembic upgrade head

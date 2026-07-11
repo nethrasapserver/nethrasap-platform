@@ -12,9 +12,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: nethrasap-db
-          property: connectionString
+        sync: false # Neon connection string (pooled endpoint) — set in the Render UI
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -56,7 +54,4 @@ services:
     plan: starter
     ipAllowList: [] # internal-only
 
-databases:
-  - name: nethrasap-db
-    plan: basic-1gb
-    postgresMajorVersion: "16"
+# No Render Postgres: the database is Neon (see .env.example / DATABASE_URL).

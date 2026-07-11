@@ -1,7 +1,16 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   trailingSlash: false,
+  // Self-contained server bundle for Docker; tracing rooted at the monorepo
+  // so workspace deps (@nethrasap/api-client) are included.
+  output: "standalone",
+  experimental: { outputFileTracingRoot: repoRoot },
   images: {
     remotePatterns: [
       // Product/category images are served from our own storage (Cloudflare R2)
