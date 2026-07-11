@@ -90,6 +90,12 @@ def _normalise_url(url: str) -> tuple[str, dict]:
     if needs_ssl:
         connect_args["ssl"] = ssl.create_default_context()
 
+    # Neon's pooled endpoints are transaction-mode PgBouncer: server sessions
+    # are shared across clients, so asyncpg's prepared-statement and type
+    # caches go stale ("cache lookup failed for type ..."). Disable them.
+    if parts.hostname is not None and "-pooler" in parts.hostname:
+        connect_args["statement_cache_size"] = 0
+
     return cleaned, connect_args
 
 

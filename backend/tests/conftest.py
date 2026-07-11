@@ -7,14 +7,11 @@ Strategy:
 """
 from __future__ import annotations
 
-import asyncio
-
 # Ensure config sees the test DB before anything else imports app.config.
 import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
@@ -97,24 +94,35 @@ async def signup(
     )
 
 
-async def signup_token(client, phone: str, *, role: str = "customer", password: str = "Strongp@ss123") -> str:
-    resp = await signup(client, phone, role=role, password=password)
+async def signup_token(
+    client,
+    phone: str,
+    *,
+    role: str = "customer",
+    password: str = "Strongp@ss123",
+    name: str | None = None,
+) -> str:
+    resp = await signup(client, phone, role=role, password=password, name=name)
     assert resp.status_code == 201, resp.text
     return resp.json()["access_token"]
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest_asyncio.fixture(scope="session")
-async def _engine():
+def _engine_kwargs() -> tuple[str, dict]:
     settings = get_settings()
     url, connect_args = _normalise_url(settings.database_url)
-    engine = create_async_engine(url, echo=False, poolclass=None, connect_args=connect_args)
+    return url, connect_args
+
+
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def _schema():
+    """Create the schema + triggers once per session.
+
+    The engine used here is created and fully disposed inside this fixture so
+    no connection ever crosses into another test's event loop — each test gets
+    its own engine in `db_session` (NullPool, cheap over TLS to Neon).
+    """
+    url, connect_args = _engine_kwargs()
+    engine = create_async_engine(url, echo=False, connect_args=connect_args)
     async with engine.begin() as conn:
         # Make sure pgcrypto exists (test DB may be created without docker init)
         await conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pgcrypto")
@@ -181,27 +189,54 @@ async def _engine():
             "CREATE INDEX IF NOT EXISTS ix_products_sub_category_lower "
             "ON products (LOWER(sub_category))"
         )
-    yield engine
+        # Order-number sequence (raw DDL in migration 0003, invisible to create_all)
+        await conn.exec_driver_sql("CREATE SEQUENCE IF NOT EXISTS order_number_seq")
+    await engine.dispose()
+    yield
+
+
+@pytest_asyncio.fixture
+async def _session_factory(_schema):
+    """One connection + outer transaction per test; rolled back at teardown.
+
+    Sessions created from this factory join the outer transaction via
+    SAVEPOINTs, so service-level `commit()` calls release a savepoint instead
+    of committing for real — every test leaves the database untouched.
+
+    A fresh engine per test keeps every asyncpg connection on the test's own
+    event loop (pytest-asyncio uses one loop per test function).
+    """
+    from sqlalchemy.pool import NullPool
+
+    url, connect_args = _engine_kwargs()
+    engine = create_async_engine(url, echo=False, poolclass=NullPool, connect_args=connect_args)
+    async with engine.connect() as conn:
+        trans = await conn.begin()
+        factory = async_sessionmaker(
+            bind=conn,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
+        yield factory
+        await trans.rollback()
     await engine.dispose()
 
 
 @pytest_asyncio.fixture
-async def db_session(_engine) -> AsyncIterator[AsyncSession]:
-    """Per-test session inside a rollback-only transaction."""
-    async with _engine.connect() as conn:
-        trans = await conn.begin()
-        SessionLocal = async_sessionmaker(bind=conn, expire_on_commit=False)
-        async with SessionLocal() as session:
-            yield session
-        await trans.rollback()
+async def db_session(_session_factory) -> AsyncIterator[AsyncSession]:
+    """Session for direct fixture/seed access within the test transaction."""
+    async with _session_factory() as session:
+        yield session
 
 
 @pytest_asyncio.fixture
-async def client(db_session) -> AsyncIterator[AsyncClient]:
-    """HTTP client with the DB session dependency overridden."""
+async def client(_session_factory) -> AsyncIterator[AsyncClient]:
+    """HTTP client whose every request gets a FRESH session (like production),
+    all inside the same rolled-back test transaction."""
 
     async def _override() -> AsyncIterator[AsyncSession]:
-        yield db_session
+        async with _session_factory() as session:
+            yield session
 
     app.dependency_overrides[get_session] = _override
     transport = ASGITransport(app=app)

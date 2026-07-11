@@ -153,11 +153,8 @@ async def place_order(
     ip: str | None = None,
     user_agent: str | None = None,
 ) -> dict[str, Any]:
-    if not cart.items:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "cart is empty")
-
-    # Idempotency: if the user retries with the same request id, return the
-    # existing order instead of creating a duplicate.
+    # Idempotency FIRST: a retry with the same request id must replay the
+    # existing order even though the first attempt already emptied the cart.
     existing = (
         await db.execute(
             select(Order)
@@ -167,6 +164,9 @@ async def place_order(
     ).scalar_one_or_none()
     if existing is not None:
         return _build_place_response(existing, gateway_handshake=_gateway_for(existing))
+
+    if not cart.items:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "cart is empty")
 
     # Recompute totals against live prices.
     q = await quote(db, cart=cart, payment_method=payment_method, user=user)

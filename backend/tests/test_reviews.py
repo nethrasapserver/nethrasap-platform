@@ -8,7 +8,9 @@ from .conftest import phone_for, signup_token
 
 async def _signup_and_token(client, ident: str, role: str = "customer") -> str:
     """Signup via the phone-first OTP flow; `ident` maps to a stable phone."""
-    return await signup_token(client, phone_for(ident), role=role)
+    return await signup_token(
+        client, phone_for(ident), role=role, name=f"Reviewer {ident.split('@')[0].title()}"
+    )
 
 
 @pytest.mark.asyncio

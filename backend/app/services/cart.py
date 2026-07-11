@@ -41,23 +41,20 @@ async def get_or_create_cart(
     Logged-in users always operate on a cart keyed by `user_id`. Anonymous
     users get one keyed by `session_id`.
     """
+    # populate_existing: routers re-fetch the cart after a mutating commit to
+    # build the response. Without it, the identity map hands back the already
+    # loaded object with STALE relationship collections (removed items /
+    # coupon changes wouldn't show in the response).
+    base = (
+        select(Cart)
+        .options(selectinload(Cart.items), selectinload(Cart.coupon))
+        .execution_options(populate_existing=True)
+    )
     cart: Cart | None = None
     if user is not None:
-        cart = (
-            await db.execute(
-                select(Cart)
-                .options(selectinload(Cart.items), selectinload(Cart.coupon))
-                .where(Cart.user_id == user.id)
-            )
-        ).scalar_one_or_none()
+        cart = (await db.execute(base.where(Cart.user_id == user.id))).scalar_one_or_none()
     elif session_id is not None:
-        cart = (
-            await db.execute(
-                select(Cart)
-                .options(selectinload(Cart.items), selectinload(Cart.coupon))
-                .where(Cart.session_id == session_id)
-            )
-        ).scalar_one_or_none()
+        cart = (await db.execute(base.where(Cart.session_id == session_id))).scalar_one_or_none()
     else:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "missing cart identity")
 
