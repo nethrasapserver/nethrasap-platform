@@ -3,9 +3,9 @@
 ## Topology
 | Piece | Where | Notes |
 |---|---|---|
-| FastAPI API + WebSocket hub | **Render** web service (Docker) | `render.yaml` blueprint |
+| FastAPI API + WebSocket hub | **Render** web service (Docker) | `render.yaml` (repo root); **see [DEPLOY.md](DEPLOY.md)** |
 | arq background worker | **Render** worker | same image, different command |
-| PostgreSQL 16 | **Render Postgres** | migrations via pre-deploy `alembic upgrade head` |
+| PostgreSQL 16 | **Neon** (external) | migrations via pre-deploy `alembic upgrade head` |
 | Redis (pub/sub, jobs, rate limits) | **Render Key Value** | internal-only |
 | Storefront (Next.js, SSR) | **Cloudflare Pages** (`@cloudflare/next-on-pages`) | SSR needed for organic search |
 | Dashboard (Next.js) | **Cloudflare Pages** | server runtime for auth middleware |

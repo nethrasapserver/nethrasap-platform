@@ -1,0 +1,96 @@
+# Render Blueprint — Nethrasap backend (API + worker + Redis).
+# Database is Neon (external); frontends deploy to Cloudflare Pages later.
+#
+# Deploy: Render Dashboard → New → Blueprint → connect the GitHub repo.
+# Render reads this file from the repo root. See infra/DEPLOY.md for the
+# full walkthrough and the env vars you must fill in (the `sync: false` ones).
+
+envVarGroups:
+  - name: nethrasap-shared
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # Neon pooled connection string. Paste in the Render dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Shared JWT secret (generated once, used by api + worker).
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_TTL_MIN
+        value: "15"
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: "30"
+      # SMS: console prints OTPs to logs. Switch to msg91/exotel/twilio + keys later.
+      - key: SMS_PROVIDER
+        value: console
+      - key: SMS_API_KEY
+        sync: false
+      - key: SMS_SENDER_ID
+        value: NTHRSP
+      # Object storage (Cloudflare R2). Fill when R2 is enabled.
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_BUCKET
+        value: nethrasap
+      - key: STORAGE_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_SECRET_ACCESS_KEY
+        sync: false
+      - key: STORAGE_PUBLIC_BASE_URL
+        sync: false
+      # Payments (Razorpay). Fill with test keys, then live keys at go-live.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+services:
+  # --- Redis (pub/sub for realtime + arq queue + rate limiting) ---
+  - type: keyvalue
+    name: nethrasap-redis
+    plan: starter
+    ipAllowList: [] # internal-only (reachable by api + worker on the private network)
+
+  # --- API + WebSocket hub ---
+  - type: web
+    name: nethrasap-api
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.backend
+    dockerContext: .
+    plan: starter
+    region: singapore
+    healthCheckPath: /api/v1/health
+    # Runs against the NEW image before it takes traffic — safe & idempotent.
+    preDeployCommand: "alembic upgrade head && python -m scripts.seed_rbac"
+    envVars:
+      - fromGroup: nethrasap-shared
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: nethrasap-redis
+          property: connectionString
+      # Comma-separated allowed browser origins (the Cloudflare Pages domains).
+      # Set once the frontends have URLs; leave blank until then.
+      - key: CORS_ORIGINS
+        sync: false
+
+  # --- Background worker (SMS, invoice/payslip PDFs, payroll, webhooks) ---
+  - type: worker
+    name: nethrasap-worker
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile.backend
+    dockerContext: .
+    dockerCommand: "arq app.worker.WorkerSettings"
+    plan: starter
+    region: singapore
+    envVars:
+      - fromGroup: nethrasap-shared
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: nethrasap-redis
+          property: connectionString
