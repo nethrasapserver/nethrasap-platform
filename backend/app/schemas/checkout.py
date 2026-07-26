@@ -17,12 +17,31 @@ class ShippingAddress(BaseModel):
     line1: str = Field(min_length=1, max_length=255)
     line2: str | None = Field(default=None, max_length=255)
     city: str = Field(min_length=1, max_length=100)
+    # Auto-filled from the pincode; optional so older clients still validate.
+    district: str | None = Field(default=None, max_length=100)
     state: str = Field(min_length=1, max_length=100)
     pincode: str = Field(min_length=6, max_length=10)
     country: str = Field(default="IN", min_length=2, max_length=2)
 
 
 PaymentMethodLiteral = Literal["cod", "upi", "card", "netbanking", "wallet"]
+
+
+class PaymentMethodInfo(BaseModel):
+    """One method the storefront may offer at checkout."""
+
+    id: PaymentMethodLiteral
+    label: str
+    kind: Literal["offline", "gateway"]
+    description: str | None = None
+
+
+class PaymentMethodsResponse(BaseModel):
+    """Availability is config-driven (`PAYMENT_METHODS_ENABLED`) — the
+    storefront renders exactly this list, never a hardcoded one."""
+
+    methods: list[PaymentMethodInfo]
+    default: PaymentMethodLiteral
 
 
 class QuoteRequest(BaseModel):

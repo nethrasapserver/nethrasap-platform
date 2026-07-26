@@ -35,7 +35,7 @@ async def get_cart(
     session_id: CartSession,
 ) -> CartOut:
     cart = await _resolve(db, user, session_id)
-    payload = await svc.serialise_cart(db, cart)
+    payload = await svc.serialise_cart(db, cart, user)
     return CartOut.model_validate(payload)
 
 
@@ -53,7 +53,7 @@ async def add_item(
     await db.commit()
     # Re-fetch with relationships fresh.
     cart = await svc.get_or_create_cart(db, user=user, session_id=session_id)
-    data = await svc.serialise_cart(db, cart)
+    data = await svc.serialise_cart(db, cart, user)
     return CartOut.model_validate(data)
 
 
@@ -69,7 +69,7 @@ async def update_item(
     await svc.update_quantity(db, cart=cart, item_id=item_id, quantity=payload.quantity)
     await db.commit()
     cart = await svc.get_or_create_cart(db, user=user, session_id=session_id)
-    data = await svc.serialise_cart(db, cart)
+    data = await svc.serialise_cart(db, cart, user)
     return CartOut.model_validate(data)
 
 
@@ -84,7 +84,7 @@ async def remove_item(
     await svc.remove_item(db, cart=cart, item_id=item_id)
     await db.commit()
     cart = await svc.get_or_create_cart(db, user=user, session_id=session_id)
-    data = await svc.serialise_cart(db, cart)
+    data = await svc.serialise_cart(db, cart, user)
     return CartOut.model_validate(data)
 
 
@@ -99,7 +99,7 @@ async def apply_coupon(
     await svc.apply_coupon(db, cart=cart, code=payload.code)
     await db.commit()
     cart = await svc.get_or_create_cart(db, user=user, session_id=session_id)
-    data = await svc.serialise_cart(db, cart)
+    data = await svc.serialise_cart(db, cart, user)
     return CartOut.model_validate(data)
 
 
@@ -113,5 +113,5 @@ async def clear_coupon(
     await svc.clear_coupon(db, cart=cart)
     await db.commit()
     cart = await svc.get_or_create_cart(db, user=user, session_id=session_id)
-    data = await svc.serialise_cart(db, cart)
+    data = await svc.serialise_cart(db, cart, user)
     return CartOut.model_validate(data)

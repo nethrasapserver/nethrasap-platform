@@ -85,6 +85,57 @@ async def list_orders_for_user(
     return total, items
 
 
+async def list_orders_admin(
+    db: AsyncSession, *, status_filter: str | None = None, q: str | None = None,
+    limit: int = 50, offset: int = 0,
+) -> tuple[int, list[dict[str, Any]]]:
+    """All orders across customers — the ops queue. Optional status filter and
+    order-number search, newest first."""
+    from ..models.user import UserProfile
+
+    base = select(Order)
+    if status_filter:
+        base = base.where(Order.status == OrderStatus(status_filter))
+    if q:
+        base = base.where(Order.order_number.ilike(f"%{q.strip()}%"))
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
+
+    rows_stmt = (
+        select(Order, func.count(OrderItem.id), User.phone, UserProfile.full_name)
+        .select_from(Order)
+        .outerjoin(OrderItem, OrderItem.order_id == Order.id)
+        .outerjoin(User, User.id == Order.user_id)
+        .outerjoin(UserProfile, UserProfile.user_id == Order.user_id)
+        .group_by(Order.id, User.phone, UserProfile.full_name)
+        .order_by(Order.placed_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    if status_filter:
+        rows_stmt = rows_stmt.where(Order.status == OrderStatus(status_filter))
+    if q:
+        rows_stmt = rows_stmt.where(Order.order_number.ilike(f"%{q.strip()}%"))
+    rows = (await db.execute(rows_stmt)).all()
+
+    items = [
+        {
+            "id": order.id,
+            "order_number": order.order_number,
+            "status": order.status.value,
+            "payment_status": order.payment_status.value,
+            "payment_method": order.payment_method.value,
+            "grand_total": order.grand_total,
+            "currency": order.currency,
+            "item_count": int(item_count),
+            "placed_at": order.placed_at,
+            "customer_name": full_name or "—",
+            "customer_phone": phone or "",
+        }
+        for order, item_count, phone, full_name in rows
+    ]
+    return total, items
+
+
 async def get_order_for_user(
     db: AsyncSession, *, order_number: str, user: User
 ) -> dict[str, Any]:
@@ -331,7 +382,6 @@ def _serialise_order_detail(order: Order) -> dict[str, Any]:
                 "id": it.id,
                 "variant_id": it.variant_id,
                 "product_name_snapshot": it.product_name_snapshot,
-                "brand_snapshot": it.brand_snapshot,
                 "unit_label_snapshot": it.unit_label_snapshot,
                 "hsn_code_snapshot": it.hsn_code_snapshot,
                 "quantity": it.quantity,

@@ -46,9 +46,9 @@ from ..models.order import (
 from ..models.user import User
 from ..services import inventory as inventory_svc
 from ..services.inventory import LineReservation
-from . import pricing
+from . import payment_methods, pricing
 from .cart import clear_cart_items
-from .catalogue import _price_role_for_user
+from .catalogue import _price_role_for_user, active_price_for, price_is_quote_band
 from .orders import next_order_number
 
 log = get_logger("services.checkout")
@@ -67,8 +67,7 @@ async def quote(
     """Compute totals against the live catalogue. Surfaces price drift."""
     if not cart.items:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "cart is empty")
-    if payment_method not in {"cod", "upi", "card", "netbanking", "wallet"}:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid payment_method: {payment_method}")
+    payment_methods.ensure_enabled(payment_method)
 
     variant_ids = [it.variant_id for it in cart.items]
     rows = (
@@ -85,12 +84,27 @@ async def quote(
 
     price_role = _price_role_for_user(user)
 
+    # Quote-priced items can never be sold at their anchor price — they go
+    # through the enquiry flow. Checkout processes only the fixed-price lines;
+    # quote lines stay in the cart for a quote request. Backend-enforced so a
+    # stale or hostile client can't buy an unquoted product.
+    payable_items = [
+        it
+        for it in cart.items
+        if not price_is_quote_band(active_price_for(variants_by_id.get(it.variant_id), price_role))
+    ]
+    if not payable_items:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "your cart contains only quote-priced items — request a quote instead",
+        )
+
     subtotal = 0
     gst_total = 0
     has_cold_chain = False
     price_changes: list[str] = []
 
-    for it in cart.items:
+    for it in payable_items:
         variant = variants_by_id.get(it.variant_id)
         if variant is None or not variant.product.is_active:
             raise HTTPException(
@@ -222,7 +236,15 @@ async def place_order(
     variants_by_id = {v.id: v for v in variants}
     price_role = _price_role_for_user(user)
 
-    for it in cart.items:
+    # Same partition as quote(): only fixed-price lines are sold. Quote lines
+    # stay in the cart for the RFQ path.
+    payable_items = [
+        it
+        for it in cart.items
+        if not price_is_quote_band(active_price_for(variants_by_id.get(it.variant_id), price_role))
+    ]
+
+    for it in payable_items:
         v = variants_by_id[it.variant_id]
         live_price = _resolve_live_price(v, price_role)
         line = pricing.compute_line(
@@ -235,7 +257,6 @@ async def place_order(
                 order_id=order.id,
                 variant_id=v.id,
                 product_name_snapshot=v.product.name,
-                brand_snapshot=v.product.brand,
                 unit_label_snapshot=v.unit_label,
                 hsn_code_snapshot=v.product.hsn_code,
                 quantity=it.quantity,
@@ -250,7 +271,9 @@ async def place_order(
     # same transaction so a reservation failure rolls the whole order back.
     await inventory_svc.reserve_for_order(
         db,
-        lines=[LineReservation(variant_id=it.variant_id, quantity=it.quantity) for it in cart.items],
+        lines=[
+            LineReservation(variant_id=it.variant_id, quantity=it.quantity) for it in payable_items
+        ],
         order_number=order.order_number,
         actor=user,
     )
@@ -318,8 +341,9 @@ async def place_order(
     if cart.coupon and totals["discount"] > 0:
         cart.coupon.used_count = (cart.coupon.used_count or 0) + 1
 
-    # Clear the cart (items + coupon) — order has snapshotted everything.
-    await clear_cart_items(db, cart=cart)
+    # Clear only the lines that were sold — quote-priced items stay in the
+    # cart so the customer can still request a quote for them.
+    await clear_cart_items(db, cart=cart, only_item_ids={it.id for it in payable_items})
 
     db.add(
         AuditLog(

@@ -25,6 +25,19 @@ class EnquiryStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class EnquiryApproval(str, enum.Enum):
+    """Internal sign-off state for a drafted quote — never shown to the customer.
+
+    A quote a sales rep drafts sits in `pending` until a manager or admin
+    releases it; the customer only sees the enquiry move to `quoted` once
+    approval lands. `returned` sends it back to the rep to revise.
+    """
+    none = "none"          # no quote drafted yet
+    pending = "pending"    # sales drafted a quote, awaiting manager/admin sign-off
+    approved = "approved"  # released to the customer
+    returned = "returned"  # sent back to the rep to revise
+
+
 class Enquiry(Base):
     __tablename__ = "enquiries"
 
@@ -50,6 +63,29 @@ class Enquiry(Base):
     quoted_total: Mapped[int | None] = mapped_column(Integer)
     quote_valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Internal quote sign-off. A sales-drafted quote waits here for a manager or
+    # admin to release it; the customer sees nothing until approval.
+    approval_status: Mapped[EnquiryApproval] = mapped_column(
+        SAEnum(EnquiryApproval, name="enquiry_approval", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        default=EnquiryApproval.none,
+        server_default=EnquiryApproval.none.value,
+        index=True,
+    )
+    quote_prepared_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    quote_approved_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    quote_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    quote_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # lazy="joined": every enquiry read needs the order number once converted,
+    # and a LEFT JOIN is cheaper than N lazy loads across list endpoints.
+    converted_order: Mapped["Order | None"] = relationship(  # noqa: F821, UP037
+        "Order", foreign_keys="Enquiry.converted_order_id", lazy="joined", viewonly=True
+    )
     converted_order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL")
     )

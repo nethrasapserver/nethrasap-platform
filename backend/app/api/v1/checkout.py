@@ -6,6 +6,7 @@ from fastapi import APIRouter, status
 from ...db import DbSession
 from ...deps import CartSession, ClientMeta, CurrentUser
 from ...schemas.checkout import (
+    PaymentMethodsResponse,
     PlaceOrderRequest,
     PlaceOrderResponse,
     QuoteRequest,
@@ -13,8 +14,19 @@ from ...schemas.checkout import (
 )
 from ...services import cart as cart_svc
 from ...services import checkout as svc
+from ...services import payment_methods
 
 router = APIRouter()
+
+
+@router.get("/payment-methods", response_model=PaymentMethodsResponse)
+async def list_payment_methods() -> PaymentMethodsResponse:
+    return PaymentMethodsResponse.model_validate(
+        {
+            "methods": payment_methods.available_methods(),
+            "default": payment_methods.default_method(),
+        }
+    )
 
 
 @router.post("/quote", response_model=QuoteResponse)

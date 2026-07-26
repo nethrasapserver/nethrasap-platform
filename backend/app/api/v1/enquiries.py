@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from ...db import DbSession
 from ...deps import CurrentUser, require_permission
-from ...models.user import User
+from ...models.user import User, UserRole
 from ...schemas.enquiry import (
     AssignInput,
     EnquiryCreate,
@@ -16,12 +16,15 @@ from ...schemas.enquiry import (
     MessageInput,
     QuoteInput,
     RejectInput,
+    ReturnInput,
 )
 from ...services import enquiries as svc
 
 router = APIRouter()
 
 EnquiryStaff = Annotated[User, Depends(require_permission("enquiries:manage"))]
+# Manager/admin gate — releasing a drafted quote to the customer.
+EnquiryApprover = Annotated[User, Depends(require_permission("enquiries:approve"))]
 
 
 # --- Customer ----------------------------------------------------------------
@@ -65,9 +68,13 @@ async def enquiry_queue(
     db: DbSession,
     actor: EnquiryStaff,
     status_filter: Annotated[str | None, Query(alias="status")] = None,
+    approval: Annotated[str | None, Query()] = None,
     mine: Annotated[bool, Query()] = False,
 ) -> list[EnquiryOut]:
-    rows = await svc.list_queue(db, status_filter=status_filter, mine=actor.id if mine else None)
+    rows = await svc.list_queue(
+        db, status_filter=status_filter, approval_filter=approval,
+        mine=actor.id if mine else None,
+    )
     return [EnquiryOut(**e) for e in rows]
 
 
@@ -79,10 +86,27 @@ async def assign(enquiry_id: UUID, payload: AssignInput, db: DbSession, actor: E
 
 @router.post("/admin/enquiries/{enquiry_id}/quote", response_model=EnquiryOut)
 async def quote(enquiry_id: UUID, payload: QuoteInput, db: DbSession, actor: EnquiryStaff) -> EnquiryOut:
+    # Managers and admins can release their own quote; a sales rep's draft parks
+    # for approval.
+    can_approve = actor.role in (UserRole.manager, UserRole.admin)
     enq = await svc.quote(
         db, actor, enquiry_id=enquiry_id, lines=[ln.model_dump() for ln in payload.lines],
-        valid_days=payload.valid_days,
+        valid_days=payload.valid_days, can_approve=can_approve,
     )
+    return EnquiryOut(**svc._serialise(enq, full=True))
+
+
+@router.post("/admin/enquiries/{enquiry_id}/approve", response_model=EnquiryOut)
+async def approve(enquiry_id: UUID, db: DbSession, actor: EnquiryApprover) -> EnquiryOut:
+    enq = await svc.approve_quote(db, actor, enquiry_id=enquiry_id)
+    return EnquiryOut(**svc._serialise(enq, full=True))
+
+
+@router.post("/admin/enquiries/{enquiry_id}/return", response_model=EnquiryOut)
+async def return_to_sales(
+    enquiry_id: UUID, payload: ReturnInput, db: DbSession, actor: EnquiryApprover
+) -> EnquiryOut:
+    enq = await svc.return_quote(db, actor, enquiry_id=enquiry_id, reason=payload.reason)
     return EnquiryOut(**svc._serialise(enq, full=True))
 
 

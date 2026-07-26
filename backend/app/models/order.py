@@ -181,7 +181,8 @@ class OrderItem(Base):
 
     # Snapshot every renderable bit so historical orders survive product edits.
     product_name_snapshot: Mapped[str] = mapped_column(String(255), nullable=False)
-    brand_snapshot: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Brand was removed from the catalogue; kept nullable for historical rows.
+    brand_snapshot: Mapped[str | None] = mapped_column(String(120))
     unit_label_snapshot: Mapped[str] = mapped_column(String(120), nullable=False)
     hsn_code_snapshot: Mapped[str | None] = mapped_column(String(12))
 

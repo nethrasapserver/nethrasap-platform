@@ -20,7 +20,6 @@ class ProductCreate(BaseModel):
 
     name: str = Field(min_length=2, max_length=255)
     slug: str | None = Field(default=None, max_length=150, pattern=r"^[a-z0-9-]+$")
-    brand: str = Field(min_length=1, max_length=120)
     description: str | None = None
     category_slug: str
     sub_category: str | None = Field(default=None, max_length=80)
@@ -41,7 +40,6 @@ class ProductUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str | None = Field(default=None, min_length=2, max_length=255)
-    brand: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = None
     category_slug: str | None = None
     sub_category: str | None = Field(default=None, max_length=80)
@@ -62,6 +60,9 @@ class PriceIn(BaseModel):
     role: PriceRoleIn
     mrp: int = Field(gt=0, description="paise")
     selling_price: int = Field(gt=0, description="paise")
+    # Optional indicative band → makes the product quote-only for this role.
+    range_min: int | None = Field(default=None, ge=0, description="paise")
+    range_max: int | None = Field(default=None, ge=0, description="paise")
 
 
 class VariantCreate(BaseModel):
@@ -102,6 +103,14 @@ class ImageSlotResponse(BaseModel):
     expires_in: int
 
 
+class ImageUrlRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    url: str = Field(min_length=4, max_length=1024)
+    alt: str | None = Field(default=None, max_length=255)
+    is_primary: bool = False
+
+
 class AdminVariantOut(BaseModel):
     id: UUID
     pack_size: str
@@ -116,7 +125,6 @@ class AdminProductOut(BaseModel):
     id: UUID
     slug: str
     name: str
-    brand: str
     category_slug: str
     sub_category: str | None
     schedule: str

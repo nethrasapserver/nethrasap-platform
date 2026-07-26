@@ -84,23 +84,6 @@ async def test_get_product_404(client, seeded_catalogue):
 
 
 @pytest.mark.asyncio
-async def test_brand_filter_single(client, multi_catalogue):
-    resp = await client.get("/api/v1/products?brand=Cipla")
-    assert resp.status_code == 200
-    items = resp.json()["items"]
-    assert items, "expected Cipla results"
-    assert {i["brand"] for i in items} == {"Cipla"}
-
-
-@pytest.mark.asyncio
-async def test_brand_filter_multiple_comma_separated(client, multi_catalogue):
-    resp = await client.get("/api/v1/products?brand=Cipla,Sun Pharma&limit=20")
-    assert resp.status_code == 200
-    items = resp.json()["items"]
-    assert {i["brand"] for i in items} == {"Cipla", "Sun Pharma"}
-
-
-@pytest.mark.asyncio
 async def test_subcategory_filter_case_insensitive(client, multi_catalogue):
     upper = await client.get("/api/v1/products?sub_category=Antibiotics")
     lower = await client.get("/api/v1/products?sub_category=antibiotics")
@@ -162,11 +145,10 @@ async def test_sort_overrides_relevance_when_q_present(client, multi_catalogue):
 @pytest.mark.asyncio
 async def test_combined_filters(client, multi_catalogue):
     resp = await client.get(
-        "/api/v1/products?brand=Cipla&sub_category=antibiotics&sort=rating"
+        "/api/v1/products?sub_category=antibiotics&sort=rating"
     )
     assert resp.status_code == 200
     items = resp.json()["items"]
-    assert all(i["brand"] == "Cipla" for i in items)
     assert all(i["sub_category"] == "Antibiotics" for i in items)
     ratings = [i["rating"] for i in items]
     assert ratings == sorted(ratings, reverse=True)

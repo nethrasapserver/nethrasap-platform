@@ -48,15 +48,22 @@ async def test_full_lifecycle_quote_accept_convert(client, seeded_catalogue, sta
     q = await client.get("/api/v1/admin/enquiries?status=pending", headers=auth(sales))
     assert any(e["id"] == eid for e in q.json())
 
-    # Rep quotes each line.
+    # Rep quotes each line — parks for manager approval, customer sees nothing yet.
     quote = await client.post(
         f"/api/v1/admin/enquiries/{eid}/quote",
         headers=auth(sales),
         json={"lines": [{"item_id": item_id, "unit_price": 90}], "valid_days": 5},
     )
     assert quote.status_code == 200, quote.text
-    assert quote.json()["status"] == "quoted"
+    assert quote.json()["status"] == "pending"
+    assert quote.json()["approval_status"] == "pending"
     assert quote.json()["quoted_total"] == 90 * 50
+
+    # Manager approves → released to the customer as a quote.
+    appr = await client.post(f"/api/v1/admin/enquiries/{eid}/approve", headers=auth(staff_tokens["manager"]))
+    assert appr.status_code == 200, appr.text
+    assert appr.json()["status"] == "quoted"
+    assert appr.json()["approval_status"] == "approved"
 
     # Customer accepts.
     acc = await client.post(f"/api/v1/enquiries/{eid}/accept", headers=auth(token))
@@ -117,3 +124,98 @@ async def test_reject_closes_enquiry(client, seeded_catalogue, staff_tokens):
     )
     assert r.status_code == 200
     assert r.json()["status"] == "rejected"
+
+
+# --- Quote approval workflow -------------------------------------------------
+
+
+async def _sales_quote(client, sales, eid, item_id, price=90):
+    r = await client.post(
+        f"/api/v1/admin/enquiries/{eid}/quote",
+        headers=auth(sales),
+        json={"lines": [{"item_id": item_id, "unit_price": price}], "valid_days": 7},
+    )
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.mark.asyncio
+async def test_sales_quote_parks_for_approval(client, seeded_catalogue, staff_tokens):
+    """A sales rep's quote waits for approval; the customer sees nothing yet."""
+    token = await signup_token(client, phone_for("enq-appr-1"), role="retailer")
+    enq = await _create(client, token, seeded_catalogue["variant"].id)
+    eid, item_id = enq["id"], enq["items"][0]["id"]
+
+    quoted = await _sales_quote(client, staff_tokens["sales"], eid, item_id)
+    assert quoted["status"] == "pending"          # customer-facing status unchanged
+    assert quoted["approval_status"] == "pending"
+
+    # Customer still can't accept — no quote has been released.
+    acc = await client.post(f"/api/v1/enquiries/{eid}/accept", headers=auth(token))
+    assert acc.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_manager_quote_auto_approves(client, seeded_catalogue, staff_tokens):
+    token = await signup_token(client, phone_for("enq-appr-2"), role="retailer")
+    enq = await _create(client, token, seeded_catalogue["variant"].id)
+    eid, item_id = enq["id"], enq["items"][0]["id"]
+
+    quoted = await _sales_quote(client, staff_tokens["manager"], eid, item_id)
+    assert quoted["status"] == "quoted"
+    assert quoted["approval_status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_sales_cannot_approve(client, seeded_catalogue, staff_tokens):
+    token = await signup_token(client, phone_for("enq-appr-3"), role="retailer")
+    enq = await _create(client, token, seeded_catalogue["variant"].id)
+    eid, item_id = enq["id"], enq["items"][0]["id"]
+    await _sales_quote(client, staff_tokens["sales"], eid, item_id)
+
+    r = await client.post(f"/api/v1/admin/enquiries/{eid}/approve", headers=auth(staff_tokens["sales"]))
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_return_then_requote_then_approve(client, seeded_catalogue, staff_tokens):
+    token = await signup_token(client, phone_for("enq-appr-4"), role="retailer")
+    enq = await _create(client, token, seeded_catalogue["variant"].id)
+    eid, item_id = enq["id"], enq["items"][0]["id"]
+    await _sales_quote(client, staff_tokens["sales"], eid, item_id, price=90)
+
+    # Manager returns it to the rep.
+    ret = await client.post(
+        f"/api/v1/admin/enquiries/{eid}/return",
+        headers=auth(staff_tokens["manager"]),
+        json={"reason": "margin too low"},
+    )
+    assert ret.status_code == 200
+    assert ret.json()["approval_status"] == "returned"
+    assert ret.json()["status"] == "pending"
+
+    # Rep re-quotes → pending approval again.
+    requoted = await _sales_quote(client, staff_tokens["sales"], eid, item_id, price=110)
+    assert requoted["approval_status"] == "pending"
+
+    # Admin approves (admin approval also releases).
+    appr = await client.post(f"/api/v1/admin/enquiries/{eid}/approve", headers=auth(staff_tokens["admin"]))
+    assert appr.status_code == 200
+    assert appr.json()["status"] == "quoted"
+    assert appr.json()["approval_status"] == "approved"
+
+    # Now the customer can accept.
+    acc = await client.post(f"/api/v1/enquiries/{eid}/accept", headers=auth(token))
+    assert acc.status_code == 200
+    assert acc.json()["status"] == "confirmed"
+
+
+@pytest.mark.asyncio
+async def test_approve_requires_pending_quote(client, seeded_catalogue, staff_tokens):
+    """Approving an enquiry with no drafted quote is a conflict."""
+    token = await signup_token(client, phone_for("enq-appr-5"), role="retailer")
+    enq = await _create(client, token, seeded_catalogue["variant"].id)
+    r = await client.post(
+        f"/api/v1/admin/enquiries/{enq['id']}/approve", headers=auth(staff_tokens["manager"])
+    )
+    assert r.status_code == 409

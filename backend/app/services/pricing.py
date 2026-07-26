@@ -21,24 +21,42 @@ DEFAULT_GST_RATE_PCT = 12
 @dataclass(slots=True)
 class LineMath:
     quantity: int
-    unit_price: int      # paise
+    unit_price: int      # paise, TAX-INCLUSIVE (the price the customer sees)
     gst_rate_pct: int
-    subtotal: int        # paise: quantity * unit_price
-    gst_amount: int      # paise: integer-rounded GST on the subtotal
-    line_total: int      # paise: subtotal + gst_amount
+    subtotal: int        # paise: taxable value = line_total - gst_amount
+    gst_amount: int      # paise: GST contained *within* line_total
+    line_total: int      # paise: quantity * unit_price
+
+
+def gst_within(inclusive_amount: int, gst_rate_pct: int | None = None) -> int:
+    """GST contained inside a tax-inclusive amount.
+
+    Prices on this platform are MRP-style — inclusive of all taxes, as Indian
+    retail listings must be — so tax is *extracted*, never added:
+
+        gst = amount x rate / (100 + rate)
+
+    Integer paise with ROUND_HALF_UP (Indian invoicing convention); the x2 form
+    avoids the fractional half-divisor that plain floor division would truncate.
+    """
+    rate = gst_rate_pct if gst_rate_pct is not None else DEFAULT_GST_RATE_PCT
+    if inclusive_amount <= 0 or rate <= 0:
+        return 0
+    return (2 * inclusive_amount * rate + (100 + rate)) // (2 * (100 + rate))
 
 
 def compute_line(quantity: int, unit_price: int, gst_rate_pct: int | None) -> LineMath:
+    """`unit_price` is tax-inclusive; the customer pays quantity x unit_price."""
     if quantity < 1:
         raise ValueError("quantity must be >= 1")
     if unit_price < 0:
         raise ValueError("unit_price must be >= 0")
     rate = gst_rate_pct if gst_rate_pct is not None else DEFAULT_GST_RATE_PCT
-    subtotal = quantity * unit_price
-    # Integer GST: round to nearest paisa (Indian invoicing convention is
-    # ROUND_HALF_UP at line level; Python's // is banker's. Use explicit add.)
-    gst_amount = (subtotal * rate + 50) // 100
-    line_total = subtotal + gst_amount
+    line_total = quantity * unit_price
+    gst_amount = gst_within(line_total, rate)
+    # Taxable value for the GST invoice — grand totals stay
+    # `subtotal + gst`, so every downstream caller keeps working.
+    subtotal = line_total - gst_amount
     return LineMath(
         quantity=quantity,
         unit_price=unit_price,

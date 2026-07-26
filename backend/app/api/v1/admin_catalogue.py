@@ -22,6 +22,7 @@ from ...schemas.admin import (
     CouponUpdate,
     ImageSlotRequest,
     ImageSlotResponse,
+    ImageUrlRequest,
     ImportReport,
     ProductCreate,
     ProductUpdate,
@@ -40,6 +41,12 @@ def _out(product) -> AdminProductOut:
 
 
 # --- Products ----------------------------------------------------------------
+
+
+@router.get("/admin/products")
+async def list_products_admin(db: DbSession, actor: CatalogueAdmin) -> list[dict]:
+    """Full product list including unpublished rows — the ops table view."""
+    return await svc.list_products_admin(db)
 
 
 @router.post("/admin/products", response_model=AdminProductOut, status_code=status.HTTP_201_CREATED)
@@ -107,6 +114,22 @@ async def create_image_slot(
     return ImageSlotResponse(**slot)
 
 
+@router.post("/admin/products/{product_id}/images/url", status_code=status.HTTP_201_CREATED)
+async def add_image_url(
+    product_id: UUID, payload: ImageUrlRequest, db: DbSession, actor: CatalogueAdmin
+) -> dict:
+    """Attach a product image by public URL (works without object storage)."""
+    return await svc.add_image_url(
+        db, actor, product_id, url=payload.url, alt=payload.alt, is_primary=payload.is_primary
+    )
+
+
+@router.patch("/admin/images/{image_id}/primary", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def set_primary_image(image_id: UUID, db: DbSession, actor: CatalogueAdmin) -> Response:
+    await svc.set_primary_image(db, actor, image_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.delete("/admin/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def delete_image(image_id: UUID, db: DbSession, actor: CatalogueAdmin) -> Response:
     await svc.delete_image(db, actor, image_id)
@@ -114,6 +137,12 @@ async def delete_image(image_id: UUID, db: DbSession, actor: CatalogueAdmin) -> 
 
 
 # --- Categories ------------------------------------------------------------------
+
+
+@router.get("/admin/categories")
+async def list_categories_admin(db: DbSession, actor: CatalogueAdmin) -> list[dict]:
+    """All categories including inactive, with live product counts."""
+    return await svc.list_categories_admin(db)
 
 
 @router.post("/admin/categories", status_code=status.HTTP_201_CREATED)

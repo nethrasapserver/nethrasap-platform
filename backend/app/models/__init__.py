@@ -22,6 +22,7 @@ from .chat import Conversation, ConversationStatus, Message, MessageRead
 from .cms import AppSetting, CmsBlock, CmsPage, FeatureFlag
 from .enquiry import (
     Enquiry,
+    EnquiryApproval,
     EnquiryItem,
     EnquiryMessage,
     EnquiryStatus,
@@ -58,8 +59,10 @@ from .order import (
     ShipmentStatus,
 )
 from .otp import OtpCode, OtpPurpose
+from .pincode import Pincode
 from .rbac import Permission, Role, RolePermission
 from .sales import SalesAssignment, SalesTarget
+from .saved_items import CompareItem, WishlistItem
 from .user import Address, Session, User, UserProfile, UserRole, UserStatus
 from .verification import KycDocType, KycDocument, VerificationRequest, VerificationStatus
 
@@ -93,6 +96,7 @@ __all__ = [
     "StockStatus",
     "OtpCode",
     "OtpPurpose",
+    "Pincode",
     "Permission",
     "Role",
     "RolePermission",
@@ -119,6 +123,7 @@ __all__ = [
     "Message",
     "MessageRead",
     "Enquiry",
+    "EnquiryApproval",
     "EnquiryItem",
     "EnquiryMessage",
     "EnquiryStatus",
@@ -128,6 +133,8 @@ __all__ = [
     "NotificationType",
     "SalesAssignment",
     "SalesTarget",
+    "CompareItem",
+    "WishlistItem",
     "AttendanceRecord",
     "AttendanceStatus",
     "Employee",

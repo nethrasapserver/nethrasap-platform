@@ -80,7 +80,6 @@ class Product(Base):
     id: Mapped[uuid_pk]
     slug: Mapped[str] = mapped_column(String(150), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    brand: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text)
 
     category_id: Mapped[uuid.UUID] = mapped_column(
@@ -196,6 +195,12 @@ class ProductPrice(Base):
     )
     mrp: Mapped[int] = mapped_column(Integer, nullable=False)  # paise; render with /100 if needed
     selling_price: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Indicative price band for the RFQ (quote) model. When range_max > range_min
+    # the product is *quote-only*: the catalogue shows a band, buying raises
+    # an enquiry, and the firm price is whatever the rep quotes. NULL / equal =>
+    # fixed price (checks out directly at selling_price). All tax-inclusive paise.
+    range_min: Mapped[int | None] = mapped_column(Integer)
+    range_max: Mapped[int | None] = mapped_column(Integer)
     currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
 
     valid_from: Mapped[datetime] = mapped_column(

@@ -54,10 +54,23 @@ class Settings(BaseSettings):
     storage_secret_access_key: str = ""
     storage_public_base_url: str = ""
 
-    # --- Payments (Razorpay) ---
+    # --- Payments ---
+    # Comma-separated list of checkout methods offered to customers. COD-only
+    # for launch; add upi/card/netbanking/wallet here once the Razorpay modal
+    # ships on the storefront — no code changes needed to re-enable them.
+    payment_methods_enabled: str = "cod"
+
+    # Razorpay credentials (used by the gateway methods when enabled).
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
     razorpay_webhook_secret: str = ""
+
+    # --- Pincode lookup (checkout address autofill) ---
+    # "india_post" resolves unknown PINs via the public postal API and caches
+    # them; "none" disables the network call (cache-only — useful in tests/air-
+    # gapped). Swap the URL for a licensed dataset service in production.
+    pincode_provider: Literal["india_post", "none"] = "india_post"
+    pincode_api_url: str = "https://api.postalpincode.in/pincode"
 
     @model_validator(mode="after")
     def enforce_production_safety(self) -> Self:
@@ -89,6 +102,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def payment_methods_enabled_list(self) -> list[str]:
+        return [m.strip().lower() for m in self.payment_methods_enabled.split(",") if m.strip()]
 
 
 @lru_cache

@@ -15,7 +15,6 @@ class OrderLineOut(BaseModel):
     id: UUID
     variant_id: UUID
     product_name: str = Field(validation_alias="product_name_snapshot")
-    brand: str = Field(validation_alias="brand_snapshot")
     unit_label: str = Field(validation_alias="unit_label_snapshot")
     hsn_code: str | None = Field(default=None, validation_alias="hsn_code_snapshot")
     quantity: int

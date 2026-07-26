@@ -31,6 +31,11 @@ if not _test_url:
 # Force the app to use the test DB — never read the dev DB during tests.
 os.environ["DATABASE_URL"] = _test_url
 os.environ.setdefault("JWT_SECRET", "test-secret-please-do-not-use-in-prod-32-chars")
+# The suite exercises the stubbed gateway flows (UPI + webhooks) end-to-end,
+# so every method is force-enabled here regardless of the developer's .env;
+# production defaults to COD-only. The gating logic itself is covered in
+# test_saved_and_payment_methods.py (which overrides settings per-test).
+os.environ["PAYMENT_METHODS_ENABLED"] = "cod,upi,card,netbanking,wallet"
 
 from datetime import UTC  # noqa: E402
 
@@ -137,7 +142,6 @@ async def _schema():
             BEGIN
               NEW.search_tsv :=
                 setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
-                setweight(to_tsvector('english', coalesce(NEW.brand, '')), 'B') ||
                 setweight(to_tsvector('english', coalesce(NEW.description, '')), 'C');
               RETURN NEW;
             END
@@ -148,7 +152,7 @@ async def _schema():
         await conn.exec_driver_sql(
             """
             CREATE TRIGGER products_tsv_update
-              BEFORE INSERT OR UPDATE OF name, brand, description ON products
+              BEFORE INSERT OR UPDATE OF name, description ON products
               FOR EACH ROW EXECUTE FUNCTION products_tsv_trigger();
             """
         )
@@ -269,7 +273,8 @@ _STAFF_PERMS = {
     ],
     "manager": [
         ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
-        ("orders", "fulfil"), ("enquiries", "manage"), ("chat", "manage"),
+        ("orders", "fulfil"), ("enquiries", "manage"), ("enquiries", "approve"), ("chat", "manage"),
+        ("catalogue", "write"),
         ("analytics", "read"), ("sales", "read"), ("sales", "manage"), ("audit", "read"),
     ],
     "admin": [
@@ -283,6 +288,7 @@ _STAFF_PERMS = {
         ("orders", "fulfil"),
         ("orders", "refund"),
         ("enquiries", "manage"),
+        ("enquiries", "approve"),
         ("chat", "manage"),
         ("analytics", "read"),
         ("sales", "read"),
@@ -360,7 +366,6 @@ async def seeded_catalogue(db_session) -> dict[str, Any]:
     product = Product(
         slug="amoxicillin-500mg-capsules",
         name="Amoxicillin 500mg Capsules",
-        brand="Cipla",
         description="Broad-spectrum penicillin antibiotic.",
         category_id=cat.id,
         sub_category="Antibiotics",
@@ -418,20 +423,19 @@ async def multi_catalogue(db_session) -> dict[str, Any]:
     await db_session.flush()
 
     seeds = [
-        # slug, name, brand, sub_category, rating, reviews_count, customer_price
-        ("amoxicillin-500mg", "Amoxicillin 500mg", "Cipla", "Antibiotics", 4.6, 1284, 100),
-        ("paracetamol-650mg", "Paracetamol 650mg", "Sun Pharma", "Analgesics", 4.2, 980, 30),
-        ("ibuprofen-400mg", "Ibuprofen 400mg", "Cipla", "Analgesics", 4.5, 450, 50),
-        ("azithromycin-500mg", "Azithromycin 500mg", "Cipla", "Antibiotics", 4.7, 2100, 220),
-        ("metformin-500mg", "Metformin 500mg", "Sun Pharma", "Diabetes", 4.0, 120, 80),
+        # slug, name, sub_category, rating, reviews_count, customer_price
+        ("amoxicillin-500mg", "Amoxicillin 500mg", "Antibiotics", 4.6, 1284, 100),
+        ("paracetamol-650mg", "Paracetamol 650mg", "Analgesics", 4.2, 980, 30),
+        ("ibuprofen-400mg", "Ibuprofen 400mg", "Analgesics", 4.5, 450, 50),
+        ("azithromycin-500mg", "Azithromycin 500mg", "Antibiotics", 4.7, 2100, 220),
+        ("metformin-500mg", "Metformin 500mg", "Diabetes", 4.0, 120, 80),
     ]
     products: list[Product] = []
     now = datetime.now(UTC)
-    for slug, name, brand, sub, rating, reviews, price in seeds:
+    for slug, name, sub, rating, reviews, price in seeds:
         p = Product(
             slug=slug,
             name=name,
-            brand=brand,
             description=f"{name} oral tablet.",
             category_id=cat.id,
             sub_category=sub,

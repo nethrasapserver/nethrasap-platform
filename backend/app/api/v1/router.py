@@ -22,9 +22,11 @@ from . import (
     notifications,
     orders,
     payments,
+    pincodes,
     products,
     realtime,
     reviews,
+    saved_items,
 )
 
 api_router_v1 = APIRouter()
@@ -38,6 +40,7 @@ api_router_v1.include_router(admin_orders.router, tags=["admin-orders"])
 api_router_v1.include_router(enquiries.router, tags=["enquiries"])
 api_router_v1.include_router(chat.router, tags=["chat"])
 api_router_v1.include_router(notifications.router, tags=["notifications"])
+api_router_v1.include_router(saved_items.router, tags=["saved-items"])
 api_router_v1.include_router(analytics.router, tags=["analytics"])
 api_router_v1.include_router(hr.router, tags=["hr"])
 api_router_v1.include_router(cms.router, tags=["cms"])
@@ -49,3 +52,4 @@ api_router_v1.include_router(cart.router, prefix="/cart", tags=["cart"])
 api_router_v1.include_router(checkout.router, prefix="/checkout", tags=["checkout"])
 api_router_v1.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router_v1.include_router(coupons.router, prefix="/coupons", tags=["coupons"])
+api_router_v1.include_router(pincodes.router, tags=["pincodes"])

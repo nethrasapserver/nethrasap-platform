@@ -33,7 +33,7 @@ async def test_cart_add_and_update_and_remove(client, seeded_catalogue):
     body = add.json()
     assert len(body["items"]) == 1
     assert body["items"][0]["quantity"] == 2
-    assert body["totals"]["subtotal"] == 200  # 2 x 100 paise
+    assert body["totals"]["subtotal"] == 179  # 2 x 100 paise incl. tax → ₹1.79 taxable
 
     item_id = body["items"][0]["id"]
     upd = await client.patch(
@@ -76,7 +76,7 @@ async def test_cart_apply_coupon_min_order(client, seeded_catalogue, db_session)
     assert apply.status_code == 200
     body = apply.json()
     assert body["coupon"]["code"] == "TENOFF"
-    assert body["totals"]["discount"] == 60  # 10% of 600
+    assert body["totals"]["discount"] == 53  # 10% of the 536p taxable value
 
     clear = await client.delete("/api/v1/cart/coupon")
     assert clear.status_code == 200

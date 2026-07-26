@@ -24,7 +24,6 @@ class CartItemProduct(BaseModel):
     id: UUID
     slug: str
     name: str
-    brand: str
     unit_label: str
     stock_status: str
     image_storage_key: str | None = None
@@ -39,6 +38,9 @@ class CartItemOut(BaseModel):
     unit_price: int                 # paise
     gst_rate_pct: int
     line_subtotal: int              # paise
+    # Priced by quote at the caller's tier — excluded from cart totals; goes
+    # through the enquiry flow, never direct checkout.
+    is_quote_only: bool = False
     product: CartItemProduct
 
 

@@ -24,26 +24,28 @@ async def list_products(
     sub_category: str | None = Query(
         None, description="Filter by sub_category label (case-insensitive)"
     ),
-    brand: str | None = Query(
-        None,
-        description="Filter by one or more brands, comma-separated. e.g. brand=Cipla,Sun Pharma",
-    ),
     schedule: str | None = Query(None, description="Filter by schedule class: H / H1 / X"),
+    prescription: bool | None = Query(
+        None, description="true = prescription-only (any schedule); false = over-the-counter"
+    ),
+    price_min: int | None = Query(None, ge=0, description="Minimum price in paise"),
+    price_max: int | None = Query(None, ge=0, description="Maximum price in paise"),
     in_stock: bool | None = Query(None, description="Only return in-stock items"),
     featured: bool | None = Query(None, description="Only return featured items"),
     sort: Literal["relevance", "price-asc", "price-desc", "rating", "popular"] = Query(
         "relevance", description="Sort order. Non-relevance sorts override ts_rank when q is set."
     ),
 ) -> Paginated[ProductListItem]:
-    brands = [b.strip() for b in brand.split(",")] if brand else None
     total, items = await svc.list_products(
         db,
         user=user,
         q=q,
         category_slug=category,
         sub_category=sub_category,
-        brands=brands,
         schedule=schedule,
+        prescription=prescription,
+        price_min=price_min,
+        price_max=price_max,
         in_stock=in_stock,
         is_featured=featured,
         sort=sort,
@@ -56,6 +58,21 @@ async def list_products(
         offset=pagination.offset,
         items=[ProductListItem.model_validate(item) for item in items],
     )
+
+
+@router.get("/facets")
+async def facets(db: DbSession, user: OptionalUser) -> dict:
+    """Brands + price range for the products-page filter sidebar."""
+    return await svc.product_facets(db, user=user)
+
+
+@router.get("/{slug}/related", response_model=list[ProductListItem])
+async def related_products(
+    slug: str, db: DbSession, user: OptionalUser
+) -> list[ProductListItem]:
+    """Alternatives to this product, priced at the caller's tier."""
+    rows = await svc.list_related(db, slug=slug, user=user, limit=8)
+    return [ProductListItem.model_validate(r) for r in rows]
 
 
 @router.get("/{slug}", response_model=ProductDetail)

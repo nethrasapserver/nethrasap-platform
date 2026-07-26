@@ -20,7 +20,7 @@ from ..models.catalogue import (
 )
 from ..models.user import User
 from . import pricing
-from .catalogue import _price_role_for_user
+from .catalogue import _price_role_for_user, active_price_for, price_is_quote_band
 
 log = get_logger("services.cart")
 
@@ -238,10 +238,19 @@ async def remove_item(db: AsyncSession, *, cart: Cart, item_id: uuid.UUID) -> No
     await db.flush()
 
 
-async def clear_cart_items(db: AsyncSession, *, cart: Cart) -> None:
-    """Empties the cart (used after order placement)."""
+async def clear_cart_items(
+    db: AsyncSession, *, cart: Cart, only_item_ids: set[uuid.UUID] | None = None
+) -> None:
+    """Empties the cart (used after order placement).
+
+    `only_item_ids` removes just those lines — checkout passes the fixed-price
+    items it actually sold, so quote-priced lines survive for the RFQ path.
+    The coupon is released either way: it was consumed by (or no longer
+    matches) the order that just went through.
+    """
     for it in list(cart.items):
-        await db.delete(it)
+        if only_item_ids is None or it.id in only_item_ids:
+            await db.delete(it)
     # Direct UPDATE to avoid the relationship-sync lazy load.
     await db.execute(
         update(Cart).where(Cart.id == cart.id).values(coupon_id=None)
@@ -281,12 +290,18 @@ async def clear_coupon(db: AsyncSession, *, cart: Cart) -> None:
 # ---------------------------------------------------------------------------
 # Serialisation helpers
 # ---------------------------------------------------------------------------
-async def serialise_cart(db: AsyncSession, cart: Cart) -> dict[str, Any]:
+async def serialise_cart(db: AsyncSession, cart: Cart, user: User | None = None) -> dict[str, Any]:
     """Build the public cart response shape. Eager-loads everything it reads
-    so no implicit lazy SELECTs fire from inside Pydantic serialisation."""
+    so no implicit lazy SELECTs fire from inside Pydantic serialisation.
+
+    Quote-only items (indicative price band at the caller's tier) are flagged
+    and EXCLUDED from every total — their price doesn't exist until a rep
+    quotes it, so showing it in a payable total would be a lie.
+    """
     items_out: list[dict[str, Any]] = []
     subtotal = 0
     gst = 0
+    price_role = _price_role_for_user(user)
 
     variant_ids = [it.variant_id for it in cart.items]
     variants_by_id: dict[uuid.UUID, ProductVariant] = {}
@@ -300,6 +315,7 @@ async def serialise_cart(db: AsyncSession, cart: Cart) -> dict[str, Any]:
                 .options(
                     selectinload(ProductVariant.product).selectinload(Product.images),
                     selectinload(ProductVariant.product).selectinload(Product.category),
+                    selectinload(ProductVariant.prices),
                 )
                 .where(ProductVariant.id.in_(variant_ids))
             )
@@ -310,18 +326,24 @@ async def serialise_cart(db: AsyncSession, cart: Cart) -> dict[str, Any]:
                 if img.is_primary:
                     primary_image_by_product[v.product.id] = img
                     break
-            if v.product.category is not None and v.product.category.slug == "cold-chain":
-                has_cold_chain = True
 
     for it in cart.items:
+        variant = variants_by_id.get(it.variant_id)
+        is_quote = price_is_quote_band(active_price_for(variant, price_role))
         line = pricing.compute_line(
             quantity=it.quantity,
             unit_price=it.unit_price_snapshot,
             gst_rate_pct=it.gst_rate_pct_snapshot,
         )
-        subtotal += line.subtotal
-        gst += line.gst_amount
-        variant = variants_by_id.get(it.variant_id)
+        if not is_quote:
+            subtotal += line.subtotal
+            gst += line.gst_amount
+            if (
+                variant is not None
+                and variant.product.category is not None
+                and variant.product.category.slug == "cold-chain"
+            ):
+                has_cold_chain = True
         product = variant.product if variant else None
         primary_image = primary_image_by_product.get(product.id) if product else None
         items_out.append(
@@ -332,11 +354,11 @@ async def serialise_cart(db: AsyncSession, cart: Cart) -> dict[str, Any]:
                 "unit_price": it.unit_price_snapshot,
                 "gst_rate_pct": it.gst_rate_pct_snapshot,
                 "line_subtotal": line.subtotal,
+                "is_quote_only": is_quote,
                 "product": {
                     "id": product.id if product else None,
                     "slug": product.slug if product else "",
                     "name": product.name if product else "",
-                    "brand": product.brand if product else "",
                     "unit_label": variant.unit_label if variant else "",
                     "stock_status": product.stock_status.value if product else "in_stock",
                     "image_storage_key": primary_image.storage_key if primary_image else None,

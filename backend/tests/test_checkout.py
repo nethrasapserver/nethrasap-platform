@@ -57,10 +57,12 @@ async def test_quote_math(client, seeded_catalogue):
     )
     assert r.status_code == 200, r.text
     totals = r.json()["totals"]
-    assert totals["subtotal"] == 300                # 3 x 100
-    assert totals["gst"] == round(300 * 12 / 100)   # 36 paise
+    # 3 x ₹1.00 tax-inclusive = 300 paise, of which 32p is GST at 12%.
+    assert totals["subtotal"] == 268                # taxable value
+    assert totals["gst"] == 32                      # tax contained within
+    assert totals["subtotal"] + totals["gst"] == 300  # what the items cost
     assert totals["shipping"] == 5000               # below threshold
-    assert totals["grand_total"] == 300 + 36 + 5000
+    assert totals["grand_total"] == 300 + 5000
 
 
 @pytest.mark.asyncio

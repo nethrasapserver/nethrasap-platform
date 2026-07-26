@@ -29,17 +29,28 @@ class _StubCoupon:
         self.expires_at = expires_at
 
 
-def test_compute_line_basic():
+def test_compute_line_is_tax_inclusive():
+    # Prices are MRP-style: 2 x ₹100 costs exactly ₹200, with the 12% GST
+    # contained inside it (200 * 12/112 = 21.43).
     line = compute_line(quantity=2, unit_price=10000, gst_rate_pct=12)
-    assert line.subtotal == 20000
-    assert line.gst_amount == 2400
-    assert line.line_total == 22400
+    assert line.line_total == 20000
+    assert line.gst_amount == 2143
+    assert line.subtotal == 17857
+    # The customer never pays more than quantity x unit_price.
+    assert line.subtotal + line.gst_amount == line.line_total
 
 
 def test_compute_line_rounds_gst_half_up():
-    # subtotal * 5 / 100 with subtotal=99 → 4.95, rounded to 5
+    # 99 paise inclusive at 5% → 99 * 5/105 = 4.71, rounds to 5
     line = compute_line(quantity=1, unit_price=99, gst_rate_pct=5)
     assert line.gst_amount == 5
+
+
+def test_gst_within_extracts_not_adds():
+    from app.services.pricing import gst_within
+    assert gst_within(11200, 12) == 1200      # ₹112 incl. 12% → ₹12 tax
+    assert gst_within(0, 12) == 0
+    assert gst_within(10000, 0) == 0
 
 
 def test_shipping_free_above_threshold():

@@ -149,11 +149,24 @@ def _apply_prices(variant: ProductVariant, prices: list[dict]) -> int:
         role = PriceRole(p["role"])
         if p["selling_price"] > p["mrp"]:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "selling_price cannot exceed mrp")
+        # Optional quote band. Both-or-neither, and a real ascending band.
+        rmin, rmax = p.get("range_min"), p.get("range_max")
+        if (rmin is None) != (rmax is None):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "range needs both min and max")
+        if rmin is not None and rmax < rmin:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "range_max must be ≥ range_min")
         for existing in variant.prices:
             if existing.role == role and existing.valid_to is None:
                 existing.valid_to = now
         variant.prices.append(
-            ProductPrice(role=role, mrp=p["mrp"], selling_price=p["selling_price"], valid_from=now)
+            ProductPrice(
+                role=role,
+                mrp=p["mrp"],
+                selling_price=p["selling_price"],
+                range_min=rmin,
+                range_max=rmax,
+                valid_from=now,
+            )
         )
         count += 1
     return count
@@ -230,12 +243,67 @@ async def create_image_slot(
     }
 
 
+async def add_image_url(
+    db: AsyncSession, actor: User, product_id: uuid.UUID, *, url: str, alt: str | None, is_primary: bool
+) -> dict:
+    """Attach an image by its public URL (stored as the storage key, used
+    directly as the image src). Works without object storage configured."""
+    product = await _load_product(db, product_id)
+    if not product.images:
+        is_primary = True  # first image is always primary
+    if is_primary:
+        for img in product.images:
+            img.is_primary = False
+    image = ProductImage(
+        product_id=product.id,
+        storage_key=url.strip(),
+        alt=alt,
+        is_primary=is_primary,
+        sort_order=len(product.images),
+    )
+    db.add(image)
+    await db.flush()
+    await _audit(db, actor, "product_image.created", "product_image", str(image.id), {"via": "url"})
+    await db.commit()
+    await _catalogue_event("product.updated", "product", str(product.id))
+    return {"id": image.id, "storage_key": image.storage_key, "alt": image.alt, "is_primary": image.is_primary}
+
+
+async def set_primary_image(db: AsyncSession, actor: User, image_id: uuid.UUID) -> None:
+    image = (
+        await db.execute(
+            select(ProductImage).where(ProductImage.id == image_id)
+        )
+    ).scalar_one_or_none()
+    if image is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "image not found")
+    siblings = (
+        await db.execute(select(ProductImage).where(ProductImage.product_id == image.product_id))
+    ).scalars()
+    for img in siblings:
+        img.is_primary = img.id == image_id
+    await _audit(db, actor, "product_image.set_primary", "product_image", str(image_id), {})
+    await db.commit()
+    await _catalogue_event("product.updated", "product", str(image.product_id))
+
+
 async def delete_image(db: AsyncSession, actor: User, image_id: uuid.UUID) -> None:
     image = (await db.execute(select(ProductImage).where(ProductImage.id == image_id))).scalar_one_or_none()
     if image is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "image not found")
     key, product_id = image.storage_key, image.product_id
+    was_primary = image.is_primary
     await db.delete(image)
+    await db.flush()
+    # Promote another image to primary if we removed the primary one.
+    if was_primary:
+        nxt = (
+            await db.execute(
+                select(ProductImage).where(ProductImage.product_id == product_id).order_by(ProductImage.sort_order).limit(1)
+            )
+        ).scalar_one_or_none()
+        if nxt:
+            nxt.is_primary = True
     await _audit(db, actor, "product_image.deleted", "product_image", str(image_id), {})
     await db.commit()
     storage.delete_object(key)
@@ -287,6 +355,84 @@ async def delete_category(db: AsyncSession, actor: User, category_id: uuid.UUID)
     await _catalogue_event("category.deleted", "category", str(category_id))
 
 
+# --- Admin reads -------------------------------------------------------------------
+# The public catalogue hides inactive rows; ops needs to see (and re-publish)
+# everything, so these lists are unfiltered.
+
+
+async def list_products_admin(db: AsyncSession) -> list[dict[str, Any]]:
+    rows = (
+        (
+            await db.execute(
+                select(Product)
+                .options(
+                    selectinload(Product.category),
+                    selectinload(Product.variants).selectinload(ProductVariant.prices),
+                    selectinload(Product.images),
+                )
+                .order_by(Product.created_at.desc())
+            )
+        )
+        .scalars()
+        .unique()
+    )
+    out: list[dict[str, Any]] = []
+    for p in rows:
+        customer_prices = [
+            pr.selling_price
+            for v in p.variants
+            for pr in v.prices
+            if pr.valid_to is None and pr.role == PriceRole.customer
+        ]
+        primary = next((i for i in p.images if i.is_primary), None) or (p.images[0] if p.images else None)
+        out.append(
+            {
+                "id": p.id,
+                "slug": p.slug,
+                "name": p.name,
+                "image_key": primary.storage_key if primary else None,
+                "category_slug": p.category.slug if p.category else "",
+                "category_name": p.category.name if p.category else "",
+                "sub_category": p.sub_category,
+                "schedule": p.schedule.value,
+                "stock_status": p.stock_status.value,
+                "is_active": p.is_active,
+                "is_featured": p.is_featured,
+                "gst_rate_pct": p.gst_rate_pct,
+                "variant_count": len(p.variants),
+                "price_min": min(customer_prices) if customer_prices else None,
+                "description": p.description,
+                "attributes": p.attributes or {},
+                "images": [
+                    {"id": str(i.id), "storage_key": i.storage_key, "alt": i.alt, "is_primary": i.is_primary}
+                    for i in sorted(p.images, key=lambda x: (not x.is_primary, x.sort_order))
+                ],
+            }
+        )
+    return out
+
+
+async def list_categories_admin(db: AsyncSession) -> list[dict[str, Any]]:
+    counts = dict(
+        (await db.execute(select(Product.category_id, func.count()).group_by(Product.category_id))).all()
+    )
+    rows = (await db.execute(select(Category).order_by(Category.sort_order, Category.name))).scalars()
+    return [
+        {
+            "id": c.id,
+            "slug": c.slug,
+            "name": c.name,
+            "description": c.description,
+            "sku_prefix": c.sku_prefix,
+            "glyph": c.glyph,
+            "sort_order": c.sort_order,
+            "is_active": c.is_active,
+            "product_count": counts.get(c.id, 0),
+        }
+        for c in rows
+    ]
+
+
 # --- Coupons ----------------------------------------------------------------------
 
 
@@ -328,7 +474,6 @@ def serialise_admin_product(p: Product) -> dict[str, Any]:
         "id": p.id,
         "slug": p.slug,
         "name": p.name,
-        "brand": p.brand,
         "category_slug": p.category.slug if p.category else "",
         "sub_category": p.sub_category,
         "schedule": p.schedule.value,
@@ -368,11 +513,11 @@ def serialise_admin_product(p: Product) -> dict[str, Any]:
 # --- CSV import -----------------------------------------------------------------------
 # One row per variant. Products are upserted by slug, variants by pack_size.
 # Columns:
-#   name, slug?, brand, category_slug, sub_category?, schedule?, hsn_code?,
+#   name, slug?, category_slug, sub_category?, schedule?, hsn_code?,
 #   gst_rate_pct?, is_featured?, pack_size, unit_label,
 #   mrp_paise, price_customer_paise, price_clinician_paise?, price_retailer_paise?
 
-REQUIRED_COLUMNS = {"name", "brand", "category_slug", "pack_size", "unit_label", "mrp_paise", "price_customer_paise"}
+REQUIRED_COLUMNS = {"name", "category_slug", "pack_size", "unit_label", "mrp_paise", "price_customer_paise"}
 MAX_IMPORT_ROWS = 5000
 
 
@@ -416,7 +561,6 @@ async def import_catalogue_csv(db: AsyncSession, actor: User, raw: bytes) -> dic
                 product = Product(
                     slug=slug,
                     name=row["name"].strip(),
-                    brand=row["brand"].strip(),
                     category_id=category.id,
                     sub_category=(row.get("sub_category") or "").strip() or None,
                     schedule=ScheduleClass((row.get("schedule") or "NONE").strip() or "NONE"),

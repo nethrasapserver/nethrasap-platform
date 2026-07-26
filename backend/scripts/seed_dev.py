@@ -44,6 +44,9 @@ CATEGORIES = [
     ("devices", "Devices & Diagnostics", "DEV", "Monitors, kits, surgical"),
     ("wellness", "Wellness & Nutrition", "WEL", "Supplements and daily health"),
     ("cold-chain", "Cold Chain", "CC", "Vaccines and biologics (2-8C)"),
+    ("surgical", "Surgical & Consumables", "SUR", "Gloves, dressings, disposables"),
+    ("baby-care", "Baby & Mother Care", "BAB", "Infant nutrition and care"),
+    ("ayurveda", "Ayurveda & Herbal", "AYU", "Classical and proprietary formulations"),
 ]
 
 # (slug, name, brand, category, schedule, hsn, featured, packs[(size, label, cust, clin, ret)])
@@ -68,6 +71,26 @@ PRODUCTS = [
      [("30 tablets", "Bottle of 30", 34900, 32000, 28500)]),
     ("covishield-vial", "Recombinant Hepatitis-B Vaccine", "Serum Institute", "cold-chain", "H", "3002", False,
      [("0.5ml vial", "Single vial", 25000, 23000, 20500)]),
+    ("pantoprazole-40mg", "Pantoprazole 40mg Tablets", "Alkem", "prescription", "H", "3004", True,
+     [("15 tablets", "Strip of 15", 12500, 11500, 10200)]),
+    ("metformin-500mg", "Metformin 500mg Tablets", "USV", "prescription", "H", "3004", True,
+     [("20 tablets", "Strip of 20", 4400, 4000, 3600)]),
+    ("cetirizine-10mg", "Cetirizine 10mg Tablets", "Dr Reddy's", "otc", "NONE", "3004", False,
+     [("10 tablets", "Strip of 10", 2400, 2200, 1950)]),
+    ("nitrile-gloves", "Nitrile Examination Gloves (M)", "Romsons", "surgical", "NONE", "4015", True,
+     [("Box of 100", "Box of 100", 68000, 62000, 55000)]),
+    ("cotton-crepe-bandage", "Cotton Crepe Bandage 10cm", "Datt Mediproducts", "surgical", "NONE", "3005", False,
+     [("1 roll", "Single roll", 9500, 8700, 7800)]),
+    ("infant-formula-stage1", "Infant Formula Stage 1 (400g)", "Nestle", "baby-care", "NONE", "1901", True,
+     [("400g tin", "Tin of 400g", 52000, 48000, 43000)]),
+    ("baby-diapers-m", "Baby Diapers Medium (Pack of 46)", "Pampers", "baby-care", "NONE", "9619", False,
+     [("Pack of 46", "Pack of 46", 84900, 78000, 70000)]),
+    ("ashwagandha-tabs", "Ashwagandha 500mg Tablets", "Himalaya", "ayurveda", "NONE", "3004", True,
+     [("60 tablets", "Bottle of 60", 32000, 29500, 26500)]),
+    ("chyawanprash-1kg", "Chyawanprash Immunity Formula 1kg", "Dabur", "ayurveda", "NONE", "2106", False,
+     [("1kg jar", "Jar of 1kg", 41500, 38000, 34000)]),
+    ("glucometer-strips", "Glucometer Test Strips (Pack of 50)", "Accu-Chek", "devices", "NONE", "3822", True,
+     [("Pack of 50", "Pack of 50", 96000, 89000, 80000)]),
 ]
 
 

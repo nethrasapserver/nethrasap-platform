@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from ...db import DbSession
@@ -12,11 +12,25 @@ from ...deps import require_permission
 from ...models.user import User
 from ...schemas.order import OrderDetail
 from ...services import fulfilment as svc
+from ...services import orders as orders_svc
 
 router = APIRouter()
 
 FulfilStaff = Annotated[User, Depends(require_permission("orders:fulfil"))]
 RefundStaff = Annotated[User, Depends(require_permission("orders:refund"))]
+
+
+@router.get("/admin/orders")
+async def list_orders_admin(
+    db: DbSession,
+    actor: FulfilStaff,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+    q: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> dict:
+    """All customer orders for the ops queue."""
+    total, items = await orders_svc.list_orders_admin(db, status_filter=status_filter, q=q, limit=limit)
+    return {"total": total, "items": items}
 
 
 class ShipmentCreate(BaseModel):
