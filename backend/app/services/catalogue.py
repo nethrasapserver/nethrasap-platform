@@ -17,6 +17,7 @@ from ..models.catalogue import (
     ScheduleClass,
     StockStatus,
 )
+from ..integrations import storage
 from ..models.user import User, UserRole, UserStatus
 from . import pricing
 
@@ -122,7 +123,7 @@ def _serialize_product(product: Product, price_role: PriceRole) -> dict[str, Any
         "slug": product.slug,
         "name": product.name,
         "default_variant_id": default_variant.id if default_variant else None,
-        "image_key": primary.storage_key if primary else None,
+        "image_key": storage.public_url(primary.storage_key) if primary else None,
         "category_slug": product.category.slug if product.category else "",
         "category_name": product.category.name if product.category else "",
         "sub_category": product.sub_category,
@@ -391,7 +392,7 @@ async def get_product_by_slug(
         ],
         "images": [
             {
-                "storage_key": img.storage_key,
+                "storage_key": storage.public_url(img.storage_key),
                 "alt": img.alt,
                 "is_primary": img.is_primary,
                 "sort_order": img.sort_order,
@@ -482,7 +483,7 @@ async def list_categories(db: AsyncSession) -> list[dict]:
             "description": cat.description,
             "sku_prefix": cat.sku_prefix,
             "glyph": cat.glyph,
-            "image_key": cat.image_key,
+            "image_key": storage.public_url(cat.image_key) if cat.image_key else None,
             "sort_order": cat.sort_order,
             "is_active": cat.is_active,
             "product_count": int(count),
@@ -512,7 +513,7 @@ async def get_category_by_slug(db: AsyncSession, *, slug: str) -> dict:
         "description": cat.description,
         "sku_prefix": cat.sku_prefix,
         "glyph": cat.glyph,
-        "image_key": cat.image_key,
+        "image_key": storage.public_url(cat.image_key) if cat.image_key else None,
         "sort_order": cat.sort_order,
         "is_active": cat.is_active,
         "product_count": int(count),

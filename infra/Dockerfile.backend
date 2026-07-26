@@ -28,4 +28,7 @@ EXPOSE 8000
 # Render injects $PORT; default to 8000 for local `docker run`.
 # Migrations + RBAC seed run in the Render pre-deploy step (see render.yaml):
 #   alembic upgrade head && python -m scripts.seed_rbac
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# --proxy-headers: production always sits behind a proxy (Render/Cloudflare/
+# Caddy); trust X-Forwarded-* so audit logs record real client IPs and
+# url_for/scheme are https-correct.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"]

@@ -100,7 +100,13 @@ def presigned_get(key: str) -> str:
 
 
 def public_url(key: str) -> str:
-    """Public URL for catalogue images (bucket/custom-domain base)."""
+    """Public URL for catalogue images (bucket/custom-domain base).
+
+    Absolute URLs pass through untouched — dev seeds store full image URLs
+    in `storage_key`, while real uploads store R2 keys that need the base.
+    """
+    if key.startswith(("http://", "https://")):
+        return key
     base = get_settings().storage_public_base_url.rstrip("/")
     if not base:
         return f"{_STUB_BASE}/public/{key}"
