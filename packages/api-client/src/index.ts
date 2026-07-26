@@ -53,6 +53,10 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     const token = await opts.getToken?.();
     const res = await fetch(opts.baseUrl ? url.toString() : url.pathname + url.search, {
       method,
+      // Never let Next's server-side data cache persist API responses —
+      // catalogue/orders are live data; an admin edit must show on the next
+      // request, not after a container restart.
+      cache: "no-store",
       credentials: "include",
       headers: {
         ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),

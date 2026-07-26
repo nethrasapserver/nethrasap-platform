@@ -1,0 +1,12 @@
+{
+  "name": "@nethrasap/ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nethrasap design system — tokens, base styles, component classes and shared auth fields.",
+  "exports": {
+    "./styles.css": "./styles.css",
+    "./portal.css": "./portal.css",
+    "./auth.css": "./auth.css",
+    "./fields": "./fields.tsx"
+  }
+}

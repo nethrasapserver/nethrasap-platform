@@ -1,0 +1,200 @@
+/* Auth surfaces shared by the storefront and the ops dashboard.
+   Import AFTER an app's own stylesheet so .btn-lg wins over app button sizing. */
+
+/* ============================================================
+   AUTH — one focused column. No split, no showcase.
+   ============================================================ */
+.auth-page {
+  position: relative; overflow: hidden;
+  min-height: 100vh; display: grid; place-items: center;
+  padding: var(--sp-8) var(--sp-5) var(--sp-10);
+  background:
+    radial-gradient(65% 45% at 12% -5%, var(--brand-50), transparent 62%),
+    radial-gradient(60% 45% at 92% 105%, var(--ice-100), transparent 62%),
+    var(--paper);
+}
+/* Blister-pack dot grid, faded out behind the card so it never fights the
+   form. Echoes the dotted connectors used in the About flow. */
+.auth-page::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(96, 108, 56, .14) 1.2px, transparent 1.2px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(58% 52% at 50% 45%, transparent 35%, #000 88%);
+  mask-image: radial-gradient(58% 52% at 50% 45%, transparent 35%, #000 88%);
+}
+
+.auth-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+/* Soft colour wash for depth. */
+.auth-bg .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; }
+.auth-bg .orb-1 { width: 460px; height: 460px; top: -160px; left: -140px; background: var(--brand-200); }
+.auth-bg .orb-2 { width: 420px; height: 420px; bottom: -170px; right: -120px; background: var(--ice-200); }
+
+/* Capsules — the one motif that could only belong to a pharmacy platform. */
+.auth-bg .cap {
+  position: absolute; border-radius: 999px; overflow: hidden;
+  border: 2px solid var(--brand-300); opacity: .34;
+}
+.auth-bg .cap::after {
+  content: ""; position: absolute; inset: 0; right: 50%;
+  background: var(--brand-300); opacity: .5;
+}
+.auth-bg .cap-1 { width: 132px; height: 56px; top: 14%; left: 9%; transform: rotate(-24deg); }
+.auth-bg .cap-2 {
+  width: 96px; height: 40px; bottom: 16%; left: 16%; transform: rotate(14deg);
+  border-color: var(--ice-300);
+}
+.auth-bg .cap-2::after { background: var(--ice-300); }
+.auth-bg .cap-3 { width: 116px; height: 48px; top: 20%; right: 11%; transform: rotate(32deg); }
+
+@media (max-width: 900px) {
+  /* Keep the corners clear on phones — the card needs the room. */
+  .auth-bg .cap-1, .auth-bg .cap-3 { display: none; }
+  .auth-bg .cap-2 { bottom: 6%; left: 6%; opacity: .22; }
+  .auth-page::before { background-size: 22px 22px; }
+}
+/* Auth owns the whole screen — no header, footer or page furniture. */
+body:has(.auth-page) .header,
+body:has(.auth-page) .announce,
+body:has(.auth-page) .staff-bar,
+body:has(.auth-page) .footer,
+body:has(.auth-page) .m-nav,
+body:has(.auth-page) .cartbar { display: none; }
+body:has(.auth-page) { padding-bottom: 0; }
+
+.auth-col { width: 100%; max-width: 400px; display: grid; justify-items: center; gap: var(--sp-6); }
+.auth-logo { font-size: 1.3rem; }
+.auth-card-v2 {
+  width: 100%; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-xl); box-shadow: var(--sh-md);
+  padding: clamp(24px, 5vw, 34px);
+}
+.auth-card-v2 h1 { font-size: 1.55rem; margin: 0 0 5px; }
+.auth-sub { color: var(--ink-3); font-size: .88rem; margin: 0 0 var(--sp-5); line-height: 1.5; }
+.auth-hint { margin: 12px 0 0; font-size: .8rem; color: var(--ink-3); text-align: center; }
+.auth-sent {
+  margin: 0 0 var(--sp-4); font-size: .85rem; color: var(--ink-2);
+  display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+}
+.auth-alt { margin: var(--sp-5) 0 0; text-align: center; font-size: .86rem; color: var(--ink-3); }
+.auth-alt a { color: var(--brand-700); font-weight: 700; }
+.auth-note {
+  margin: 0 0 var(--sp-4); padding: 11px 13px; border-radius: var(--r-md);
+  background: var(--ice-50); border: 1px solid var(--ice-200);
+  color: var(--ink-2); font-size: .8rem; line-height: 1.5;
+}
+.auth-trust {
+  display: flex; align-items: center; gap: 7px; margin: 0;
+  font-size: .76rem; color: var(--ink-3);
+}
+.auth-trust svg { color: var(--ice-600); flex: none; }
+
+/* Signup progress — three quiet dots, no numbered chrome. */
+.auth-rail { display: flex; gap: 6px; margin-bottom: var(--sp-5); }
+.auth-rail span {
+  height: 4px; flex: 1; border-radius: 99px; background: var(--line);
+  transition: .25s var(--ease);
+}
+.auth-rail span.on { background: var(--brand-600); }
+.auth-rail span.done { background: var(--brand-300); }
+
+/* Segmented control */
+.seg {
+  display: grid; grid-auto-flow: column; gap: 4px; padding: 4px; margin-bottom: var(--sp-5);
+  background: var(--paper-3); border-radius: 999px;
+}
+.seg button {
+  border: none; background: none; padding: 9px 12px; border-radius: 999px;
+  font: inherit; font-size: .84rem; font-weight: 600; color: var(--ink-3); cursor: pointer;
+  transition: .15s var(--ease);
+}
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--sh-sm); }
+
+/* Phone field with fixed +91 affix */
+.phone-input {
+  display: flex; align-items: center; height: 48px; overflow: hidden;
+  border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--card);
+  transition: .15s var(--ease);
+}
+.phone-input:focus-within { border-color: var(--brand-600); box-shadow: 0 0 0 3px rgba(96,108,56,.2); }
+.phone-input.is-error { border-color: var(--danger); }
+.phone-input.is-disabled { background: var(--paper-3); }
+.phone-input .prefix {
+  padding: 0 12px; height: 100%; display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono-stack); font-size: .88rem; color: var(--ink-2);
+  background: var(--paper-3); border-right: 1px solid var(--line); white-space: nowrap;
+}
+.phone-input input {
+  flex: 1; min-width: 0; height: 100%; border: none; outline: none; background: none;
+  padding: 0 14px; font: inherit; font-size: .95rem; letter-spacing: .02em; color: var(--ink);
+}
+/* Compact variant lines up with the 44px .input used in checkout / forms. */
+.phone-input--sm { height: 44px; }
+.phone-input--sm .prefix { font-size: .82rem; padding: 0 10px; }
+.phone-input--sm input { font-size: .92rem; padding: 0 12px; }
+
+/* Password field with reveal toggle */
+.pw-input {
+  display: flex; align-items: center; height: 48px;
+  border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--card);
+  transition: .15s var(--ease);
+}
+.pw-input:focus-within { border-color: var(--brand-600); box-shadow: 0 0 0 3px rgba(96,108,56,.2); }
+.pw-input.is-error { border-color: var(--danger); }
+.pw-input input {
+  flex: 1; min-width: 0; height: 100%; border: none; outline: none; background: none;
+  padding: 0 4px 0 14px; font: inherit; font-size: .95rem; color: var(--ink);
+}
+.pw-input button {
+  border: none; background: none; padding: 0 12px; height: 100%; cursor: pointer;
+  color: var(--ink-3); display: grid; place-items: center;
+}
+.pw-input button:hover { color: var(--ink); }
+
+/* OTP cells */
+.otp-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.otp-cell {
+  height: 54px; width: 100%; text-align: center; border-radius: var(--r-md);
+  border: 1px solid var(--line-2); background: var(--card); color: var(--ink);
+  font-family: var(--font-mono-stack); font-size: 1.2rem; font-weight: 600;
+  transition: .15s var(--ease);
+}
+.otp-cell:focus {
+  outline: none; border-color: var(--brand-600); box-shadow: 0 0 0 3px rgba(96,108,56,.2);
+}
+.otp-cell.is-error { border-color: var(--danger); }
+
+.field-error { display: block; margin-top: 6px; font-size: .78rem; color: var(--danger); }
+.field-hint { display: block; margin-top: 6px; font-size: .78rem; color: var(--ink-3); }
+.btn-lg { height: 48px; font-size: .95rem; }
+.linkish {
+  background: none; border: none; padding: 0; font: inherit; font-size: .82rem;
+  color: var(--brand-700); font-weight: 600; cursor: pointer; text-decoration: underline;
+}
+.linkish:disabled { color: var(--ink-3); text-decoration: none; cursor: default; }
+.linkish.center { display: block; margin: 14px auto 0; }
+
+.google-btn { gap: 10px; font-weight: 600; height: 48px; }
+.auth-or {
+  display: flex; align-items: center; gap: 12px; margin: var(--sp-5) 0 var(--sp-4);
+  color: var(--ink-3); font-size: .76rem;
+}
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* Role picker */
+.role-picker { display: grid; gap: 8px; }
+.role-opt {
+  display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--r-md); padding: 11px 13px;
+  transition: .15s var(--ease);
+}
+.role-opt:hover { border-color: var(--line-2); }
+.role-opt.on { border-color: var(--brand-600); background: var(--brand-50); }
+.role-opt input { margin-top: 3px; flex: none; accent-color: var(--brand-700); }
+.role-opt b { display: block; font-size: .88rem; }
+.role-opt span span { font-size: .76rem; color: var(--ink-3); }
+
+@media (max-width: 420px) {
+  .otp-row { gap: 6px; }
+  .otp-cell { height: 48px; font-size: 1.05rem; }
+}
+

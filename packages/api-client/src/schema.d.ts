@@ -187,7 +187,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Products Admin
+         * @description Full product list including unpublished rows — the ops table view.
+         */
+        get: operations["list_products_admin_api_v1_admin_products_get"];
         put?: never;
         /** Create Product */
         post: operations["create_product_api_v1_admin_products_post"];
@@ -299,6 +303,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/products/{product_id}/images/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Image Url
+         * @description Attach a product image by public URL (works without object storage).
+         */
+        post: operations["add_image_url_api_v1_admin_products__product_id__images_url_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/images/{image_id}/primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Primary Image */
+        patch: operations["set_primary_image_api_v1_admin_images__image_id__primary_patch"];
+        trace?: never;
+    };
     "/api/v1/admin/images/{image_id}": {
         parameters: {
             query?: never;
@@ -323,7 +364,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Categories Admin
+         * @description All categories including inactive, with live product counts.
+         */
+        get: operations["list_categories_admin_api_v1_admin_categories_get"];
         put?: never;
         /** Create Category */
         post: operations["create_category_api_v1_admin_categories_post"];
@@ -532,6 +577,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Orders Admin
+         * @description All customer orders for the ops queue.
+         */
+        get: operations["list_orders_admin_api_v1_admin_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/orders/{order_number}/shipment": {
         parameters: {
             query?: never;
@@ -681,6 +746,40 @@ export interface paths {
         put?: never;
         /** Quote */
         post: operations["quote_api_v1_admin_enquiries__enquiry_id__quote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/enquiries/{enquiry_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_v1_admin_enquiries__enquiry_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/enquiries/{enquiry_id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return To Sales */
+        post: operations["return_to_sales_api_v1_admin_enquiries__enquiry_id__return_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -903,6 +1002,77 @@ export interface paths {
         /** Mark All Read */
         post: operations["mark_all_read_api_v1_notifications_read_all_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wishlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Wishlist */
+        get: operations["get_wishlist_api_v1_wishlist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wishlist/items/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add To Wishlist */
+        put: operations["add_to_wishlist_api_v1_wishlist_items__product_id__put"];
+        post?: never;
+        /** Remove From Wishlist */
+        delete: operations["remove_from_wishlist_api_v1_wishlist_items__product_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Compare */
+        get: operations["get_compare_api_v1_compare_get"];
+        put?: never;
+        post?: never;
+        /** Clear Compare */
+        delete: operations["clear_compare_api_v1_compare_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compare/items/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add To Compare */
+        put: operations["add_to_compare_api_v1_compare_items__product_id__put"];
+        post?: never;
+        /** Remove From Compare */
+        delete: operations["remove_from_compare_api_v1_compare_items__product_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1635,6 +1805,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Facets
+         * @description Brands + price range for the products-page filter sidebar.
+         */
+        get: operations["facets_api_v1_products_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{slug}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Related Products
+         * @description Alternatives to this product, priced at the caller's tier.
+         */
+        get: operations["related_products_api_v1_products__slug__related_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/{slug}": {
         parameters: {
             query?: never;
@@ -1769,6 +1979,23 @@ export interface paths {
         post: operations["apply_coupon_api_v1_cart_coupon_post"];
         /** Clear Coupon */
         delete: operations["clear_coupon_api_v1_cart_coupon_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/checkout/payment-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Payment Methods */
+        get: operations["list_payment_methods_api_v1_checkout_payment_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1930,6 +2157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pincodes/{pincode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve Pincode */
+        get: operations["resolve_pincode_api_v1_pincodes__pincode__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1964,8 +2208,6 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
-            /** Brand */
-            brand: string;
             /** Category Slug */
             category_slug: string;
             /** Sub Category */
@@ -2115,6 +2357,11 @@ export interface components {
             gst_rate_pct: number;
             /** Line Subtotal */
             line_subtotal: number;
+            /**
+             * Is Quote Only
+             * @default false
+             */
+            is_quote_only: boolean;
             product: components["schemas"]["CartItemProduct"];
         };
         /**
@@ -2131,8 +2378,6 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
-            /** Brand */
-            brand: string;
             /** Unit Label */
             unit_label: string;
             /** Stock Status */
@@ -2295,6 +2540,26 @@ export interface components {
              * @default []
              */
             blocks: components["schemas"]["CmsBlockOut"][];
+        };
+        /** CompareOut */
+        CompareOut: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["SavedItemOut"][];
+            /**
+             * Product Ids
+             * @default []
+             */
+            product_ids: string[];
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /** Max Items */
+            max_items: number;
         };
         /** ConfirmRequest */
         ConfirmRequest: {
@@ -2465,6 +2730,10 @@ export interface components {
             quantity: number;
             /** Quoted Unit Price */
             quoted_unit_price?: number | null;
+            /** Range Min */
+            range_min?: number | null;
+            /** Range Max */
+            range_max?: number | null;
         };
         /** EnquiryOut */
         EnquiryOut: {
@@ -2492,8 +2761,23 @@ export interface components {
             quoted_total?: number | null;
             /** Quote Valid Until */
             quote_valid_until?: string | null;
+            /**
+             * Approval Status
+             * @default none
+             */
+            approval_status: string;
+            /** Quote Prepared By Id */
+            quote_prepared_by_id?: string | null;
+            /** Quote Approved By Id */
+            quote_approved_by_id?: string | null;
+            /** Quote Submitted At */
+            quote_submitted_at?: string | null;
+            /** Quote Approved At */
+            quote_approved_at?: string | null;
             /** Converted Order Id */
             converted_order_id?: string | null;
+            /** Converted Order Number */
+            converted_order_number?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2577,6 +2861,18 @@ export interface components {
             public_url: string;
             /** Expires In */
             expires_in: number;
+        };
+        /** ImageUrlRequest */
+        ImageUrlRequest: {
+            /** Url */
+            url: string;
+            /** Alt */
+            alt?: string | null;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
         };
         /** ImportReport */
         ImportReport: {
@@ -2814,8 +3110,6 @@ export interface components {
             variant_id: string;
             /** Product Name */
             product_name: string;
-            /** Brand */
-            brand: string;
             /** Unit Label */
             unit_label: string;
             /** Hsn Code */
@@ -2989,6 +3283,40 @@ export interface components {
              */
             currency: string;
         };
+        /**
+         * PaymentMethodInfo
+         * @description One method the storefront may offer at checkout.
+         */
+        PaymentMethodInfo: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "cod" | "upi" | "card" | "netbanking" | "wallet";
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "offline" | "gateway";
+            /** Description */
+            description?: string | null;
+        };
+        /**
+         * PaymentMethodsResponse
+         * @description Availability is config-driven (`PAYMENT_METHODS_ENABLED`) — the
+         *     storefront renders exactly this list, never a hardcoded one.
+         */
+        PaymentMethodsResponse: {
+            /** Methods */
+            methods: components["schemas"]["PaymentMethodInfo"][];
+            /**
+             * Default
+             * @enum {string}
+             */
+            default: "cod" | "upi" | "card" | "netbanking" | "wallet";
+        };
         /** PaymentOut */
         PaymentOut: {
             /** Method */
@@ -3015,6 +3343,17 @@ export interface components {
              * Format: date
              */
             period: string;
+        };
+        /** PincodeOut */
+        PincodeOut: {
+            /** Pincode */
+            pincode: string;
+            /** City */
+            city: string;
+            /** District */
+            district: string;
+            /** State */
+            state: string;
         };
         /** PlaceOrderRequest */
         PlaceOrderRequest: {
@@ -3063,6 +3402,16 @@ export interface components {
              * @description paise
              */
             selling_price: number;
+            /**
+             * Range Min
+             * @description paise
+             */
+            range_min?: number | null;
+            /**
+             * Range Max
+             * @description paise
+             */
+            range_max?: number | null;
         };
         /** ProductCreate */
         ProductCreate: {
@@ -3070,8 +3419,6 @@ export interface components {
             name: string;
             /** Slug */
             slug?: string | null;
-            /** Brand */
-            brand: string;
             /** Description */
             description?: string | null;
             /** Category Slug */
@@ -3138,8 +3485,10 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
-            /** Brand */
-            brand: string;
+            /** Default Variant Id */
+            default_variant_id?: string | null;
+            /** Image Key */
+            image_key?: string | null;
             /** Category Slug */
             category_slug: string;
             /** Category Name */
@@ -3159,6 +3508,21 @@ export interface components {
             price_min: number;
             /** Price Max */
             price_max: number;
+            /**
+             * Mrp
+             * @default 0
+             */
+            mrp: number;
+            /**
+             * Gst Rate Pct
+             * @default 12
+             */
+            gst_rate_pct: number;
+            /**
+             * Is Quote Only
+             * @default false
+             */
+            is_quote_only: boolean;
             /** Is Featured */
             is_featured: boolean;
             /** Badge */
@@ -3182,6 +3546,7 @@ export interface components {
              * @default []
              */
             specs: Record<string, never>[];
+            info?: components["schemas"]["ProductInfo"];
             /**
              * Variants
              * @default []
@@ -3205,6 +3570,46 @@ export interface components {
             sort_order: number;
         };
         /**
+         * ProductInfo
+         * @description Product-information block shown under the PDP description.
+         *
+         *     Sourced from the product's free-form `attributes`; every field is optional
+         *     so partially-filled products still render (the frontend fills sensible
+         *     fallbacks). `dosage_timing` is a list of `morning` / `afternoon` / `night`.
+         */
+        ProductInfo: {
+            /** Uses */
+            uses?: string | null;
+            /** Composition */
+            composition?: string | null;
+            /** Directions */
+            directions?: string | null;
+            /**
+             * Dosage Timing
+             * @default []
+             */
+            dosage_timing: string[];
+            /** Storage */
+            storage?: string | null;
+            /** Warnings */
+            warnings?: string | null;
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Country Of Origin */
+            country_of_origin?: string | null;
+            /** Mfg Date */
+            mfg_date?: string | null;
+            /** Expiry Date */
+            expiry_date?: string | null;
+            /** Shelf Life Months */
+            shelf_life_months?: number | null;
+            /**
+             * Prescription Required
+             * @default false
+             */
+            prescription_required: boolean;
+        };
+        /**
          * ProductListItem
          * @description Catalogue row — backwards-compatible with the existing JSX cards.
          */
@@ -3218,8 +3623,10 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
-            /** Brand */
-            brand: string;
+            /** Default Variant Id */
+            default_variant_id?: string | null;
+            /** Image Key */
+            image_key?: string | null;
             /** Category Slug */
             category_slug: string;
             /** Category Name */
@@ -3239,6 +3646,21 @@ export interface components {
             price_min: number;
             /** Price Max */
             price_max: number;
+            /**
+             * Mrp
+             * @default 0
+             */
+            mrp: number;
+            /**
+             * Gst Rate Pct
+             * @default 12
+             */
+            gst_rate_pct: number;
+            /**
+             * Is Quote Only
+             * @default false
+             */
+            is_quote_only: boolean;
             /** Is Featured */
             is_featured: boolean;
             /** Badge */
@@ -3254,7 +3676,12 @@ export interface components {
              */
             schedule: "NONE" | "H" | "H1" | "X";
         };
-        /** ProductPriceRow */
+        /**
+         * ProductPriceRow
+         * @description All money is tax-INCLUSIVE paise. `gst_amount` is the tax contained
+         *     within `selling_price` — computed server-side so the UI never re-derives
+         *     tax and drifts from what checkout actually charges.
+         */
         ProductPriceRow: {
             /**
              * Role
@@ -3265,6 +3692,20 @@ export interface components {
             mrp: number;
             /** Selling Price */
             selling_price: number;
+            /** Range Min */
+            range_min?: number | null;
+            /** Range Max */
+            range_max?: number | null;
+            /**
+             * Gst Rate Pct
+             * @default 12
+             */
+            gst_rate_pct: number;
+            /**
+             * Gst Amount
+             * @default 0
+             */
+            gst_amount: number;
             /**
              * Currency
              * @default INR
@@ -3275,8 +3716,6 @@ export interface components {
         ProductUpdate: {
             /** Name */
             name?: string | null;
-            /** Brand */
-            brand?: string | null;
             /** Description */
             description?: string | null;
             /** Category Slug */
@@ -3417,6 +3856,14 @@ export interface components {
             reason?: string | null;
         };
         /**
+         * ReturnInput
+         * @description Manager/admin sends a drafted quote back to the rep.
+         */
+        ReturnInput: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
          * ReviewAuthor
          * @description Public-facing author identity. Email and exact role are not exposed.
          */
@@ -3469,6 +3916,18 @@ export interface components {
              */
             updated_at: string;
             author: components["schemas"]["ReviewAuthor"];
+        };
+        /**
+         * SavedItemOut
+         * @description One saved product, rendered with the caller's role-aware pricing.
+         */
+        SavedItemOut: {
+            product: components["schemas"]["ProductListItem"];
+            /**
+             * Added At
+             * Format: date-time
+             */
+            added_at: string;
         };
         /** SendMessage */
         SendMessage: {
@@ -3531,6 +3990,8 @@ export interface components {
             line2?: string | null;
             /** City */
             city: string;
+            /** District */
+            district?: string | null;
             /** State */
             state: string;
             /** Pincode */
@@ -3826,6 +4287,24 @@ export interface components {
             state?: string | null;
             /** Is Active */
             is_active: boolean;
+        };
+        /** WishlistOut */
+        WishlistOut: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["SavedItemOut"][];
+            /**
+             * Product Ids
+             * @default []
+             */
+            product_ids: string[];
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
         };
         /** AssignInput */
         app__api__v1__analytics__AssignInput: {
@@ -4219,6 +4698,37 @@ export interface operations {
             };
         };
     };
+    list_products_admin_api_v1_admin_products_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_product_api_v1_admin_products_post: {
         parameters: {
             query?: never;
@@ -4468,6 +4978,74 @@ export interface operations {
             };
         };
     };
+    add_image_url_api_v1_admin_products__product_id__images_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageUrlRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_primary_image_api_v1_admin_images__image_id__primary_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                image_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_image_api_v1_admin_images__image_id__delete: {
         parameters: {
             query?: never;
@@ -4487,6 +5065,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_categories_admin_api_v1_admin_categories_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -5007,6 +5616,41 @@ export interface operations {
             };
         };
     };
+    list_orders_admin_api_v1_admin_orders_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                q?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_shipment_api_v1_admin_orders__order_number__shipment_post: {
         parameters: {
             query?: never;
@@ -5291,6 +5935,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string | null;
+                approval?: string | null;
                 mine?: boolean;
             };
             header?: {
@@ -5372,6 +6017,76 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["QuoteInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnquiryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_v1_admin_enquiries__enquiry_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                enquiry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnquiryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    return_to_sales_api_v1_admin_enquiries__enquiry_id__return_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                enquiry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnInput"];
             };
         };
         responses: {
@@ -5821,6 +6536,231 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_wishlist_api_v1_wishlist_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WishlistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_to_wishlist_api_v1_wishlist_items__product_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WishlistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_from_wishlist_api_v1_wishlist_items__product_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WishlistOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_compare_api_v1_compare_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompareOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_compare_api_v1_compare_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompareOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_to_compare_api_v1_compare_items__product_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompareOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_from_compare_api_v1_compare_items__product_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompareOut"];
                 };
             };
             /** @description Validation Error */
@@ -7501,10 +8441,14 @@ export interface operations {
                 category?: string | null;
                 /** @description Filter by sub_category label (case-insensitive) */
                 sub_category?: string | null;
-                /** @description Filter by one or more brands, comma-separated. e.g. brand=Cipla,Sun Pharma */
-                brand?: string | null;
                 /** @description Filter by schedule class: H / H1 / X */
                 schedule?: string | null;
+                /** @description true = prescription-only (any schedule); false = over-the-counter */
+                prescription?: boolean | null;
+                /** @description Minimum price in paise */
+                price_min?: number | null;
+                /** @description Maximum price in paise */
+                price_max?: number | null;
                 /** @description Only return in-stock items */
                 in_stock?: boolean | null;
                 /** @description Only return featured items */
@@ -7529,6 +8473,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Paginated_ProductListItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    facets_api_v1_products_facets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    related_products_api_v1_products__slug__related_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListItem"][];
                 };
             };
             /** @description Validation Error */
@@ -7911,6 +8919,26 @@ export interface operations {
             };
         };
     };
+    list_payment_methods_api_v1_checkout_payment_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodsResponse"];
+                };
+            };
+        };
+    };
     quote_api_v1_checkout_quote_post: {
         parameters: {
             query?: never;
@@ -8208,6 +9236,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__coupon__CouponOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_pincode_api_v1_pincodes__pincode__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pincode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PincodeOut"];
                 };
             };
             /** @description Validation Error */

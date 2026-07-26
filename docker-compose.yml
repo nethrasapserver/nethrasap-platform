@@ -80,8 +80,17 @@ services:
     build:
       context: .
       dockerfile: infra/Dockerfile.frontend
-      args: { APP: storefront, API_PROXY_TARGET: "http://api:8000" }
+      args:
+        APP: storefront
+        API_PROXY_TARGET: "http://api:8000"
+        # Browser-facing URL of the ops portal (staff banner link).
+        NEXT_PUBLIC_DASHBOARD_URL: "http://localhost:3001"
     container_name: nethrasap-storefront
+    # Build arg covers the baked Next rewrites; SSR server components read
+    # API_PROXY_TARGET at RUNTIME (lib/api.ts serverApi), so it must also be
+    # set on the running container.
+    environment:
+      API_PROXY_TARGET: "http://api:8000"
     ports:
       - "3000:3000"
     depends_on:
@@ -95,6 +104,8 @@ services:
       dockerfile: infra/Dockerfile.frontend
       args: { APP: dashboard, API_PROXY_TARGET: "http://api:8000" }
     container_name: nethrasap-dashboard
+    environment:
+      API_PROXY_TARGET: "http://api:8000"
     ports:
       - "3001:3000"
     depends_on:
