@@ -48,6 +48,12 @@ envVarGroups:
         sync: false
       - key: STORAGE_PUBLIC_BASE_URL
         sync: false
+      # First ops login — set once for the initial deploy, remove after the
+      # admin exists and the password has been rotated in the dashboard.
+      - key: BOOTSTRAP_ADMIN_PHONE
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
       # Payments (Razorpay). Fill with test keys, then live keys at go-live.
       - key: RAZORPAY_KEY_ID
         sync: false
@@ -73,7 +79,9 @@ services:
     region: singapore
     healthCheckPath: /api/v1/health
     # Runs against the NEW image before it takes traffic — safe & idempotent.
-    preDeployCommand: "alembic upgrade head && python -m scripts.seed_rbac"
+    # bootstrap_admin creates the first admin from BOOTSTRAP_ADMIN_* env vars
+    # and self-skips once any admin exists (or when the vars are unset).
+    preDeployCommand: "alembic upgrade head && python -m scripts.seed_rbac && python -m scripts.bootstrap_admin"
     envVars:
       - fromGroup: nethrasap-shared
       - key: REDIS_URL
