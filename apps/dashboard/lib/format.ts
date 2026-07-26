@@ -12,6 +12,22 @@ export function inrExact(paise: number | null | undefined): string {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(paise / 100);
 }
 
+/* --- Money entry -----------------------------------------------------------
+   The API speaks integer paise, but staff think in rupees. Forms bind to
+   rupee strings and convert at the boundary — never make a human type paise. */
+
+/** Rupee text from a form field → integer paise for the API. */
+export function toPaise(rupees: string): number {
+  const n = Number(String(rupees).replace(/,/g, "").trim());
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+/** Integer paise → plain rupee string suitable for an editable input. */
+export function toRupeeInput(paise: number | null | undefined): string {
+  if (paise == null) return "";
+  return String(paise / 100);
+}
+
 export function dateShort(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });

@@ -6,6 +6,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // @nethrasap/ui ships raw .tsx (shared auth fields) — Next must compile it.
+  transpilePackages: ["@nethrasap/ui"],
   output: "standalone",
   experimental: { outputFileTracingRoot: repoRoot },
   async rewrites() {

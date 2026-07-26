@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Modal } from "@/components/Modal";
+import { useEffect, useState } from "react";
+import { Drawer } from "@/components/Drawer";
+import { Pagination, paginate } from "@/components/Pagination";
 import { api } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
@@ -23,6 +24,11 @@ export default function InventoryPage() {
   const [lowOnly, setLowOnly] = useState(false);
   const { data, loading, refetch } = useApi<Level[]>("/admin/inventory", { low_only: lowOnly });
   const [receive, setReceive] = useState<Level | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
+  useEffect(() => setPage(1), [lowOnly]);
+  const rows = data ?? [];
+  const pageItems = paginate(rows, page, PAGE_SIZE);
 
   return (
     <div>
@@ -53,7 +59,7 @@ export default function InventoryPage() {
                 </td>
               </tr>
             )}
-            {data?.map((l) => (
+            {pageItems.map((l) => (
               <tr key={l.level_id}>
                 <td style={{ fontWeight: 600 }}>{l.product_name}</td>
                 <td className="muted">{l.pack_size}</td>
@@ -70,7 +76,7 @@ export default function InventoryPage() {
                 </td>
               </tr>
             ))}
-            {!loading && data?.length === 0 && (
+            {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="empty">
                   No tracked stock.
@@ -80,6 +86,8 @@ export default function InventoryPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
 
       {receive && (
         <ReceiveModal
@@ -100,34 +108,52 @@ function ReceiveModal({ level, onClose, onDone }: { level: Level; onClose: () =>
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   return (
-    <Modal title={`Receive stock — ${level.product_name}`} onClose={onClose}>
-      <div className="muted small" style={{ marginBottom: 12 }}>
-        {level.pack_size} · currently {level.on_hand} on hand
-      </div>
+    <Drawer
+      title="Receive stock"
+      subtitle={level.product_name}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={busy || !qty}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await api.post("/admin/inventory/receive", {
+                  variant_id: level.variant_id,
+                  quantity: Number(qty),
+                });
+                toast("Stock received");
+                onDone();
+              } catch {
+                toast("Could not receive stock", true);
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Adding…" : "Add to inventory"}
+          </button>
+        </>
+      }
+    >
+      <dl className="drawer-dl" style={{ marginBottom: 18 }}>
+        <dt>Pack size</dt>
+        <dd>{level.pack_size}</dd>
+        <dt>Currently on hand</dt>
+        <dd className="mono">{level.on_hand}</dd>
+      </dl>
       <div className="field">
         <label>Quantity received</label>
-        <input className="input" value={qty} onChange={(e) => setQty(e.target.value)} />
+        <input className="input" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
       </div>
-      <button
-        className="btn btn-primary"
-        disabled={busy || !qty}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await api.post("/admin/inventory/receive", {
-              variant_id: level.variant_id,
-              quantity: Number(qty),
-            });
-            toast("Stock received");
-            onDone();
-          } catch {
-            toast("Failed", true);
-            setBusy(false);
-          }
-        }}
-      >
-        Add to inventory
-      </button>
-    </Modal>
+      <p className="muted small" style={{ margin: 0 }}>
+        New on-hand total <strong className="mono">{level.on_hand + (Number(qty) || 0)}</strong> — posts a
+        receipt line to the stock ledger.
+      </p>
+    </Drawer>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Modal } from "@/components/Modal";
+import { Drawer } from "@/components/Drawer";
 import { api } from "@/lib/api";
-import { inr, statusPill } from "@/lib/format";
+import { inr, statusPill, toPaise } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
 
@@ -96,17 +96,50 @@ function AddEmployee({ onClose, onDone }: { onClose: () => void; onDone: () => v
     department: "Sales",
     designation: "Executive",
     date_joined: "2026-01-01",
-    basic_salary: "5000000",
-    allowances: "1000000",
+    // Rupees in the form; converted to paise on submit.
+    basic_salary: "50000",
+    allowances: "10000",
   });
   const [busy, setBusy] = useState(false);
   const set = (k: string, v: string) => setF({ ...f, [k]: v });
+  const monthly = toPaise(f.basic_salary) + toPaise(f.allowances);
+
+  async function submit() {
+    setBusy(true);
+    try {
+      await api.post("/hr/employees", {
+        ...f,
+        basic_salary: toPaise(f.basic_salary),
+        allowances: toPaise(f.allowances),
+      });
+      toast("Employee added");
+      onDone();
+    } catch {
+      toast("Could not add employee — the code may already exist", true);
+      setBusy(false);
+    }
+  }
+
   return (
-    <Modal title="Add employee" onClose={onClose}>
+    <Drawer
+      title="Add employee"
+      subtitle="Creates an HR record for payroll and leave."
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" disabled={busy || !f.code || !f.full_name} onClick={submit}>
+            {busy ? "Adding…" : "Add employee"}
+          </button>
+        </>
+      }
+    >
       <div className="row">
         <div className="field grow">
           <label>Code</label>
-          <input className="input" value={f.code} onChange={(e) => set("code", e.target.value)} />
+          <input className="input" value={f.code} onChange={(e) => set("code", e.target.value)} placeholder="EMP-014" />
         </div>
         <div className="field grow">
           <label>Full name</label>
@@ -123,37 +156,23 @@ function AddEmployee({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <input className="input" value={f.designation} onChange={(e) => set("designation", e.target.value)} />
         </div>
       </div>
+      <div className="field">
+        <label>Date joined</label>
+        <input className="input" type="date" value={f.date_joined} onChange={(e) => set("date_joined", e.target.value)} />
+      </div>
       <div className="row">
         <div className="field grow">
-          <label>Basic (paise/mo)</label>
-          <input className="input" value={f.basic_salary} onChange={(e) => set("basic_salary", e.target.value)} />
+          <label>Basic salary (₹ / month)</label>
+          <input className="input" inputMode="decimal" value={f.basic_salary} onChange={(e) => set("basic_salary", e.target.value)} />
         </div>
         <div className="field grow">
-          <label>Allowances (paise/mo)</label>
-          <input className="input" value={f.allowances} onChange={(e) => set("allowances", e.target.value)} />
+          <label>Allowances (₹ / month)</label>
+          <input className="input" inputMode="decimal" value={f.allowances} onChange={(e) => set("allowances", e.target.value)} />
         </div>
       </div>
-      <button
-        className="btn btn-primary"
-        disabled={busy || !f.code || !f.full_name}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await api.post("/hr/employees", {
-              ...f,
-              basic_salary: Number(f.basic_salary),
-              allowances: Number(f.allowances),
-            });
-            toast("Employee added");
-            onDone();
-          } catch {
-            toast("Failed (code may exist)", true);
-            setBusy(false);
-          }
-        }}
-      >
-        Add employee
-      </button>
-    </Modal>
+      <p className="muted small" style={{ margin: 0 }}>
+        Gross monthly cost <strong className="mono">{inr(monthly)}</strong>
+      </p>
+    </Drawer>
   );
 }

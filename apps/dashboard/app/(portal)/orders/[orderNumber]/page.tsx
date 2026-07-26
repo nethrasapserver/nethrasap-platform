@@ -3,10 +3,10 @@
 import type { OrderDetail } from "@nethrasap/api-client";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { Modal } from "@/components/Modal";
+import { Drawer } from "@/components/Drawer";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { dateTime, inrExact, statusPill } from "@/lib/format";
+import { dateTime, inr, inrExact, statusPill, toPaise } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
 
@@ -77,7 +77,6 @@ export default function OrderDetailPage() {
                 <tr key={it.id}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{it.product_name}</div>
-                    <div className="muted small">{it.brand}</div>
                   </td>
                   <td className="num">{it.quantity}</td>
                   <td className="num">{inrExact(it.line_total)}</td>
@@ -153,33 +152,44 @@ function DispatchModal({ orderNumber, onClose, onDone }: { orderNumber: string; 
   const [awb, setAwb] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <Modal title="Dispatch order" onClose={onClose}>
+    <Drawer
+      title="Dispatch order"
+      subtitle={`${orderNumber} — reserved stock will be fulfilled`}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={busy || !awb}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await api.post(`/admin/orders/${orderNumber}/shipment`, { courier, awb_number: awb });
+                toast("Order dispatched — stock fulfilled");
+                onDone();
+              } catch {
+                toast("Could not dispatch the order", true);
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Dispatching…" : "Confirm dispatch"}
+          </button>
+        </>
+      }
+    >
       <div className="field">
         <label>Courier</label>
         <input className="input" value={courier} onChange={(e) => setCourier(e.target.value)} />
       </div>
       <div className="field">
         <label>AWB / tracking number</label>
-        <input className="input" value={awb} onChange={(e) => setAwb(e.target.value)} />
+        <input className="input" value={awb} onChange={(e) => setAwb(e.target.value)} placeholder="Required" />
       </div>
-      <button
-        className="btn btn-primary"
-        disabled={busy || !awb}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await api.post(`/admin/orders/${orderNumber}/shipment`, { courier, awb_number: awb });
-            toast("Order dispatched — stock fulfilled");
-            onDone();
-          } catch {
-            toast("Dispatch failed", true);
-            setBusy(false);
-          }
-        }}
-      >
-        Confirm dispatch
-      </button>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -199,41 +209,69 @@ function RefundModal({
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  // Guard the partial-refund amount client-side; the API is the final authority.
+  const overMax = !full && toPaise(amount) > max;
   return (
-    <Modal title="Refund order" onClose={onClose}>
-      <label className="row" style={{ gap: 8, marginBottom: 10 }}>
-        <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Full refund
+    <Drawer
+      title="Refund order"
+      subtitle={`${orderNumber} — paid ${inr(max)}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-danger"
+            disabled={busy || overMax || (!full && !amount)}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await api.post(`/admin/orders/${orderNumber}/refund`, {
+                  amount_paise: full ? undefined : toPaise(amount),
+                  reason,
+                });
+                toast("Refund initiated");
+                onDone();
+              } catch {
+                toast("Could not process the refund", true);
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Processing…" : `Refund ${inr(full ? max : toPaise(amount))}`}
+          </button>
+        </>
+      }
+    >
+      <label className="row" style={{ gap: 8, marginBottom: 14, cursor: "pointer" }}>
+        <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} />
+        Full refund — {inr(max)}
       </label>
+
       {!full && (
         <div className="field">
-          <label>Amount (paise, max {max})</label>
-          <input className="input" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <label>Amount (₹)</label>
+          <input
+            className="input"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder={`Up to ${inr(max)}`}
+            aria-invalid={overMax}
+          />
+          {overMax && (
+            <p className="small" style={{ color: "var(--danger)", margin: "6px 0 0" }}>
+              Exceeds the amount paid ({inr(max)}).
+            </p>
+          )}
         </div>
       )}
+
       <div className="field">
         <label>Reason</label>
-        <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Shown in the audit log" />
       </div>
-      <button
-        className="btn btn-danger"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            await api.post(`/admin/orders/${orderNumber}/refund`, {
-              amount_paise: full ? undefined : Number(amount),
-              reason,
-            });
-            toast("Refund initiated");
-            onDone();
-          } catch {
-            toast("Refund failed", true);
-            setBusy(false);
-          }
-        }}
-      >
-        Process refund
-      </button>
-    </Modal>
+    </Drawer>
   );
 }
