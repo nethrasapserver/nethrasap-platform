@@ -8,6 +8,13 @@ export function inr(paise: number | null | undefined): string {
   }).format(paise / 100);
 }
 
+/** Midpoint of a price band, rounded to the rupee — the "≈ ₹20" on listings. */
+export function inrAvg(min: number | null | undefined, max: number | null | undefined): string {
+  if (min == null || max == null) return "—";
+  const mid = Math.round((min + max) / 2 / 100) * 100;
+  return inr(mid);
+}
+
 export function stockLabel(status: string): { text: string; cls: string } {
   switch (status) {
     case "in_stock":

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import "@nethrasap/ui/styles.css";
 import "@/styles/app.css";
-import { Footer, Header } from "@/components/Shell";
+import "@nethrasap/ui/auth.css";
+import { ChatBot } from "@/components/ChatBot";
+import { Announce, BottomNav, FloatingCartBar, Footer, Header, StaffBanner } from "@/components/Shell";
+import { sans } from "./fonts";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
@@ -14,12 +18,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={sans.variable}>
       <body>
         <Providers>
+          <Announce />
+          <StaffBanner />
           <Header />
           <main style={{ minHeight: "60vh" }}>{children}</main>
           <Footer />
+          <BottomNav />
+          <FloatingCartBar />
+          <ChatBot />
         </Providers>
       </body>
     </html>

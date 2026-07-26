@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { api } from "./api";
@@ -19,6 +20,10 @@ interface CartState {
   add: (variantId: string, quantity?: number) => Promise<void>;
   update: (itemId: string, quantity: number) => Promise<void>;
   remove: (itemId: string) => Promise<void>;
+  /** Quantity of a variant in the cart (0 if absent) — drives card steppers. */
+  qtyForVariant: (variantId: string) => number;
+  incVariant: (variantId: string) => Promise<void>;
+  decVariant: (variantId: string) => Promise<void>;
 }
 
 const CartContext = createContext<CartState | null>(null);
@@ -69,8 +74,48 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const count = cart?.items?.reduce((n, i) => n + (i.quantity ?? 0), 0) ?? 0;
 
+  const byVariant = useMemo(() => {
+    const m = new Map<string, NonNullable<CartOut["items"]>[number]>();
+    for (const it of cart?.items ?? []) m.set(it.variant_id, it);
+    return m;
+  }, [cart]);
+
+  const qtyForVariant = useCallback(
+    (variantId: string) => byVariant.get(variantId)?.quantity ?? 0,
+    [byVariant],
+  );
+
+  const incVariant = useCallback(
+    async (variantId: string) => {
+      const it = byVariant.get(variantId);
+      if (!it) return add(variantId, 1);
+      try {
+        await update(it.id, it.quantity + 1);
+      } catch {
+        toast("Could not update quantity", true);
+      }
+    },
+    [byVariant, add, update, toast],
+  );
+
+  const decVariant = useCallback(
+    async (variantId: string) => {
+      const it = byVariant.get(variantId);
+      if (!it) return;
+      try {
+        if (it.quantity <= 1) await remove(it.id);
+        else await update(it.id, it.quantity - 1);
+      } catch {
+        toast("Could not update quantity", true);
+      }
+    },
+    [byVariant, update, remove, toast],
+  );
+
   return (
-    <CartContext.Provider value={{ cart, count, reload, add, update, remove }}>
+    <CartContext.Provider
+      value={{ cart, count, reload, add, update, remove, qtyForVariant, incVariant, decVariant }}
+    >
       {children}
     </CartContext.Provider>
   );

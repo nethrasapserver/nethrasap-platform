@@ -89,32 +89,20 @@ export default function OrderDetailPage() {
         <div className="card pad" style={{ marginTop: 12 }}>
           <div className="row" style={{ gap: 0, justifyContent: "space-between" }}>
             {STEPS.map((s, i) => (
-              <div key={s} style={{ flex: 1, textAlign: "center", position: "relative" }}>
-                <div
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 999,
-                    margin: "0 auto 6px",
-                    background: i <= stepIndex ? "var(--brand)" : "var(--line)",
-                    color: "#fff",
-                    display: "grid",
-                    placeItems: "center",
-                    fontSize: 12,
-                  }}
-                >
-                  {i <= stepIndex ? "✓" : ""}
-                </div>
-                <div className="small" style={{ color: i <= stepIndex ? "var(--ink)" : "var(--ink-3)" }}>
-                  {s.replace(/_/g, " ")}
-                </div>
+              <div
+                key={s}
+                className={`track-step ${i <= stepIndex ? "is-done" : ""}`}
+                style={{ flex: 1, textAlign: "center", position: "relative" }}
+              >
+                <div className="n">{i <= stepIndex ? "✓" : ""}</div>
+                <div className="lab">{s.replace(/_/g, " ")}</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="grid" style={{ gridTemplateColumns: "1.5fr 1fr", alignItems: "start", marginTop: 16 }}>
+      <div className="two-col" style={{ marginTop: 16 }}>
         <div className="card">
           <table className="table">
             <thead>
@@ -129,7 +117,6 @@ export default function OrderDetailPage() {
                 <tr key={it.id}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{it.product_name}</div>
-                    <div className="muted small">{it.brand}</div>
                   </td>
                   <td>{it.quantity}</td>
                   <td style={{ textAlign: "right" }}>{inr(it.line_total)}</td>

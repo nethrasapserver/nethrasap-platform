@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart";
+import { SavedProvider } from "@/lib/saved";
 import { ToastProvider } from "@/lib/toast";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -14,7 +15,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={client}>
       <ToastProvider>
         <AuthProvider>
-          <CartProvider>{children}</CartProvider>
+          <SavedProvider>
+            <CartProvider>{children}</CartProvider>
+          </SavedProvider>
         </AuthProvider>
       </ToastProvider>
     </QueryClientProvider>
