@@ -54,7 +54,7 @@ function TileIcon({ d }: { d: string }) {
   );
 }
 
-/** Sparkline with area fill + emphasized endpoint, built from the live trend. */
+/** Sparkline with a flat translucent area fill + emphasized endpoint. */
 function Spark({ id, series, line, fill, dot }: { id: string; series: number[]; line: string; fill: string; dot: string }) {
   if (series.length < 2) return null;
   const max = Math.max(...series, 1);
@@ -62,14 +62,8 @@ function Spark({ id, series, line, fill, dot }: { id: string; series: number[]; 
   const path = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
   const last = pts[pts.length - 1];
   return (
-    <svg className="spark" viewBox="0 0 120 44" preserveAspectRatio="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={fill} stopOpacity=".38" />
-          <stop offset="1" stopColor={fill} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${path} L120 44 L0 44 Z`} fill={`url(#${id})`} />
+    <svg className="spark" viewBox="0 0 120 44" preserveAspectRatio="none" aria-hidden="true" data-spark={id}>
+      <path d={`${path} L120 44 L0 44 Z`} fill={fill} fillOpacity=".14" />
       <path d={path} fill="none" stroke={line} strokeWidth="2" />
       <circle cx={last[0]} cy={last[1]} r="3.5" fill={dot} />
     </svg>
@@ -185,9 +179,7 @@ export default function DashboardHome() {
                         style={{
                           height: `${(p.revenue_paise / maxRev) * 150}px`,
                           minHeight: 3,
-                          background: p.revenue_paise > 0
-                            ? "linear-gradient(180deg, var(--brand-400), var(--brand-700))"
-                            : "var(--line)",
+                          background: p.revenue_paise > 0 ? "var(--brand-600)" : "var(--line)",
                           borderRadius: "4px 4px 0 0",
                         }}
                       />

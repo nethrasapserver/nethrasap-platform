@@ -142,7 +142,7 @@ a.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .panel-body { padding: var(--sp-5); }
 .bar-row { display: grid; grid-template-columns: 110px 1fr 64px; gap: 10px; align-items: center; font-size: .8rem; }
 .bar-track { height: 8px; border-radius: 99px; background: var(--paper-3); overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--brand-300), var(--brand-600)); }
+.bar-fill { height: 100%; border-radius: 99px; background: var(--brand-600); }
 
 /* ---------- Status pills (order/kyc/hr states) ---------- */
 .st {
