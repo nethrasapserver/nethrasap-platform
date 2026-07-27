@@ -310,9 +310,21 @@ async def track_order_public(
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+_INVOICEABLE_STATUSES = (
+    OrderStatus.dispatched,
+    OrderStatus.out_for_delivery,
+    OrderStatus.delivered,
+)
+_INVOICEABLE_PAYMENT = (
+    PaymentStatus.captured,
+    PaymentStatus.refunded,
+    PaymentStatus.partial_refund,
+)
+
+
 async def invoice_url(db: AsyncSession, *, order_number: str, user: User) -> dict[str, Any]:
     """Return a presigned URL for the order's invoice PDF, generating it on
-    demand if a captured payment exists but the PDF isn't ready yet."""
+    demand if the worker hasn't run yet (or for COD orders post-dispatch)."""
     from ..integrations import storage
     from .invoices import generate_for_order
 
@@ -322,7 +334,15 @@ async def invoice_url(db: AsyncSession, *, order_number: str, user: User) -> dic
     invoice = order.invoice
     key = invoice.pdf_storage_key if invoice else None
     if key is None:
-        # Lazily generate (e.g. worker hasn't run, or COD order being viewed).
+        # A tax invoice documents a sale: don't issue one for an order that is
+        # neither paid nor on its way (placed-but-unpaid COD, cancelled, …).
+        if (
+            order.payment_status not in _INVOICEABLE_PAYMENT
+            and order.status not in _INVOICEABLE_STATUSES
+        ):
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "invoice is issued once the order is dispatched"
+            )
         key = await generate_for_order(db, order_number)
     if key is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "invoice not available")

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { WS_BASE, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { inr } from "@/lib/format";
+import { useToast } from "@/lib/toast";
 
 export const dynamic = "force-dynamic";
 
@@ -140,10 +141,9 @@ export default function OrderDetailPage() {
               <strong>Total</strong>
               <strong>{inr(order.grand_total)}</strong>
             </div>
-            {order.status === "confirmed" && (
-              <Link href={`/orders/${order.order_number}/invoice`} className="btn btn-outline btn-sm btn-block">
-                Download invoice
-              </Link>
+            {(["dispatched", "out_for_delivery", "delivered"].includes(order.status) ||
+              ["captured", "refunded", "partial_refund"].includes(order.payment_status)) && (
+              <InvoiceButton orderNumber={order.order_number} />
             )}
           </div>
 
@@ -163,5 +163,30 @@ export default function OrderDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Fetches a short-lived presigned URL for the invoice PDF and opens it. */
+function InvoiceButton({ orderNumber }: { orderNumber: string }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      className="btn btn-outline btn-sm btn-block"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const d = await api.get<{ url: string }>(`/orders/${orderNumber}/invoice`);
+          window.open(d.url, "_blank", "noopener");
+        } catch {
+          toast("Invoice isn't ready yet — try again shortly", true);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "Preparing…" : "Download invoice"}
+    </button>
   );
 }

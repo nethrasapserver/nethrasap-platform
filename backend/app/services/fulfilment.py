@@ -179,6 +179,12 @@ async def update_shipment_status(
     await _notify(order, type="order.status_changed", note=f"shipment {ship_status.value}")
     if ship_status == ShipmentStatus.delivered:
         sms.send_sms(to=_phone(order), body=f"Nethrasap: order {order.order_number} delivered. Thank you!")
+        # COD orders have no payment-capture moment, so delivery is when the
+        # sale completes — issue the tax invoice now (prepaid orders already
+        # got theirs at capture; generate_for_order is idempotent either way).
+        from ..worker import enqueue_job
+
+        await enqueue_job("generate_invoice_pdf", order_number=order.order_number)
     return await _detail(db, order_number)
 
 
