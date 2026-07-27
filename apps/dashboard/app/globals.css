@@ -180,3 +180,29 @@ body { font-size: 14px; }
 .btn { border-radius: var(--r-md); height: 38px; }
 .btn-sm { height: 30px; }
 .btn-danger { background: var(--danger-bg); color: var(--danger); }
+
+/* ---------------------------------------------------------------------------
+   White console (owner brief 2026-07-27): every surface reads pure white —
+   page, cards, panels, KPI tiles, table heads, drawer, topbar, login ground.
+   The brand-900 sidebar stays the console's single dark element. Status
+   pills, icon chips, hover states and scrims keep their colours: they are
+   indicators and affordances, not surfaces. */
+:root {
+  --card: #ffffff;
+  --tint-clay: #ffffff;
+  --tint-info: #ffffff;
+  --tint-copper: #ffffff;
+  --ice-50: #ffffff; /* panel heads, drawer head, table heads sat on this */
+}
+.ptop { background: rgba(255, 255, 255, .92); }
+/* Tinted KPI tiles had transparent borders — on white they need a hairline. */
+.kpi.k-clay, .kpi.k-info, .kpi.k-copper { border-color: var(--line); }
+.kpi.k-hero { background: #ffffff; border-color: var(--line); color: var(--ink); }
+.kpi.k-hero .lab { color: var(--ink-3); }
+.kpi.k-hero .ic { background: var(--brand-700); color: var(--cream); }
+.kpi.k-hero .delta { color: var(--ok); }
+.kpi.k-hero .delta small { color: var(--ink-3); }
+/* Login ground: flat white. auth.css loads after this file, so out-specify it. */
+body .auth-page { background: #ffffff; }
+body .auth-page::before { background-image: none; }
+body .auth-page .auth-bg { display: none; }

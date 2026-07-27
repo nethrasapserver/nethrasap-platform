@@ -134,7 +134,7 @@ export default function DashboardHome() {
           <span className="delta">
             AOV {inr(k?.aov_paise)} <small>per order</small>
           </span>
-          <Spark id="sg-rev" series={revSeries} line="#b3bf78" fill="#b3bf78" dot="#fefae0" />
+          <Spark id="sg-rev" series={revSeries} line="#606c38" fill="#606c38" dot="#283618" />
         </div>
         <Link href="/orders" className="kpi k-clay" style={{ textDecoration: "none", color: "inherit" }}>
           <span className="lab">
