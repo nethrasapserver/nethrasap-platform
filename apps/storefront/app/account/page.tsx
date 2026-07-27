@@ -2,8 +2,9 @@
 
 import type { OrderListItem } from "@nethrasap/api-client";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { KycPanel } from "@/components/KycPanel";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { inr } from "@/lib/format";
@@ -31,7 +32,6 @@ export default function AccountPage() {
 function AccountInner() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const params = useSearchParams();
   const [orders, setOrders] = useState<OrderListItem[]>([]);
 
   useEffect(() => {
@@ -47,25 +47,17 @@ function AccountInner() {
   }, [user]);
 
   if (!user) return null;
-  const needsKyc = user.status === "pending_kyc";
 
   return (
     <div className="container section">
       <div className="row spread">
         <h2>Hello, {user.profile?.full_name ?? "there"}</h2>
-        <span className={`pill ${user.status === "active" ? "pill-ok" : "pill-low"}`}>{user.status}</span>
+        <span className={`pill ${user.status === "active" ? "pill-ok" : "pill-low"}`}>
+          {user.status.replace(/_/g, " ")}
+        </span>
       </div>
 
-      {needsKyc && (
-        <div className="card pad" style={{ marginTop: 16, borderColor: "var(--amber)" }}>
-          <strong>Verify your account to unlock {user.role} pricing.</strong>
-          <p className="muted small" style={{ margin: "6px 0 10px" }}>
-            Upload your {user.role === "retailer" ? "drug licence (20B/21B) and GSTIN" : "council registration"} to
-            get verified.
-          </p>
-          {params.get("kyc") && <span className="pill pill-low">KYC upload coming next in this build</span>}
-        </div>
-      )}
+      <KycPanel />
 
       <h3 style={{ marginTop: 28 }}>Your orders</h3>
       {orders.length === 0 ? (

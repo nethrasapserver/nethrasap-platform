@@ -46,6 +46,7 @@ const NAV: NavSection[] = [
     title: "Sales",
     items: [
       { href: "/enquiries", label: "Enquiries", icon: "enquiries", perm: "enquiries:manage" },
+      { href: "/verifications", label: "Verifications", icon: "kyc", perm: "kyc:review" },
     ],
   },
   {
