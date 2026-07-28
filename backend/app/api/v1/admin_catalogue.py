@@ -5,10 +5,11 @@ module is the write side the admin dashboard drives.
 """
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Response, UploadFile, status
+from pydantic import BaseModel, Field
 
 from ...db import DbSession
 from ...deps import require_permission
@@ -157,6 +158,38 @@ async def update_category(
 ) -> dict:
     c = await svc.update_category(db, actor, category_id, payload.model_dump(exclude_unset=True))
     return {"id": c.id, "slug": c.slug, "name": c.name, "is_active": c.is_active}
+
+
+class CategoryImageSlotRequest(BaseModel):
+    content_type: Literal["image/jpeg", "image/png", "image/webp"]
+
+
+class CategoryImageUrlRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=512)
+
+
+@router.post("/admin/categories/{category_id}/image", status_code=status.HTTP_201_CREATED)
+async def category_image_slot(
+    category_id: UUID, payload: CategoryImageSlotRequest, db: DbSession, actor: CatalogueAdmin
+) -> dict:
+    """Presigned PUT slot for the category tile image."""
+    return await svc.create_category_image_slot(db, actor, category_id, content_type=payload.content_type)
+
+
+@router.post("/admin/categories/{category_id}/image/url")
+async def category_image_url(
+    category_id: UUID, payload: CategoryImageUrlRequest, db: DbSession, actor: CatalogueAdmin
+) -> dict:
+    """Set the tile image from a public URL (works without object storage)."""
+    return await svc.set_category_image_url(db, actor, category_id, url=payload.url)
+
+
+@router.delete(
+    "/admin/categories/{category_id}/image", status_code=status.HTTP_204_NO_CONTENT, response_class=Response
+)
+async def category_image_clear(category_id: UUID, db: DbSession, actor: CatalogueAdmin) -> Response:
+    await svc.clear_category_image(db, actor, category_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete(

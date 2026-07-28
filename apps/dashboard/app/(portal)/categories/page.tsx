@@ -17,6 +17,7 @@ interface AdminCategory {
   sku_prefix: string;
   glyph: string | null;
   sort_order: number;
+  image_key: string | null;
   is_active: boolean;
   product_count: number;
 }
@@ -113,11 +114,10 @@ export default function CategoriesPage() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Category</th>
+              <th colSpan={2}>Category</th>
               <th>Slug</th>
               <th>SKU prefix</th>
               <th className="num">Products</th>
-              <th className="num">Sort</th>
               <th>Status</th>
               <th />
             </tr>
@@ -130,11 +130,23 @@ export default function CategoriesPage() {
             )}
             {pageItems.map((c) => (
               <tr key={c.id} style={c.is_active ? undefined : { opacity: 0.55 }}>
-                <td style={{ fontWeight: 600 }}>{c.name}</td>
+                <td className="prod-thumb-cell">
+                  <span className="prod-thumb">
+                    {c.image_key ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={c.image_key} alt="" loading="lazy" />
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>
+                    )}
+                  </span>
+                </td>
+                <td>
+                  <div style={{ fontWeight: 600 }}>{c.name}</div>
+                  {c.description && <div className="muted small" style={{ maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.description}</div>}
+                </td>
                 <td className="muted mono small">{c.slug}</td>
                 <td className="muted mono small">{c.sku_prefix}</td>
                 <td className="num">{c.product_count}</td>
-                <td className="num muted">{c.sort_order}</td>
                 <td>
                   <span className={`pill ${c.is_active ? "pill-ok" : "pill-muted"}`}>
                     {c.is_active ? "Live" : "Hidden"}
@@ -199,9 +211,65 @@ function CategoryForm({
     name: category?.name ?? "",
     sku_prefix: category?.sku_prefix ?? "",
     description: category?.description ?? "",
-    sort_order: String(category?.sort_order ?? 0),
   });
   const [busy, setBusy] = useState(false);
+  const [image, setImage] = useState<string | null>(category?.image_key ?? null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imgBusy, setImgBusy] = useState(false);
+
+  async function uploadImage(file: File | null) {
+    if (!category || !file) return;
+    setImgBusy(true);
+    try {
+      const slot = await api.post<{ upload_url: string; public_url: string }>(
+        `/admin/categories/${category.id}/image`,
+        { content_type: file.type },
+      );
+      const put = await fetch(slot.upload_url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!put.ok) throw new Error("upload failed");
+      setImage(slot.public_url);
+      toast("Image uploaded");
+    } catch {
+      toast("Upload failed — storage may not be configured; paste an image URL instead", true);
+    } finally {
+      setImgBusy(false);
+    }
+  }
+
+  async function setImageFromUrl() {
+    if (!category || !imageUrl.trim()) return;
+    setImgBusy(true);
+    try {
+      const r = await api.post<{ image_key: string }>(`/admin/categories/${category.id}/image/url`, {
+        url: imageUrl.trim(),
+      });
+      setImage(r.image_key);
+      setImageUrl("");
+      toast("Image set");
+    } catch {
+      toast("Could not set the image", true);
+    } finally {
+      setImgBusy(false);
+    }
+  }
+
+  async function removeImage() {
+    if (!category) return;
+    setImgBusy(true);
+    try {
+      await api.del(`/admin/categories/${category.id}/image`);
+      setImage(null);
+      toast("Image removed");
+    } catch {
+      toast("Could not remove the image", true);
+    } finally {
+      setImgBusy(false);
+    }
+  }
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   async function save() {
@@ -210,7 +278,6 @@ function CategoryForm({
       name: form.name,
       sku_prefix: form.sku_prefix.toUpperCase(),
       description: form.description.trim() || null,
-      sort_order: Number(form.sort_order) || 0,
     };
     try {
       if (editing) {
@@ -249,30 +316,62 @@ function CategoryForm({
         <label>Name</label>
         <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} />
       </div>
-      <div className="row">
-        <div className="field grow">
-          <label>SKU prefix</label>
-          <input
-            className="input mono"
-            maxLength={8}
-            placeholder="e.g. RX"
-            value={form.sku_prefix}
-            onChange={(e) => set("sku_prefix", e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
-          />
-        </div>
-        <div className="field" style={{ width: 120 }}>
-          <label>Sort order</label>
-          <input
-            className="input"
-            inputMode="numeric"
-            value={form.sort_order}
-            onChange={(e) => set("sort_order", e.target.value.replace(/\D/g, "").slice(0, 3))}
-          />
-        </div>
+      <div className="field">
+        <label>SKU prefix</label>
+        <input
+          className="input mono"
+          maxLength={8}
+          placeholder="e.g. RX"
+          value={form.sku_prefix}
+          onChange={(e) => set("sku_prefix", e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
+        />
       </div>
       <div className="field">
         <label>Description (optional)</label>
         <textarea className="input" rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
+      </div>
+
+      <div className="field">
+        <label>Tile image</label>
+        {!editing && (
+          <p className="muted small" style={{ margin: 0 }}>
+            Create the category first — the image can be added right after, from Edit.
+          </p>
+        )}
+        {editing && (
+          <>
+            {image && (
+              <div className="row" style={{ gap: 10, marginBottom: 10, alignItems: "center" }}>
+                <span className="prod-thumb" style={{ width: 64, height: 64 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={image} alt="" />
+                </span>
+                <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={removeImage} disabled={imgBusy}>
+                  Remove
+                </button>
+              </div>
+            )}
+            <input
+              className="input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={imgBusy}
+              onChange={(e) => uploadImage(e.target.files?.[0] ?? null)}
+            />
+            <div className="row" style={{ gap: 8, marginTop: 8 }}>
+              <input
+                className="input"
+                style={{ flex: 1 }}
+                placeholder="…or paste an image URL"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+              />
+              <button className="btn btn-outline btn-sm" onClick={setImageFromUrl} disabled={imgBusy || !imageUrl.trim()}>
+                Set
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </Drawer>
   );

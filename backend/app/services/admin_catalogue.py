@@ -340,6 +340,50 @@ async def update_category(db: AsyncSession, actor: User, category_id: uuid.UUID,
     return category
 
 
+async def _load_category(db: AsyncSession, category_id: uuid.UUID) -> Category:
+    category = (await db.execute(select(Category).where(Category.id == category_id))).scalar_one_or_none()
+    if category is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "category not found")
+    return category
+
+
+async def create_category_image_slot(
+    db: AsyncSession, actor: User, category_id: uuid.UUID, *, content_type: str
+) -> dict:
+    """Presigned direct upload for the category tile image."""
+    category = await _load_category(db, category_id)
+    if content_type not in storage.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unsupported image type")
+    key = storage.make_key("categories", content_type=content_type, prefix=category.slug)
+    category.image_key = key
+    await _audit(db, actor, "category.image_set", "category", str(category.id), {"key": key})
+    await db.commit()
+    await _catalogue_event("category.updated", "category", str(category.id))
+    return {
+        "upload_url": storage.presigned_put(key, content_type=content_type),
+        "storage_key": key,
+        "public_url": storage.public_url(key),
+    }
+
+
+async def set_category_image_url(db: AsyncSession, actor: User, category_id: uuid.UUID, *, url: str) -> dict:
+    """Set the tile image by public URL (works without object storage)."""
+    category = await _load_category(db, category_id)
+    category.image_key = url
+    await _audit(db, actor, "category.image_set", "category", str(category.id), {"url": url})
+    await db.commit()
+    await _catalogue_event("category.updated", "category", str(category.id))
+    return {"image_key": url}
+
+
+async def clear_category_image(db: AsyncSession, actor: User, category_id: uuid.UUID) -> None:
+    category = await _load_category(db, category_id)
+    category.image_key = None
+    await _audit(db, actor, "category.image_cleared", "category", str(category.id), {})
+    await db.commit()
+    await _catalogue_event("category.updated", "category", str(category.id))
+
+
 async def delete_category(db: AsyncSession, actor: User, category_id: uuid.UUID) -> None:
     category = (await db.execute(select(Category).where(Category.id == category_id))).scalar_one_or_none()
     if category is None:
@@ -426,6 +470,7 @@ async def list_categories_admin(db: AsyncSession) -> list[dict[str, Any]]:
             "sku_prefix": c.sku_prefix,
             "glyph": c.glyph,
             "sort_order": c.sort_order,
+            "image_key": storage.public_url(c.image_key) if c.image_key else None,
             "is_active": c.is_active,
             "product_count": counts.get(c.id, 0),
         }

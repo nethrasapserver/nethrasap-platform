@@ -192,3 +192,40 @@ async def test_csv_import(client, staff_tokens):
     pub = await client.get("/api/v1/products?q=metformin")
     assert pub.json()["total"] == 1
     assert pub.json()["items"][0]["price_min"] == 3600  # cheapest variant, customer tier
+
+
+@pytest.mark.asyncio
+async def test_category_image_lifecycle(client, staff_tokens):
+    """Set by URL (no storage needed), slot minting, and clearing."""
+    admin = staff_tokens["admin"]
+    cat = await _create_category(client, admin, slug="img-cat")
+    cid = cat["id"]
+
+    r = await client.post(
+        f"/api/v1/admin/categories/{cid}/image/url",
+        headers=auth(admin),
+        json={"url": "https://images.example.com/cat.jpg"},
+    )
+    assert r.status_code == 200 and r.json()["image_key"] == "https://images.example.com/cat.jpg"
+    listing = (await client.get("/api/v1/admin/categories", headers=auth(admin))).json()
+    assert any(c["id"] == cid and c["image_key"] == "https://images.example.com/cat.jpg" for c in listing)
+
+    r = await client.post(
+        f"/api/v1/admin/categories/{cid}/image",
+        headers=auth(admin),
+        json={"content_type": "image/webp"},
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["storage_key"].startswith("categories/") and "upload_url" in body
+
+    r = await client.delete(f"/api/v1/admin/categories/{cid}/image", headers=auth(admin))
+    assert r.status_code == 204
+    listing = (await client.get("/api/v1/admin/categories", headers=auth(admin))).json()
+    assert any(c["id"] == cid and c["image_key"] is None for c in listing)
+
+    # Bad content type is a 422 (schema) — not a 500.
+    r = await client.post(
+        f"/api/v1/admin/categories/{cid}/image", headers=auth(admin), json={"content_type": "image/gif"}
+    )
+    assert r.status_code == 422
