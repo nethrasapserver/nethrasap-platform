@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { Pagination, paginate } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { dateShort, statusPill } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -16,8 +19,17 @@ interface Leave {
 }
 
 export default function LeavePage() {
-  const { data, loading, refetch } = useApi<{ items: Leave[] }>("/hr/leave", { status: "pending" });
+  const [status, setStatus] = useState("pending");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
+  useEffect(() => setPage(1), [status]);
+  const { data, loading, refetch } = useApi<{ items: Leave[] }>(
+    "/hr/leave",
+    status ? { status } : undefined,
+  );
   const toast = useToast();
+  const rows = data?.items ?? [];
+  const pageItems = paginate(rows, page, PAGE_SIZE);
 
   async function decide(id: string, approve: boolean) {
     try {
@@ -33,8 +45,29 @@ export default function LeavePage() {
     <div>
       <div className="page-head">
         <h1>Leave requests</h1>
-        <span className="muted small">Pending approvals</span>
       </div>
+
+      <div className="card pad filterbar">
+        <Select
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: "pending", label: "Pending approval" },
+            { value: "approved", label: "Approved" },
+            { value: "rejected", label: "Rejected" },
+          ]}
+          placeholder="All requests"
+          ariaLabel="Leave status"
+          width={180}
+        />
+        {status && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setStatus("")}>
+            Clear
+          </button>
+        )}
+        <span className="muted small fcount">{rows.length} request{rows.length === 1 ? "" : "s"}</span>
+      </div>
+
       <div className="card">
         <table className="tbl">
           <thead>
@@ -55,7 +88,7 @@ export default function LeavePage() {
                 </td>
               </tr>
             )}
-            {data?.items.map((l) => (
+            {pageItems.map((l) => (
               <tr key={l.id}>
                 <td className="small muted">{l.employee_id.slice(0, 8)}</td>
                 <td>
@@ -66,26 +99,32 @@ export default function LeavePage() {
                 <td>
                   <span className={`pill ${statusPill(l.status)}`}>{l.status}</span>
                 </td>
-                <td className="num">
-                  <button className="btn btn-primary btn-sm" onClick={() => decide(l.id, true)}>
-                    Approve
-                  </button>{" "}
-                  <button className="btn btn-ghost btn-sm" onClick={() => decide(l.id, false)}>
-                    Reject
-                  </button>
+                <td className="num" style={{ whiteSpace: "nowrap" }}>
+                  {l.status === "pending" && (
+                    <>
+                      <button className="btn btn-primary btn-sm" onClick={() => decide(l.id, true)}>
+                        Approve
+                      </button>{" "}
+                      <button className="btn btn-ghost btn-sm" onClick={() => decide(l.id, false)}>
+                        Reject
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
-            {!loading && data?.items.length === 0 && (
+            {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="empty">
-                  No pending leave requests.
+                  {status ? `No ${status} leave requests.` : "No leave requests yet."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { Pagination, paginate } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
@@ -21,23 +22,58 @@ interface Level {
 }
 
 export default function InventoryPage() {
-  const [lowOnly, setLowOnly] = useState(false);
-  const { data, loading, refetch } = useApi<Level[]>("/admin/inventory", { low_only: lowOnly });
+  // low_only is a required param upstream; stock states filter client-side.
+  const { data, loading, refetch } = useApi<Level[]>("/admin/inventory", { low_only: false });
   const [receive, setReceive] = useState<Level | null>(null);
+  const [query, setQuery] = useState("");
+  const [stock, setStock] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
-  useEffect(() => setPage(1), [lowOnly]);
-  const rows = data ?? [];
+  useEffect(() => setPage(1), [query, stock]);
+  const all = data ?? [];
+  const rows = all.filter((l) => {
+    if (stock === "low" && !l.is_low) return false;
+    if (stock === "out" && l.available > 0) return false;
+    if (stock === "healthy" && l.is_low) return false;
+    if (query && !l.product_name.toLowerCase().includes(query.toLowerCase())) return false;
+    return true;
+  });
   const pageItems = paginate(rows, page, PAGE_SIZE);
 
   return (
     <div>
       <div className="page-head">
         <h1>Inventory</h1>
-        <label className="row small" style={{ gap: 6 }}>
-          <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} /> Low stock only
-        </label>
       </div>
+
+      <div className="card pad filterbar">
+        <input
+          className="input fsearch"
+          placeholder="Search product…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search inventory"
+        />
+        <Select
+          value={stock}
+          onChange={setStock}
+          options={[
+            { value: "low", label: "Low stock" },
+            { value: "out", label: "Out of stock" },
+            { value: "healthy", label: "Healthy" },
+          ]}
+          placeholder="All stock"
+          ariaLabel="Stock state"
+          width={160}
+        />
+        {(query || stock) && (
+          <button className="btn btn-ghost btn-sm" onClick={() => { setQuery(""); setStock(""); }}>
+            Clear
+          </button>
+        )}
+        <span className="muted small fcount">{rows.length} of {all.length}</span>
+      </div>
+
       <div className="card">
         <table className="tbl">
           <thead>
@@ -79,7 +115,7 @@ export default function InventoryPage() {
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="empty">
-                  No tracked stock.
+                  {query || stock ? "Nothing matches these filters." : "No tracked stock."}
                 </td>
               </tr>
             )}

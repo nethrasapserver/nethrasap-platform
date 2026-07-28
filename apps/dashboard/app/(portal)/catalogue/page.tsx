@@ -4,6 +4,7 @@ import type { ProductDetail } from "@nethrasap/api-client";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { Pagination, paginate } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { inr, statusPill, toPaise, toRupeeInput } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -127,23 +128,28 @@ export default function CataloguePage() {
       </div>
 
       {/* Toolbar */}
-      <div className="prod-toolbar">
-        <div className="prod-search">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
-          <input
-            placeholder="Search products or category…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          {query && <button className="prod-search-x" onClick={() => setQuery("")} aria-label="Clear">✕</button>}
-        </div>
-        <select className="input" style={{ width: 190 }} value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.slug}>{c.name}</option>
-          ))}
-        </select>
-        <span className="muted small" style={{ marginLeft: "auto" }}>
+      <div className="card pad filterbar">
+        <input
+          className="input fsearch"
+          placeholder="Search products or category…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search products"
+        />
+        <Select
+          value={catFilter}
+          onChange={setCatFilter}
+          options={categories.map((c) => ({ value: c.slug, label: c.name }))}
+          placeholder="All categories"
+          ariaLabel="Category"
+          width={190}
+        />
+        {(query || catFilter) && (
+          <button className="btn btn-ghost btn-sm" onClick={() => { setQuery(""); setCatFilter(""); }}>
+            Clear
+          </button>
+        )}
+        <span className="muted small fcount">
           {products.length} of {all.length}
         </span>
       </div>

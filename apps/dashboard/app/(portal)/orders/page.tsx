@@ -157,10 +157,9 @@ function OrdersInner() {
       </div>
 
       {/* Filter toolbar */}
-      <div className="card pad" style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
+      <div className="card pad filterbar">
         <input
-          className="input"
-          style={{ flex: "1 1 220px", minWidth: 180 }}
+          className="input fsearch"
           placeholder="Search order no. / phone / name…"
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}

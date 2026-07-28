@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { Pagination, paginate } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
@@ -23,10 +24,23 @@ export default function CategoriesPage() {
   const { data, loading, refetch } = useApi<AdminCategory[]>("/admin/categories");
   const [create, setCreate] = useState(false);
   const [edit, setEdit] = useState<AdminCategory | null>(null);
+  const [query, setQuery] = useState("");
+  const [visibility, setVisibility] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
   const toast = useToast();
-  const rows = data ?? [];
+  useEffect(() => setPage(1), [query, visibility]);
+  const all = data ?? [];
+  const rows = all.filter((c) => {
+    if (visibility === "active" && !c.is_active) return false;
+    if (visibility === "hidden" && c.is_active) return false;
+    if (query) {
+      const q = query.toLowerCase();
+      if (!c.name.toLowerCase().includes(q) && !c.slug.includes(q) && !c.sku_prefix.toLowerCase().includes(q))
+        return false;
+    }
+    return true;
+  });
   const pageItems = paginate(rows, page, PAGE_SIZE);
 
   async function toggleActive(c: AdminCategory) {
@@ -57,6 +71,34 @@ export default function CategoriesPage() {
           + New category
         </button>
       </div>
+
+      <div className="card pad filterbar">
+        <input
+          className="input fsearch"
+          placeholder="Search name / slug / SKU prefix…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search categories"
+        />
+        <Select
+          value={visibility}
+          onChange={setVisibility}
+          options={[
+            { value: "active", label: "Live" },
+            { value: "hidden", label: "Hidden" },
+          ]}
+          placeholder="All visibility"
+          ariaLabel="Visibility"
+          width={160}
+        />
+        {(query || visibility) && (
+          <button className="btn btn-ghost btn-sm" onClick={() => { setQuery(""); setVisibility(""); }}>
+            Clear
+          </button>
+        )}
+        <span className="muted small fcount">{rows.length} of {all.length}</span>
+      </div>
+
       <div className="card">
         <table className="tbl">
           <thead>
@@ -103,7 +145,9 @@ export default function CategoriesPage() {
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty">No categories yet.</td>
+                <td colSpan={7} className="empty">
+                  {query || visibility ? "No categories match these filters." : "No categories yet."}
+                </td>
               </tr>
             )}
           </tbody>

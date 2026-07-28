@@ -240,6 +240,11 @@ a.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 }
 /* Read-only definition rows inside a drawer */
 .drawer-dl { display: grid; grid-template-columns: 40% 1fr; gap: 8px 12px; font-size: .86rem; }
+/* ---------- List-page filter toolbar (shared across all portal lists) ---------- */
+.filterbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+.filterbar .fsearch { flex: 1 1 220px; min-width: 180px; }
+.filterbar .fcount { margin-left: auto; }
+
 /* ---------- Custom select (native popups can't be themed) ---------- */
 .sel { position: relative; }
 .sel-btn {

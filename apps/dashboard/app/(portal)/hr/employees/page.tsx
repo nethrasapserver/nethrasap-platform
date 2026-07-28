@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Pagination, paginate } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { Drawer } from "@/components/Drawer";
 import { api } from "@/lib/api";
 import { inr, statusPill, toPaise } from "@/lib/format";
@@ -21,6 +23,27 @@ interface Employee {
 export default function EmployeesPage() {
   const { data, loading, refetch } = useApi<{ items: Employee[] }>("/hr/employees");
   const [add, setAdd] = useState(false);
+  const [query, setQuery] = useState("");
+  const [dept, setDept] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
+  useEffect(() => setPage(1), [query, dept]);
+  const all = data?.items ?? [];
+  const departments = [...new Set(all.map((e) => e.department).filter(Boolean))].sort();
+  const rows = all.filter((e) => {
+    if (dept && e.department !== dept) return false;
+    if (query) {
+      const q = query.toLowerCase();
+      if (
+        !e.full_name.toLowerCase().includes(q) &&
+        !e.code.toLowerCase().includes(q) &&
+        !e.designation.toLowerCase().includes(q)
+      )
+        return false;
+    }
+    return true;
+  });
+  const pageItems = paginate(rows, page, PAGE_SIZE);
 
   return (
     <div>
@@ -30,6 +53,31 @@ export default function EmployeesPage() {
           + Add employee
         </button>
       </div>
+
+      <div className="card pad filterbar">
+        <input
+          className="input fsearch"
+          placeholder="Search name / code / designation…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search employees"
+        />
+        <Select
+          value={dept}
+          onChange={setDept}
+          options={departments.map((d) => ({ value: d, label: d }))}
+          placeholder="All departments"
+          ariaLabel="Department"
+          width={180}
+        />
+        {(query || dept) && (
+          <button className="btn btn-ghost btn-sm" onClick={() => { setQuery(""); setDept(""); }}>
+            Clear
+          </button>
+        )}
+        <span className="muted small fcount">{rows.length} of {all.length}</span>
+      </div>
+
       <div className="card">
         <table className="tbl">
           <thead>
@@ -51,7 +99,7 @@ export default function EmployeesPage() {
                 </td>
               </tr>
             )}
-            {data?.items.map((e) => (
+            {pageItems.map((e) => (
               <tr key={e.id}>
                 <td style={{ fontWeight: 600 }}>{e.code}</td>
                 <td>{e.full_name}</td>
@@ -64,16 +112,18 @@ export default function EmployeesPage() {
                 <td className="num">{inr(e.allowances)}</td>
               </tr>
             ))}
-            {!loading && data?.items.length === 0 && (
+            {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="empty">
-                  No employees yet.
+                  {query || dept ? "No employees match these filters." : "No employees yet."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
 
       {add && (
         <AddEmployee

@@ -4,6 +4,7 @@ import type { Schemas } from "@nethrasap/api-client";
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { Pagination } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
@@ -26,17 +27,15 @@ const DOC_LABEL: Record<string, string> = {
   hospital_license: "Institutional licence",
 };
 
-const FILTERS = ["pending", "approved", "rejected", "all"] as const;
-
 export default function VerificationsPage() {
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("pending");
+  const [filter, setFilter] = useState("pending");
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [filter]);
 
   const { data, loading, refetch } = useApi<VerificationList>("/verifications", {
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
-    status: filter === "all" ? undefined : filter,
+    status: filter || undefined,
   });
   const [reviewId, setReviewId] = useState<string | null>(null);
 
@@ -46,17 +45,29 @@ export default function VerificationsPage() {
     <div>
       <div className="page-head">
         <h1>Verifications</h1>
-        <div className="row" style={{ gap: 6 }}>
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              className={`btn btn-sm ${filter === f ? "btn-primary" : "btn-outline"}`}
-              onClick={() => setFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+      </div>
+
+      <div className="card pad filterbar">
+        <Select
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: "pending", label: "Pending review" },
+            { value: "approved", label: "Approved" },
+            { value: "rejected", label: "Rejected" },
+          ]}
+          placeholder="All statuses"
+          ariaLabel="Verification status"
+          width={180}
+        />
+        {filter && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setFilter("")}>
+            Clear
+          </button>
+        )}
+        <span className="muted small fcount">
+          {data ? `${data.total} request${data.total === 1 ? "" : "s"}` : ""}
+        </span>
       </div>
 
       <div className="card">

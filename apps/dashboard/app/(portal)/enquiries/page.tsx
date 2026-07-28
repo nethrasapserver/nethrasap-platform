@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
+import { Pagination, paginate } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { ApiError } from "@nethrasap/api-client";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -51,6 +53,19 @@ export default function EnquiriesPage() {
       ? { status: filter }
       : undefined;
   const { data, loading, refetch } = useApi<Enquiry[]>("/admin/enquiries", query);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
+  useEffect(() => setPage(1), [search, filter]);
+  const rows = (data ?? []).filter((e) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      e.reference.toLowerCase().includes(q) ||
+      e.items.some((i) => i.product_name.toLowerCase().includes(q))
+    );
+  });
+  const pageItems = paginate(rows, page, PAGE_SIZE);
   const { can } = useAuth();
   const canApprove = can("enquiries:approve");
   const [drawer, setDrawer] = useState<{ enq: Enquiry; mode: "quote" | "review" } | null>(null);
@@ -80,15 +95,39 @@ export default function EnquiriesPage() {
     <div>
       <div className="page-head">
         <h1>Enquiries (RFQ)</h1>
-        <select className="input" style={{ width: 190 }} value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="">All</option>
-          {canApprove && <option value="approval:pending">Awaiting my approval</option>}
-          <option value="pending">Pending</option>
-          <option value="quoted">Quoted</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="converted">Converted</option>
-        </select>
       </div>
+
+      <div className="card pad filterbar">
+        <input
+          className="input fsearch"
+          placeholder="Search reference or product…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search enquiries"
+        />
+        <Select
+          value={filter}
+          onChange={setFilter}
+          options={[
+            ...(canApprove ? [{ value: "approval:pending", label: "Awaiting my approval" }] : []),
+            { value: "pending", label: "Pending" },
+            { value: "quoted", label: "Quoted" },
+            { value: "confirmed", label: "Confirmed" },
+            { value: "converted", label: "Converted" },
+            { value: "rejected", label: "Rejected" },
+          ]}
+          placeholder="All enquiries"
+          ariaLabel="Enquiry status"
+          width={200}
+        />
+        {(search || filter) && (
+          <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(""); setFilter(""); }}>
+            Clear
+          </button>
+        )}
+        <span className="muted small fcount">{rows.length} of {(data ?? []).length}</span>
+      </div>
+
       <div className="card">
         <table className="tbl">
           <thead>
@@ -109,7 +148,7 @@ export default function EnquiriesPage() {
                 </td>
               </tr>
             )}
-            {data?.map((e) => {
+            {pageItems.map((e) => {
               const ap = e.approval_status;
               const drafting = ap === "none" || ap === "approved";
               return (
@@ -169,16 +208,18 @@ export default function EnquiriesPage() {
                 </tr>
               );
             })}
-            {!loading && data?.length === 0 && (
+            {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="empty">
-                  No enquiries.
+                  {search || filter ? "No enquiries match these filters." : "No enquiries."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
 
       {drawer && (
         <QuoteDrawer
