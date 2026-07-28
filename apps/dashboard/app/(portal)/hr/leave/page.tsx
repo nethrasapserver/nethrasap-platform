@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
+import { Drawer } from "@/components/Drawer";
 import { api } from "@/lib/api";
 import { dateShort, statusPill } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -21,6 +22,7 @@ interface Leave {
 
 export default function LeavePage() {
   const [status, setStatus] = useState("pending");
+  const [view, setView] = useState<Leave | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [status]);
@@ -99,7 +101,13 @@ export default function LeavePage() {
               </tr>
             )}
             {pageItems.map((l) => (
-              <tr key={l.id}>
+              <tr
+                key={l.id}
+                onClick={() => setView(l)}
+                onKeyDown={(e) => e.key === "Enter" && setView(l)}
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+              >
                 <td className="small muted">{l.employee_id.slice(0, 8)}</td>
                 <td>
                   {dateShort(l.start_date)} → {dateShort(l.end_date)}
@@ -109,7 +117,7 @@ export default function LeavePage() {
                 <td>
                   <span className={`pill ${statusPill(l.status)}`}>{l.status}</span>
                 </td>
-                <td className="num" style={{ whiteSpace: "nowrap" }}>
+                <td className="num" style={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
                   {l.status === "pending" && (
                     <>
                       <button className="btn btn-primary btn-sm" onClick={() => decide(l.id, true)}>
@@ -135,6 +143,45 @@ export default function LeavePage() {
       </div>
 
       <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+
+      {view && (
+        <Drawer
+          title="Leave request"
+          subtitle={`${dateShort(view.start_date)} → ${dateShort(view.end_date)}`}
+          onClose={() => setView(null)}
+          footer={
+            view.status === "pending" ? (
+              <>
+                <button className="btn btn-ghost" onClick={() => setView(null)}>Close</button>
+                <button className="btn btn-danger" onClick={() => { decide(view.id, false); setView(null); }}>
+                  Reject
+                </button>
+                <button className="btn btn-primary" onClick={() => { decide(view.id, true); setView(null); }}>
+                  Approve
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-ghost" onClick={() => setView(null)}>Close</button>
+            )
+          }
+        >
+          <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+            <span className={`pill ${statusPill(view.status)}`}>{view.status}</span>
+          </div>
+          <dl className="drawer-dl">
+            <dt>Employee</dt>
+            <dd className="mono">{view.employee_id.slice(0, 8)}</dd>
+            <dt>From</dt>
+            <dd>{dateShort(view.start_date)}</dd>
+            <dt>To</dt>
+            <dd>{dateShort(view.end_date)}</dd>
+            <dt>Days</dt>
+            <dd className="mono" style={{ fontWeight: 700 }}>{view.days}</dd>
+            <dt>Reason</dt>
+            <dd>{view.reason ?? "—"}</dd>
+          </dl>
+        </Drawer>
+      )}
     </div>
   );
 }

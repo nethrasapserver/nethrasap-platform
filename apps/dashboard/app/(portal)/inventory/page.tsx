@@ -6,6 +6,7 @@ import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
+import { dateTime } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
 
@@ -26,6 +27,7 @@ export default function InventoryPage() {
   // low_only is a required param upstream; stock states filter client-side.
   const { data, loading, refetch } = useApi<Level[]>("/admin/inventory", { low_only: false });
   const [receive, setReceive] = useState<Level | null>(null);
+  const [view, setView] = useState<Level | null>(null);
   const [query, setQuery] = useState("");
   const [stock, setStock] = useState("");
   const [page, setPage] = useState(1);
@@ -106,7 +108,13 @@ export default function InventoryPage() {
               </tr>
             )}
             {pageItems.map((l) => (
-              <tr key={l.level_id}>
+              <tr
+                key={l.level_id}
+                onClick={() => setView(l)}
+                onKeyDown={(e) => e.key === "Enter" && setView(l)}
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+              >
                 <td style={{ fontWeight: 600 }}>{l.product_name}</td>
                 <td className="muted">{l.pack_size}</td>
                 <td className="num">{l.on_hand}</td>
@@ -115,7 +123,7 @@ export default function InventoryPage() {
                   <span className={`pill ${l.is_low ? "pill-warn" : "pill-ok"}`}>{l.available}</span>
                 </td>
                 <td className="num muted">{l.reorder_point}</td>
-                <td className="num">
+                <td className="num" onClick={(e) => e.stopPropagation()}>
                   <button className="btn btn-outline btn-sm" onClick={() => setReceive(l)}>
                     Receive
                   </button>
@@ -134,6 +142,17 @@ export default function InventoryPage() {
       </div>
 
       <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+
+      {view && (
+        <LevelDrawer
+          level={view}
+          onClose={() => setView(null)}
+          onReceive={() => {
+            setReceive(view);
+            setView(null);
+          }}
+        />
+      )}
 
       {receive && (
         <ReceiveModal
@@ -200,6 +219,87 @@ function ReceiveModal({ level, onClose, onDone }: { level: Level; onClose: () =>
         New on-hand total <strong className="mono">{level.on_hand + (Number(qty) || 0)}</strong> — posts a
         receipt line to the stock ledger.
       </p>
+    </Drawer>
+  );
+}
+
+interface LedgerEntry {
+  id: string;
+  movement: string;
+  quantity: number;
+  reason: string | null;
+  ref_type: string | null;
+  ref_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+/** Single stock item: level detail + the append-only movement ledger. */
+function LevelDrawer({ level, onClose, onReceive }: { level: Level; onClose: () => void; onReceive: () => void }) {
+  const ledger = useApi<LedgerEntry[]>("/admin/inventory/ledger", { variant_id: level.variant_id, limit: 25 });
+
+  return (
+    <Drawer
+      wide
+      title={level.product_name}
+      subtitle={`${level.pack_size} · stock detail`}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-primary" onClick={onReceive}>Receive stock</button>
+        </>
+      }
+    >
+      <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <span className={`pill ${level.available <= 0 ? "pill-out" : level.is_low ? "pill-low" : "pill-ok"}`}>
+          {level.available <= 0 ? "out of stock" : level.is_low ? "low stock" : "healthy"}
+        </span>
+      </div>
+
+      <dl className="drawer-dl">
+        <dt>On hand</dt>
+        <dd className="mono">{level.on_hand}</dd>
+        <dt>Reserved</dt>
+        <dd className="mono">{level.reserved}</dd>
+        <dt>Available to sell</dt>
+        <dd className="mono" style={{ fontWeight: 700 }}>{level.available}</dd>
+        <dt>Reorder point</dt>
+        <dd className="mono">{level.reorder_point}</dd>
+      </dl>
+
+      <h4 className="drawer-h">Recent movements</h4>
+      {ledger.loading && <p className="muted small">Loading ledger…</p>}
+      {!ledger.loading && (ledger.data ?? []).length === 0 && (
+        <p className="muted small">No ledger entries yet.</p>
+      )}
+      {(ledger.data ?? []).length > 0 && (
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Movement</th>
+              <th className="num">Qty</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(ledger.data ?? []).map((e) => (
+              <tr key={e.id}>
+                <td className="muted small">{dateTime(e.created_at)}</td>
+                <td>
+                  <span className={`pill ${e.quantity >= 0 ? "pill-ok" : "pill-low"}`}>{e.movement.replace(/_/g, " ")}</span>
+                  {e.reason && <div className="muted small">{e.reason}</div>}
+                </td>
+                <td className="num mono" style={{ fontWeight: 600 }}>{e.quantity > 0 ? `+${e.quantity}` : e.quantity}</td>
+                <td className="muted small mono">
+                  {e.ref_type ? `${e.ref_type} ${String(e.ref_id ?? "").slice(0, 8)}` : e.note ?? "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </Drawer>
   );
 }

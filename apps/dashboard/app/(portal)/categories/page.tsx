@@ -26,6 +26,7 @@ export default function CategoriesPage() {
   const { data, loading, refetch } = useApi<AdminCategory[]>("/admin/categories");
   const [create, setCreate] = useState(false);
   const [edit, setEdit] = useState<AdminCategory | null>(null);
+  const [view, setView] = useState<AdminCategory | null>(null);
   const [query, setQuery] = useState("");
   const [visibility, setVisibility] = useState("");
   const [page, setPage] = useState(1);
@@ -129,7 +130,13 @@ export default function CategoriesPage() {
               </tr>
             )}
             {pageItems.map((c) => (
-              <tr key={c.id} style={c.is_active ? undefined : { opacity: 0.55 }}>
+              <tr
+                key={c.id}
+                style={{ opacity: c.is_active ? undefined : 0.55, cursor: "pointer" }}
+                onClick={() => setView(c)}
+                onKeyDown={(e) => e.key === "Enter" && setView(c)}
+                tabIndex={0}
+              >
                 <td className="prod-thumb-cell">
                   <span className="prod-thumb">
                     {c.image_key ? (
@@ -152,7 +159,7 @@ export default function CategoriesPage() {
                     {c.is_active ? "Live" : "Hidden"}
                   </span>
                 </td>
-                <td className="num" style={{ whiteSpace: "nowrap" }}>
+                <td className="num" style={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
                   <button className="btn btn-outline btn-sm" onClick={() => setEdit(c)}>Edit</button>{" "}
                   <button className="btn btn-ghost btn-sm" onClick={() => toggleActive(c)}>
                     {c.is_active ? "Hide" : "Publish"}
@@ -177,6 +184,51 @@ export default function CategoriesPage() {
       </div>
 
       <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+
+      {view && (
+        <Drawer
+          title={view.name}
+          subtitle={view.slug}
+          onClose={() => setView(null)}
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => setView(null)}>Close</button>
+              <button className="btn btn-outline" onClick={() => { toggleActive(view); setView(null); }}>
+                {view.is_active ? "Hide from storefront" : "Publish"}
+              </button>
+              <button className="btn btn-primary" onClick={() => { setEdit(view); setView(null); }}>
+                Edit
+              </button>
+            </>
+          }
+        >
+          {view.image_key && (
+            <div style={{ marginBottom: 16 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={view.image_key} alt="" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 12, border: "1px solid var(--line)" }} />
+            </div>
+          )}
+          <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+            <span className={`pill ${view.is_active ? "pill-ok" : "pill-out"}`}>{view.is_active ? "Live" : "Hidden"}</span>
+          </div>
+          <dl className="drawer-dl">
+            <dt>Name</dt>
+            <dd><b>{view.name}</b></dd>
+            <dt>Slug</dt>
+            <dd className="mono">{view.slug}</dd>
+            <dt>SKU prefix</dt>
+            <dd className="mono">{view.sku_prefix}</dd>
+            <dt>Products</dt>
+            <dd className="mono">{view.product_count}</dd>
+            {view.description && (
+              <>
+                <dt>Description</dt>
+                <dd>{view.description}</dd>
+              </>
+            )}
+          </dl>
+        </Drawer>
+      )}
 
       {(create || edit) && (
         <CategoryForm

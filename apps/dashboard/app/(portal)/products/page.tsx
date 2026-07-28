@@ -60,6 +60,7 @@ export default function CataloguePage() {
   const [edit, setEdit] = useState<AdminProduct | null>(null);
   const [priceFor, setPriceFor] = useState<AdminProduct | null>(null);
   const [variantFor, setVariantFor] = useState<AdminProduct | null>(null);
+  const [view, setView] = useState<AdminProduct | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [catFilter, setCatFilter] = useState("");
@@ -163,7 +164,14 @@ export default function CataloguePage() {
               <tr><td colSpan={8} className="empty">Loading…</td></tr>
             )}
             {pageItems.map((p) => (
-              <tr key={p.id} className={p.is_active ? "" : "is-draft"}>
+              <tr
+                key={p.id}
+                className={p.is_active ? "" : "is-draft"}
+                onClick={() => setView(p)}
+                onKeyDown={(e) => e.key === "Enter" && setView(p)}
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+              >
                 <td className="prod-thumb-cell">
                   <span className="prod-thumb">
                     {p.image_key ? (
@@ -189,8 +197,8 @@ export default function CataloguePage() {
                 <td className="num" style={{ fontWeight: 600 }}>{p.price_min != null ? inr(p.price_min) : "—"}</td>
                 <td className="num">
                   <div className="prod-actions">
-                    <button className="btn btn-outline btn-sm" onClick={() => setEdit(p)}>Edit</button>
-                    <button className="btn btn-outline btn-sm" onClick={() => setPriceFor(p)}>Prices</button>
+                    <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setEdit(p); }}>Edit</button>
+                    <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setPriceFor(p); }}>Prices</button>
                     <RowMenu
                       isActive={p.is_active}
                       onVariant={() => setVariantFor(p)}
@@ -210,6 +218,16 @@ export default function CataloguePage() {
       </div>
 
       <Pagination page={page} total={products.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+
+      {view && (
+        <ProductViewDrawer
+          product={view}
+          onClose={() => setView(null)}
+          onEdit={() => { setEdit(view); setView(null); }}
+          onPrices={() => { setPriceFor(view); setView(null); }}
+          onToggle={() => { toggleActive(view); setView(null); }}
+        />
+      )}
 
       {create && (
         <ProductForm
@@ -837,6 +855,136 @@ function PriceEditor({
             </section>
           ))}
         </div>
+      )}
+    </Drawer>
+  );
+}
+
+/** Single product: gallery, compliance facts, per-role variant pricing.
+    Live products load the public detail; drafts fall back to admin row data. */
+function ProductViewDrawer({
+  product,
+  onClose,
+  onEdit,
+  onPrices,
+  onToggle,
+}: {
+  product: AdminProduct;
+  onClose: () => void;
+  onEdit: () => void;
+  onPrices: () => void;
+  onToggle: () => void;
+}) {
+  const detail = useApi<ProductDetail>(product.is_active ? `/products/${product.slug}` : null);
+  const d = detail.data;
+  const attrs = Object.entries(product.attributes ?? {}).filter(([, v]) => v != null && v !== "");
+
+  return (
+    <Drawer
+      wide
+      title={product.name}
+      subtitle={`${product.category_name}${product.sub_category ? ` · ${product.sub_category}` : ""}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-outline" onClick={onToggle}>
+            {product.is_active ? "Unpublish" : "Publish"}
+          </button>
+          <button className="btn btn-outline" onClick={onPrices}>Prices</button>
+          <button className="btn btn-primary" onClick={onEdit}>Edit</button>
+        </>
+      }
+    >
+      <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <span className={`pill ${product.is_active ? "pill-ok" : "pill-muted"}`}>{product.is_active ? "Live" : "Draft"}</span>
+        <span className={`pill ${statusPill(product.stock_status)}`}>{product.stock_status.replace(/_/g, " ")}</span>
+        {product.schedule !== "NONE" && <span className="pill pill-rx">Rx · Schedule {product.schedule}</span>}
+        {product.is_featured && <span className="pill pill-info">Featured</span>}
+      </div>
+
+      {product.images.length > 0 && (
+        <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          {product.images.map((img) => (
+            <span key={img.id} className="prod-thumb" style={{ width: 72, height: 72 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={img.storage_key} alt={img.alt ?? ""} />
+            </span>
+          ))}
+        </div>
+      )}
+
+      <dl className="drawer-dl">
+        <dt>Slug</dt>
+        <dd className="mono">{product.slug}</dd>
+        <dt>Category</dt>
+        <dd>{product.category_name}{product.sub_category ? ` · ${product.sub_category}` : ""}</dd>
+        <dt>GST rate</dt>
+        <dd className="mono">{product.gst_rate_pct}%</dd>
+        <dt>Variants</dt>
+        <dd className="mono">{product.variant_count}</dd>
+      </dl>
+
+      {product.description && (
+        <>
+          <h4 className="drawer-h">Description</h4>
+          <p className="small" style={{ margin: 0 }}>{product.description}</p>
+        </>
+      )}
+
+      {attrs.length > 0 && (
+        <>
+          <h4 className="drawer-h">Attributes</h4>
+          <dl className="drawer-dl">
+            {attrs.map(([k, v]) => (
+              <div key={k} style={{ display: "contents" }}>
+                <dt style={{ textTransform: "capitalize" }}>{k.replace(/_/g, " ")}</dt>
+                <dd>{String(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
+
+      <h4 className="drawer-h">Variants &amp; pricing</h4>
+      {!product.is_active && (
+        <p className="muted small">Draft product — publish it to see live tier pricing here, or open Prices to manage it.</p>
+      )}
+      {product.is_active && detail.loading && <p className="muted small">Loading pricing…</p>}
+      {product.is_active && !detail.loading && !d && (
+        <p className="muted small">Could not load live pricing — open Prices to manage it.</p>
+      )}
+      {d && (
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Pack</th>
+              <th className="num">Customer</th>
+              <th className="num">Clinician</th>
+              <th className="num">Retailer</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.variants.map((v) => {
+              const by = (role: string) => v.prices.find((pr) => pr.role === role);
+              const fmt = (pr?: { selling_price: number; range_min?: number | null; range_max?: number | null }) =>
+                !pr ? "—" : pr.range_min != null && pr.range_max != null
+                  ? `${inr(pr.range_min)}–${inr(pr.range_max)}`
+                  : inr(pr.selling_price);
+              return (
+                <tr key={v.id}>
+                  <td style={{ fontWeight: 600 }}>
+                    {v.pack_size}
+                    {v.is_default && <span className="mini-tag t-sub" style={{ marginLeft: 6 }}>default</span>}
+                  </td>
+                  <td className="num mono">{fmt(by("customer"))}</td>
+                  <td className="num mono">{fmt(by("clinician"))}</td>
+                  <td className="num mono">{fmt(by("retailer"))}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
     </Drawer>
   );

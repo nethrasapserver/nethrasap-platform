@@ -6,7 +6,7 @@ import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { Drawer } from "@/components/Drawer";
 import { api } from "@/lib/api";
-import { inr, statusPill, toPaise } from "@/lib/format";
+import { dateShort, inr, statusPill, toPaise } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
 
@@ -24,6 +24,7 @@ interface Employee {
 export default function EmployeesPage() {
   const { data, loading, refetch } = useApi<{ items: Employee[] }>("/hr/employees");
   const [add, setAdd] = useState(false);
+  const [view, setView] = useState<Employee | null>(null);
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("");
   const [page, setPage] = useState(1);
@@ -110,7 +111,13 @@ export default function EmployeesPage() {
               </tr>
             )}
             {pageItems.map((e) => (
-              <tr key={e.id}>
+              <tr
+                key={e.id}
+                onClick={() => setView(e)}
+                onKeyDown={(ev) => ev.key === "Enter" && setView(e)}
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+              >
                 <td style={{ fontWeight: 600 }}>{e.code}</td>
                 <td>{e.full_name}</td>
                 <td className="muted">{e.department}</td>
@@ -134,6 +141,8 @@ export default function EmployeesPage() {
       </div>
 
       <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+
+      {view && <EmployeeDrawer employee={view} onClose={() => setView(null)} />}
 
       {add && (
         <AddEmployee
@@ -233,6 +242,80 @@ function AddEmployee({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <p className="muted small" style={{ margin: 0 }}>
         Gross monthly cost <strong className="mono">{inr(monthly)}</strong>
       </p>
+    </Drawer>
+  );
+}
+
+interface AttendanceItem {
+  id: string;
+  day: string;
+  check_in: string | null;
+  check_out: string | null;
+  status: string;
+}
+
+/** Single employee: profile, salary breakdown, recent attendance. */
+function EmployeeDrawer({ employee, onClose }: { employee: Employee; onClose: () => void }) {
+  const attendance = useApi<{ items: AttendanceItem[] }>(`/hr/attendance/${employee.id}`);
+  const recent = (attendance.data?.items ?? []).slice(0, 10);
+
+  return (
+    <Drawer
+      wide
+      title={employee.full_name}
+      subtitle={`${employee.code} · ${employee.designation}`}
+      onClose={onClose}
+      footer={<button className="btn btn-ghost" onClick={onClose}>Close</button>}
+    >
+      <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+        <span className={`pill ${statusPill(employee.status)}`}>{employee.status.replace(/_/g, " ")}</span>
+        <span className="pill pill-ink">{employee.department}</span>
+      </div>
+
+      <dl className="drawer-dl">
+        <dt>Employee code</dt>
+        <dd className="mono">{employee.code}</dd>
+        <dt>Designation</dt>
+        <dd>{employee.designation}</dd>
+        <dt>Department</dt>
+        <dd>{employee.department}</dd>
+      </dl>
+
+      <h4 className="drawer-h">Compensation (monthly)</h4>
+      <dl className="drawer-dl">
+        <dt>Basic salary</dt>
+        <dd className="mono">{inr(employee.basic_salary)}</dd>
+        <dt>Allowances</dt>
+        <dd className="mono">{inr(employee.allowances)}</dd>
+        <dt><b>Gross</b></dt>
+        <dd className="mono" style={{ fontWeight: 700 }}>{inr(employee.basic_salary + employee.allowances)}</dd>
+      </dl>
+
+      <h4 className="drawer-h">Recent attendance</h4>
+      {attendance.loading && <p className="muted small">Loading…</p>}
+      {!attendance.loading && recent.length === 0 && <p className="muted small">No attendance records yet.</p>}
+      {recent.length > 0 && (
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Status</th>
+              <th>In</th>
+              <th>Out</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recent.map((a) => (
+              <tr key={a.id}>
+                <td className="muted small">{dateShort(a.day)}</td>
+                <td><span className={`pill ${statusPill(a.status)}`}>{a.status.replace(/_/g, " ")}</span></td>
+                <td className="mono small">{a.check_in ? new Date(a.check_in).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                <td className="mono small">{a.check_out ? new Date(a.check_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </Drawer>
   );
 }

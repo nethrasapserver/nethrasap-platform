@@ -72,6 +72,7 @@ export default function EnquiriesPage() {
   const { can } = useAuth();
   const canApprove = can("enquiries:approve");
   const [drawer, setDrawer] = useState<{ enq: Enquiry; mode: "quote" | "review" } | null>(null);
+  const [view, setView] = useState<Enquiry | null>(null);
   const toast = useToast();
 
   async function run(fn: () => Promise<unknown>, ok: string) {
@@ -164,7 +165,13 @@ export default function EnquiriesPage() {
               const ap = e.approval_status;
               const drafting = ap === "none" || ap === "approved";
               return (
-                <tr key={e.id}>
+                <tr
+                  key={e.id}
+                  onClick={() => setView(e)}
+                  onKeyDown={(ev) => ev.key === "Enter" && setView(e)}
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                >
                   <td style={{ fontWeight: 600 }}>{e.reference}</td>
                   <td className="muted small">
                     {e.items.map((i) => `${i.product_name} ×${i.quantity}`).join(", ")}
@@ -179,7 +186,7 @@ export default function EnquiriesPage() {
                     )}
                   </td>
                   <td className="num">{inr(e.quoted_total)}</td>
-                  <td className="num" style={{ whiteSpace: "nowrap" }}>
+                  <td className="num" style={{ whiteSpace: "nowrap" }} onClick={(ev) => ev.stopPropagation()}>
                     {ap === "pending" && canApprove && (
                       <>
                         <button className="btn btn-primary btn-sm" onClick={() => approve(e.id)}>
@@ -232,6 +239,26 @@ export default function EnquiriesPage() {
       </div>
 
       <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+
+      {view && (
+        <EnquiryViewDrawer
+          enquiry={view}
+          onClose={() => setView(null)}
+          onQuote={(mode) => {
+            setDrawer({ enq: view, mode });
+            setView(null);
+          }}
+          onApprove={() => {
+            approve(view.id);
+            setView(null);
+          }}
+          onConvert={() => {
+            convert(view.id);
+            setView(null);
+          }}
+          canApprove={canApprove}
+        />
+      )}
 
       {drawer && (
         <QuoteDrawer
@@ -412,6 +439,152 @@ function QuoteDrawer({
             onChange={(e) => setReason(e.target.value)}
           />
         </div>
+      )}
+    </Drawer>
+  );
+}
+
+interface EnquiryDetail extends Enquiry {
+  quoted_subtotal: number | null;
+  quote_valid_until: string | null;
+  converted_order_number: string | null;
+  messages: { id?: string; body: string; sender_id?: string; created_at?: string; at?: string }[] | null;
+  history: { status: string; note?: string | null; at?: string; created_at?: string }[] | null;
+}
+
+/** Single enquiry: quote summary, line items with allowed bands, the
+    negotiation thread and the status history — read without leaving the list. */
+function EnquiryViewDrawer({
+  enquiry,
+  onClose,
+  onQuote,
+  onApprove,
+  onConvert,
+  canApprove,
+}: {
+  enquiry: Enquiry;
+  onClose: () => void;
+  onQuote: (mode: "quote" | "review") => void;
+  onApprove: () => void;
+  onConvert: () => void;
+  canApprove: boolean;
+}) {
+  const { data: d, loading } = useApi<EnquiryDetail>(`/enquiries/${enquiry.id}`);
+  const ap = enquiry.approval_status;
+  const drafting = ap === "none" || ap === "approved";
+
+  return (
+    <Drawer
+      wide
+      title={enquiry.reference}
+      subtitle={`Submitted ${dateShort(enquiry.created_at)}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          {ap === "pending" && canApprove && (
+            <>
+              <button className="btn btn-outline" onClick={() => onQuote("review")}>Review</button>
+              <button className="btn btn-primary" onClick={onApprove}>Approve</button>
+            </>
+          )}
+          {ap === "returned" && (
+            <button className="btn btn-primary" onClick={() => onQuote("quote")}>Revise quote</button>
+          )}
+          {drafting && (enquiry.status === "pending" || enquiry.status === "quoted") && (
+            <button className="btn btn-primary" onClick={() => onQuote("quote")}>
+              {enquiry.status === "quoted" ? "Re-quote" : "Quote"}
+            </button>
+          )}
+          {enquiry.status === "confirmed" && (
+            <button className="btn btn-primary" onClick={onConvert}>Convert to order</button>
+          )}
+        </>
+      }
+    >
+      <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <span className={`pill ${statusPill(enquiry.status)}`}>{enquiry.status}</span>
+        {(ap === "pending" || ap === "returned") && (
+          <span className={`pill ${APPROVAL_PILL[ap]}`}>{APPROVAL_LABEL[ap]}</span>
+        )}
+        {d?.converted_order_number && <span className="pill pill-ok">→ {d.converted_order_number}</span>}
+      </div>
+
+      {loading && <p className="muted small">Loading full detail…</p>}
+
+      <h4 className="drawer-h">Items ({enquiry.items.length})</h4>
+      <table className="tbl">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th className="num">Qty</th>
+            <th className="num">Allowed band</th>
+            <th className="num">Quoted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {enquiry.items.map((i) => (
+            <tr key={i.id}>
+              <td style={{ fontWeight: 600 }}>{i.product_name}</td>
+              <td className="num">{i.quantity}</td>
+              <td className="num muted small mono">
+                {i.range_min != null && i.range_max != null ? `${inr(i.range_min)} – ${inr(i.range_max)}` : "—"}
+              </td>
+              <td className="num mono">{i.quoted_unit_price != null ? inr(i.quoted_unit_price) : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h4 className="drawer-h">Quote</h4>
+      <dl className="drawer-dl">
+        <dt>Quoted total</dt>
+        <dd className="mono" style={{ fontWeight: 700 }}>{enquiry.quoted_total != null ? inr(enquiry.quoted_total) : "not quoted yet"}</dd>
+        {d?.quote_valid_until && (
+          <>
+            <dt>Valid until</dt>
+            <dd>{dateShort(d.quote_valid_until)}</dd>
+          </>
+        )}
+        {enquiry.note && (
+          <>
+            <dt>Customer note</dt>
+            <dd>{enquiry.note}</dd>
+          </>
+        )}
+      </dl>
+
+      {(d?.messages ?? []).length > 0 && (
+        <>
+          <h4 className="drawer-h">Messages</h4>
+          <div style={{ display: "grid", gap: 10 }}>
+            {(d?.messages ?? []).map((m, i) => (
+              <div key={m.id ?? i} className="small" style={{ padding: "8px 10px", background: "var(--paper-3)", borderRadius: 10 }}>
+                {m.body}
+                {(m.created_at ?? m.at) && (
+                  <div className="muted" style={{ fontSize: ".7rem", marginTop: 3 }}>{dateShort(m.created_at ?? m.at ?? "")}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {(d?.history ?? []).length > 0 && (
+        <>
+          <h4 className="drawer-h">Timeline</h4>
+          <div style={{ display: "grid", gap: 8 }}>
+            {(d?.history ?? []).map((h, i) => (
+              <div key={i} className="row spread small" style={{ gap: 10 }}>
+                <span>
+                  {h.status.replace(/_/g, " ")}
+                  {h.note && <span className="muted"> — {h.note}</span>}
+                </span>
+                <span className="muted mono" style={{ flex: "none" }}>{dateShort(h.at ?? h.created_at ?? "")}</span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </Drawer>
   );
