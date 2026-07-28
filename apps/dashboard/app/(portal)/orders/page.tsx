@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { OrderDrawer } from "@/components/OrderDrawer";
 import { dateShort, inr, statusPill } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
 
@@ -19,6 +20,7 @@ interface AdminOrder {
 
 export default function OrdersPage() {
   const [status, setStatus] = useState("");
+  const [openOrder, setOpenOrder] = useState<string | null>(null);
   const { data, loading } = useApi<{ items: AdminOrder[]; total: number }>(
     "/admin/orders",
     status ? { status } : undefined,
@@ -62,9 +64,21 @@ export default function OrdersPage() {
               </tr>
             )}
             {data?.items.map((o) => (
-              <tr key={o.order_number}>
+              <tr
+                key={o.order_number}
+                onClick={() => setOpenOrder(o.order_number)}
+                onKeyDown={(e) => e.key === "Enter" && setOpenOrder(o.order_number)}
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+                aria-label={`View ${o.order_number}`}
+              >
                 <td>
-                  <Link href={`/orders/${o.order_number}`} style={{ fontWeight: 600, color: "var(--brand-dark)" }}>
+                  <Link
+                    href={`/orders/${o.order_number}`}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ fontWeight: 600, color: "var(--brand-dark)" }}
+                    title="Open full view"
+                  >
                     {o.order_number}
                   </Link>
                 </td>
@@ -91,6 +105,8 @@ export default function OrdersPage() {
           </tbody>
         </table>
       </div>
+
+      {openOrder && <OrderDrawer orderNumber={openOrder} onClose={() => setOpenOrder(null)} />}
     </div>
   );
 }
