@@ -255,6 +255,39 @@ button.kpi:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 
 }
 /* Read-only definition rows inside a drawer */
 .drawer-dl { display: grid; grid-template-columns: 40% 1fr; gap: 8px 12px; font-size: .86rem; }
+/* ---------- Analytics: bento grid, tiles, section subtabs ---------- */
+.bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
+.bento > * { min-width: 0; }
+.bento .b2 { grid-column: span 2; }
+.bento .b3 { grid-column: span 3; }
+.bento .b4 { grid-column: span 4; }
+.bento .r2 { grid-row: span 2; }
+@media (max-width: 1100px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bento .b3, .bento .b4 { grid-column: span 2; }
+}
+@media (max-width: 640px) {
+  .bento { grid-template-columns: 1fr; }
+  .bento .b2, .bento .b3, .bento .b4 { grid-column: span 1; }
+}
+.tile {
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
+  padding: 18px; display: flex; flex-direction: column; gap: 12px;
+}
+.tile > h3 { margin: 0; font-size: .92rem; display: flex; justify-content: space-between; align-items: baseline; }
+.tile > h3 .eyebrow { color: var(--ice-600); }
+.tile .big {
+  font-family: var(--font-mono-stack); font-size: 1.9rem; font-weight: 700;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+.subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.subtab {
+  padding: 7px 14px; border-radius: 999px; font-size: .84rem; font-weight: 600;
+  color: var(--ink-2); border: 1px solid var(--line-2); background: var(--field);
+}
+.subtab:hover { color: var(--ink); }
+.subtab.on { background: var(--brand-700); border-color: var(--brand-700); color: var(--cream); }
+
 /* ---------- List-page filter toolbar (shared across all portal lists) ---------- */
 .filterbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
 .filterbar .fsearch { flex: 1 1 220px; min-width: 180px; }

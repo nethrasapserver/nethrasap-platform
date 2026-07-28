@@ -32,7 +32,13 @@ interface NavItem { href: string; label: string; icon: string; perm?: string; }
 interface NavSection { title: string; items: NavItem[]; }
 
 const NAV: NavSection[] = [
-  { title: "Overview", items: [{ href: "/", label: "Dashboard", icon: "dash" }] },
+  {
+    title: "Overview",
+    items: [
+      { href: "/", label: "Dashboard", icon: "dash" },
+      { href: "/analytics", label: "Analytics", icon: "payroll", perm: "analytics:read" },
+    ],
+  },
   {
     title: "Commerce",
     items: [
