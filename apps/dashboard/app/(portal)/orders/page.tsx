@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { OrderDrawer } from "@/components/OrderDrawer";
 import { Pagination } from "@/components/Pagination";
+import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { dateShort, inr, statusPill } from "@/lib/format";
 import { useToast } from "@/lib/toast";
@@ -165,18 +166,22 @@ function OrdersInner() {
           onChange={(e) => setQInput(e.target.value)}
           aria-label="Search orders"
         />
-        <select className="input" style={{ width: 160 }} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Order status">
-          <option value="">All statuses</option>
-          {ORDER_STATUSES.map((s) => (
-            <option key={s} value={s}>{label(s)}</option>
-          ))}
-        </select>
-        <select className="input" style={{ width: 160 }} value={payment} onChange={(e) => setPayment(e.target.value)} aria-label="Payment status">
-          <option value="">All payments</option>
-          {PAYMENT_STATUSES.map((s) => (
-            <option key={s} value={s}>{label(s)}</option>
-          ))}
-        </select>
+        <Select
+          value={status}
+          onChange={setStatus}
+          options={ORDER_STATUSES.map((s) => ({ value: s, label: label(s) }))}
+          placeholder="All statuses"
+          ariaLabel="Order status"
+          width={170}
+        />
+        <Select
+          value={payment}
+          onChange={setPayment}
+          options={PAYMENT_STATUSES.map((s) => ({ value: s, label: label(s) }))}
+          placeholder="All payments"
+          ariaLabel="Payment status"
+          width={170}
+        />
         <div className="row" style={{ gap: 6, alignItems: "center" }}>
           <input className="input" type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
           <span className="muted small">→</span>
