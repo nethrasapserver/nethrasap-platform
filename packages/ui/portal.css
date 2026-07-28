@@ -240,6 +240,24 @@ a.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 }
 /* Read-only definition rows inside a drawer */
 .drawer-dl { display: grid; grid-template-columns: 40% 1fr; gap: 8px 12px; font-size: .86rem; }
+/* Delivery progress rail inside the order drawer. */
+.oship { display: flex; margin: 4px 0 8px; }
+.oship .stp { flex: 1; position: relative; text-align: center; padding-top: 20px; font-size: .7rem; color: var(--ink-3); line-height: 1.35; text-transform: none; letter-spacing: 0; }
+.oship .stp .dot {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 1;
+  width: 13px; height: 13px; border-radius: 999px;
+  border: 2px solid var(--line-2); background: var(--paper);
+}
+.oship .stp::before {
+  content: ""; position: absolute; top: 5.5px; left: -50%; width: 100%;
+  border-top: 2px solid var(--line);
+}
+.oship .stp:first-child::before { display: none; }
+.oship .stp.is-done .dot { background: var(--brand-600); border-color: var(--brand-600); }
+.oship .stp.is-done::before { border-color: var(--brand-600); }
+.oship .stp.is-done { color: var(--ink); font-weight: 600; }
+.oship .stp small { display: block; font-weight: 400; color: var(--ink-3); font-size: .64rem; margin-top: 1px; }
+
 /* Clear section titles inside drawers: eyebrow + hairline divider. */
 .drawer-h {
   font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;

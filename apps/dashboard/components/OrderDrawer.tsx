@@ -5,9 +5,47 @@ import { useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { dateTime, inr, statusPill, toPaise } from "@/lib/format";
+import { dateShort, dateTime, inr, statusPill, toPaise } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
+
+/** The fulfilment walk, in order. Placed sits before the first stage. */
+const STAGES = [
+  { key: "confirmed", label: "Confirmed" },
+  { key: "packed", label: "Packed" },
+  { key: "dispatched", label: "Dispatched" },
+  { key: "out_for_delivery", label: "Out for delivery" },
+  { key: "delivered", label: "Delivered" },
+] as const;
+
+/** Visual delivery rail: done stages filled with their timestamps from the
+    status history; terminal states (cancelled/refunded) show a notice. */
+function DeliveryProgress({ o }: { o: OrderDetail }) {
+  const terminal = ["cancelled", "payment_failed", "refunded"].includes(o.status);
+  if (terminal) {
+    return (
+      <p className="small" style={{ color: "var(--danger)", margin: "0 0 6px" }}>
+        This order is {o.status.replace(/_/g, " ")} — the delivery walk ended.
+      </p>
+    );
+  }
+  const rank = STAGES.findIndex((s) => s.key === o.status);
+  const at = (key: string) => o.status_history.find((h) => h.status === key)?.at;
+  return (
+    <div className="oship" aria-label="Delivery progress">
+      {STAGES.map((s, i) => {
+        const ts = at(s.key);
+        return (
+          <div key={s.key} className={`stp ${i <= rank ? "is-done" : ""}`}>
+            <span className="dot" />
+            {s.label}
+            <small>{ts ? dateShort(ts) : "—"}</small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /** The single surface for one order: full context + every fulfilment action.
     Dispatch/refund swap the panel content in place (no stacked drawers). */
@@ -100,13 +138,16 @@ export function OrderDrawer({
       {error && <p className="muted">Could not load this order.</p>}
       {o && (
         <>
-          <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
             <span className={`pill ${statusPill(o.status)}`}>{o.status.replace(/_/g, " ")}</span>
             <span className={`pill ${statusPill(o.payment_status)}`}>
               {o.payment_method.toUpperCase()} · {o.payment_status.replace(/_/g, " ")}
             </span>
           </div>
 
+          <DeliveryProgress o={o} />
+
+          <h4 className="drawer-h">Details</h4>
           <dl className="drawer-dl">
             <dt>Customer</dt>
             <dd>
