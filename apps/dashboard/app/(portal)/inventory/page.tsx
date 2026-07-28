@@ -28,7 +28,7 @@ export default function InventoryPage() {
   const [query, setQuery] = useState("");
   const [stock, setStock] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 12;
+  const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [query, stock]);
   const all = data ?? [];
   const rows = all.filter((l) => {
@@ -38,7 +38,7 @@ export default function InventoryPage() {
     if (query && !l.product_name.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
-  const pageItems = paginate(rows, page, PAGE_SIZE);
+  const pageItems = paginate(rows, page, pageSize);
 
   return (
     <div>
@@ -123,7 +123,7 @@ export default function InventoryPage() {
         </table>
       </div>
 
-      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {receive && (
         <ReceiveModal

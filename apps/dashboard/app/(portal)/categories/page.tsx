@@ -27,7 +27,7 @@ export default function CategoriesPage() {
   const [query, setQuery] = useState("");
   const [visibility, setVisibility] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
   const toast = useToast();
   useEffect(() => setPage(1), [query, visibility]);
   const all = data ?? [];
@@ -41,7 +41,7 @@ export default function CategoriesPage() {
     }
     return true;
   });
-  const pageItems = paginate(rows, page, PAGE_SIZE);
+  const pageItems = paginate(rows, page, pageSize);
 
   async function toggleActive(c: AdminCategory) {
     try {
@@ -154,7 +154,7 @@ export default function CategoriesPage() {
         </table>
       </div>
 
-      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {(create || edit) && (
         <CategoryForm

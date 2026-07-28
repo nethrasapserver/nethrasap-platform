@@ -12,7 +12,6 @@ import { useApi } from "@/lib/useApi";
 type Verification = Schemas["VerificationOut"];
 type VerificationList = Schemas["VerificationListOut"];
 
-const PAGE_SIZE = 15;
 
 const STATUS_PILL: Record<string, string> = {
   pending: "pill-low",
@@ -30,11 +29,12 @@ const DOC_LABEL: Record<string, string> = {
 export default function VerificationsPage() {
   const [filter, setFilter] = useState("pending");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [filter]);
 
   const { data, loading, refetch } = useApi<VerificationList>("/verifications", {
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
     status: filter || undefined,
   });
   const [reviewId, setReviewId] = useState<string | null>(null);
@@ -125,7 +125,7 @@ export default function VerificationsPage() {
         </table>
       </div>
 
-      <Pagination page={page} total={data?.total ?? 0} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={data?.total ?? 0} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {reviewId && (
         <ReviewDrawer

@@ -22,7 +22,6 @@ interface AdminOrder {
   customer_phone: string;
 }
 
-const PAGE_SIZE = 15;
 
 const ORDER_STATUSES = [
   "placed",
@@ -65,6 +64,7 @@ function OrdersInner() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   // Deep-linkable: /orders?open=NS-2026-00015 opens that order's drawer.
   const [openOrder, setOpenOrder] = useState<string | null>(useSearchParams().get("open"));
   const [exporting, setExporting] = useState(false);
@@ -86,8 +86,8 @@ function OrdersInner() {
   };
   const { data, loading, refetch } = useApi<{ items: AdminOrder[]; total: number }>("/admin/orders", {
     ...filters,
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
   });
 
   const hasFilters = Boolean(q || status || payment || from || to);
@@ -249,7 +249,7 @@ function OrdersInner() {
         </table>
       </div>
 
-      <Pagination page={page} total={data?.total ?? 0} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={data?.total ?? 0} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {openOrder && (
         <OrderDrawer orderNumber={openOrder} onClose={() => setOpenOrder(null)} onChanged={refetch} />

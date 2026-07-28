@@ -259,6 +259,9 @@ a.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .sel.open .sel-btn svg { transform: rotate(180deg); }
 .sel-pop {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 70; min-width: 100%;
+}
+.sel-pop.up { top: auto; bottom: calc(100% + 6px); }
+.sel-pop, .sel-pop.up {
   background: var(--field); border: 1px solid var(--line-2); border-radius: 12px;
   box-shadow: var(--sh-lg); padding: 6px; max-height: 300px; overflow-y: auto;
   animation: fadeInUp .14s var(--ease);

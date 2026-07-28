@@ -91,11 +91,11 @@ export default function CataloguePage() {
     return true;
   });
 
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
   // Any change to the filters resets to the first page.
   useEffect(() => setPage(1), [query, statusFilter, catFilter]);
-  const pageItems = paginate(products, page, PAGE_SIZE);
+  const pageItems = paginate(products, page, pageSize);
 
   const TILES: { key: StatusFilter; label: string; value: number; tone: string }[] = [
     { key: "all", label: "All products", value: stats.total, tone: "t-brand" },
@@ -218,7 +218,7 @@ export default function CataloguePage() {
         </table>
       </div>
 
-      <Pagination page={page} total={products.length} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={products.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {create && (
         <ProductForm

@@ -17,6 +17,7 @@ export function Select({
   placeholder,
   width,
   ariaLabel,
+  up,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -25,6 +26,8 @@ export function Select({
   placeholder: string;
   width?: number | string;
   ariaLabel?: string;
+  /** Open the listbox above the trigger (for controls near the page bottom). */
+  up?: boolean;
 }) {
   const all: SelectOption[] = [{ value: "", label: placeholder }, ...options];
   const [open, setOpen] = useState(false);
@@ -114,7 +117,7 @@ export function Select({
         </svg>
       </button>
       {open && (
-        <div ref={pop} className="sel-pop" role="listbox" aria-label={ariaLabel ?? placeholder}>
+        <div ref={pop} className={`sel-pop ${up ? "up" : ""}`} role="listbox" aria-label={ariaLabel ?? placeholder}>
           {all.map((o, i) => (
             <button
               key={o.value || "__all"}

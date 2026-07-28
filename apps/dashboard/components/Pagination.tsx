@@ -1,22 +1,31 @@
 "use client";
 
-/** Client-side pager for the dashboard tables. Hidden when everything fits on
-    one page. Shows a windowed set of page numbers with ellipses. */
+import { Select } from "./Select";
+
+export const PAGE_SIZES = [10, 25, 50, 100];
+
+/** Pager for the dashboard tables: range info, rows-per-page chooser
+    (when onPageSize is wired), windowed page numbers, prev/next. Hidden only
+    when the smallest page size already fits everything. */
 export function Pagination({
   page,
   total,
   pageSize,
   onPage,
+  onPageSize,
 }: {
   page: number;
   total: number;
   pageSize: number;
   onPage: (p: number) => void;
+  /** Enables the 10/25/50/100 rows-per-page chooser; resets to page 1 on change. */
+  onPageSize?: (n: number) => void;
 }) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  if (total <= pageSize) return null;
+  const chooserUseful = Boolean(onPageSize) && total > PAGE_SIZES[0];
+  if (total <= pageSize && !chooserUseful) return null;
 
-  const from = (page - 1) * pageSize + 1;
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
 
   const nums: (number | "dots")[] = [];
@@ -33,6 +42,20 @@ export function Pagination({
       <span className="pager-info">
         {from}–{to} of {total}
       </span>
+      {onPageSize && (
+        <Select
+          value={String(pageSize)}
+          onChange={(v) => {
+            onPageSize(Number(v));
+            onPage(1);
+          }}
+          options={PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} / page` }))}
+          placeholder="Rows"
+          ariaLabel="Rows per page"
+          width={112}
+          up
+        />
+      )}
       <div className="pager-btns">
         <button className="pager-btn" disabled={page <= 1} onClick={() => onPage(page - 1)}>
           ‹ Prev

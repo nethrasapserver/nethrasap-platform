@@ -55,7 +55,7 @@ export default function EnquiriesPage() {
   const { data, loading, refetch } = useApi<Enquiry[]>("/admin/enquiries", query);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 12;
+  const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [search, filter]);
   const rows = (data ?? []).filter((e) => {
     if (!search) return true;
@@ -65,7 +65,7 @@ export default function EnquiriesPage() {
       e.items.some((i) => i.product_name.toLowerCase().includes(q))
     );
   });
-  const pageItems = paginate(rows, page, PAGE_SIZE);
+  const pageItems = paginate(rows, page, pageSize);
   const { can } = useAuth();
   const canApprove = can("enquiries:approve");
   const [drawer, setDrawer] = useState<{ enq: Enquiry; mode: "quote" | "review" } | null>(null);
@@ -219,7 +219,7 @@ export default function EnquiriesPage() {
         </table>
       </div>
 
-      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {drawer && (
         <QuoteDrawer

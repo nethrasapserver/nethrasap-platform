@@ -21,7 +21,7 @@ interface Leave {
 export default function LeavePage() {
   const [status, setStatus] = useState("pending");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 12;
+  const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [status]);
   const { data, loading, refetch } = useApi<{ items: Leave[] }>(
     "/hr/leave",
@@ -29,7 +29,7 @@ export default function LeavePage() {
   );
   const toast = useToast();
   const rows = data?.items ?? [];
-  const pageItems = paginate(rows, page, PAGE_SIZE);
+  const pageItems = paginate(rows, page, pageSize);
 
   async function decide(id: string, approve: boolean) {
     try {
@@ -124,7 +124,7 @@ export default function LeavePage() {
         </table>
       </div>
 
-      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
     </div>
   );
 }

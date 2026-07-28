@@ -26,7 +26,7 @@ export default function EmployeesPage() {
   const [query, setQuery] = useState("");
   const [dept, setDept] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 12;
+  const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [query, dept]);
   const all = data?.items ?? [];
   const departments = [...new Set(all.map((e) => e.department).filter(Boolean))].sort();
@@ -43,7 +43,7 @@ export default function EmployeesPage() {
     }
     return true;
   });
-  const pageItems = paginate(rows, page, PAGE_SIZE);
+  const pageItems = paginate(rows, page, pageSize);
 
   return (
     <div>
@@ -123,7 +123,7 @@ export default function EmployeesPage() {
         </table>
       </div>
 
-      <Pagination page={page} total={rows.length} pageSize={PAGE_SIZE} onPage={setPage} />
+      <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {add && (
         <AddEmployee
