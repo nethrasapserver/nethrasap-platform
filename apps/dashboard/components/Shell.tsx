@@ -122,7 +122,7 @@ export function PortalChrome({ children }: { children: React.ReactNode }) {
           <span className="crumb">{crumb}</span>
           <div className="grow" />
           <span className="pill pill-info">{user?.role}</span>
-          <button className="btn btn-ghost btn-sm" onClick={logout}>
+          <button className="btn btn-danger-solid btn-sm" onClick={logout}>
             Sign out
           </button>
         </div>

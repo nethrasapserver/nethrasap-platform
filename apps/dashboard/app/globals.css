@@ -180,6 +180,9 @@ body { font-size: 14px; }
 .btn { border-radius: var(--r-md); height: 38px; }
 .btn-sm { height: 30px; }
 .btn-danger { background: var(--danger-bg); color: var(--danger); }
+/* Solid red variant — the topbar sign-out. */
+.btn-danger-solid { background: var(--danger); color: #fff; }
+.btn-danger-solid:hover { background: #9e3b1d; color: #fff; }
 
 /* ---------------------------------------------------------------------------
    White console (owner brief 2026-07-27): every surface reads pure white —
