@@ -1,11 +1,11 @@
 """Order queries + mutations: list, get, cancel, reorder, track, numbering."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -86,21 +86,63 @@ async def list_orders_for_user(
 
 
 async def list_orders_admin(
-    db: AsyncSession, *, status_filter: str | None = None, q: str | None = None,
-    limit: int = 50, offset: int = 0,
+    db: AsyncSession,
+    *,
+    status_filter: str | None = None,
+    payment_filter: str | None = None,
+    q: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> tuple[int, list[dict[str, Any]]]:
-    """All orders across customers — the ops queue. Optional status filter and
-    order-number search, newest first."""
+    """All orders across customers — the ops queue, newest first.
+
+    Filters compose: order/payment status, free-text q (order number,
+    customer phone or name), and an inclusive placed-at date range.
+    """
     from ..models.user import UserProfile
 
-    base = select(Order)
-    if status_filter:
-        base = base.where(Order.status == OrderStatus(status_filter))
-    if q:
-        base = base.where(Order.order_number.ilike(f"%{q.strip()}%"))
+    def apply_filters(stmt):
+        if status_filter:
+            try:
+                stmt = stmt.where(Order.status == OrderStatus(status_filter))
+            except ValueError:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid status: {status_filter}") from None
+        if payment_filter:
+            try:
+                stmt = stmt.where(Order.payment_status == PaymentStatus(payment_filter))
+            except ValueError:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST, f"invalid payment_status: {payment_filter}"
+                ) from None
+        if q:
+            term = f"%{q.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    Order.order_number.ilike(term),
+                    User.phone.ilike(term),
+                    UserProfile.full_name.ilike(term),
+                )
+            )
+        if date_from:
+            stmt = stmt.where(Order.placed_at >= datetime.combine(date_from, time.min, tzinfo=UTC))
+        if date_to:
+            # Inclusive end date: everything before the next midnight.
+            stmt = stmt.where(
+                Order.placed_at < datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=UTC)
+            )
+        return stmt
+
+    # q filters on customer columns, so the joins must be present everywhere.
+    base = apply_filters(
+        select(Order.id)
+        .outerjoin(User, User.id == Order.user_id)
+        .outerjoin(UserProfile, UserProfile.user_id == Order.user_id)
+    )
     total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
 
-    rows_stmt = (
+    rows_stmt = apply_filters(
         select(Order, func.count(OrderItem.id), User.phone, UserProfile.full_name)
         .select_from(Order)
         .outerjoin(OrderItem, OrderItem.order_id == Order.id)
@@ -111,10 +153,6 @@ async def list_orders_admin(
         .limit(limit)
         .offset(offset)
     )
-    if status_filter:
-        rows_stmt = rows_stmt.where(Order.status == OrderStatus(status_filter))
-    if q:
-        rows_stmt = rows_stmt.where(Order.order_number.ilike(f"%{q.strip()}%"))
     rows = (await db.execute(rows_stmt)).all()
 
     items = [

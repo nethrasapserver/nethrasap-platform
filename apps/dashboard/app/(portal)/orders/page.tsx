@@ -1,9 +1,12 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { OrderDrawer } from "@/components/OrderDrawer";
+import { Pagination } from "@/components/Pagination";
+import { api } from "@/lib/api";
 import { dateShort, inr, statusPill } from "@/lib/format";
+import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
 
 interface AdminOrder {
@@ -18,6 +21,31 @@ interface AdminOrder {
   customer_phone: string;
 }
 
+const PAGE_SIZE = 15;
+
+const ORDER_STATUSES = [
+  "placed",
+  "confirmed",
+  "packed",
+  "dispatched",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+  "refunded",
+  "payment_failed",
+];
+const PAYMENT_STATUSES = [
+  "cod_pending",
+  "pending",
+  "authorized",
+  "captured",
+  "failed",
+  "refunded",
+  "partial_refund",
+];
+
+const label = (s: string) => s.replace(/_/g, " ");
+
 export default function OrdersPage() {
   return (
     <Suspense fallback={<div className="card empty">Loading…</div>}>
@@ -27,32 +55,140 @@ export default function OrdersPage() {
 }
 
 function OrdersInner() {
+  const toast = useToast();
+  // Filters. `qInput` is what's typed; `q` is the debounced value that queries.
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
+  const [payment, setPayment] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [page, setPage] = useState(1);
   // Deep-linkable: /orders?open=NS-2026-00015 opens that order's drawer.
   const [openOrder, setOpenOrder] = useState<string | null>(useSearchParams().get("open"));
-  const { data, loading, refetch } = useApi<{ items: AdminOrder[]; total: number }>(
-    "/admin/orders",
-    status ? { status } : undefined,
-  );
+  const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput.trim()), 350);
+    return () => clearTimeout(t);
+  }, [qInput]);
+
+  // Any filter change goes back to page 1.
+  useEffect(() => setPage(1), [q, status, payment, from, to]);
+
+  const filters = {
+    q: q || undefined,
+    status: status || undefined,
+    payment_status: payment || undefined,
+    date_from: from || undefined,
+    date_to: to || undefined,
+  };
+  const { data, loading, refetch } = useApi<{ items: AdminOrder[]; total: number }>("/admin/orders", {
+    ...filters,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+
+  const hasFilters = Boolean(q || status || payment || from || to);
+
+  function clearFilters() {
+    setQInput("");
+    setQ("");
+    setStatus("");
+    setPayment("");
+    setFrom("");
+    setTo("");
+  }
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const full = await api.get<{ items: AdminOrder[]; total: number }>("/admin/orders", {
+        ...filters,
+        limit: 200,
+      });
+      const rows = [
+        ["Order", "Customer", "Phone", "Placed", "Status", "Payment", "Items", "Total (₹)"],
+        ...full.items.map((o) => [
+          o.order_number,
+          o.customer_name,
+          o.customer_phone,
+          new Date(o.placed_at).toLocaleDateString("en-IN"),
+          o.status,
+          o.payment_status,
+          String(o.item_count),
+          (o.grand_total / 100).toFixed(2),
+        ]),
+      ];
+      const csv = rows
+        .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
+        .join("\n");
+      const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nethrasap-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      if (full.total > full.items.length) {
+        toast(`Exported the first ${full.items.length} of ${full.total} — narrow the filters for the rest`);
+      } else {
+        toast(`Exported ${full.items.length} orders`);
+      }
+    } catch {
+      toast("Export failed", true);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div>
       <div className="page-head">
         <h1>Orders</h1>
-        <div className="row" style={{ gap: 12 }}>
-          <span className="muted small" style={{ alignSelf: "center" }}>{data?.total ?? 0} total</span>
-          <select className="input" style={{ width: 160 }} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="placed">Placed</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="packed">Packed</option>
-            <option value="dispatched">Dispatched</option>
-            <option value="out_for_delivery">Out for delivery</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+        <div className="row" style={{ gap: 10 }}>
+          <span className="muted small" style={{ alignSelf: "center" }}>
+            {data ? `${data.total} order${data.total === 1 ? "" : "s"}` : ""}
+          </span>
+          <button className="btn btn-outline btn-sm" onClick={exportCsv} disabled={exporting || !data?.total}>
+            {exporting ? "Exporting…" : "Export CSV"}
+          </button>
         </div>
       </div>
+
+      {/* Filter toolbar */}
+      <div className="card pad" style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16 }}>
+        <input
+          className="input"
+          style={{ flex: "1 1 220px", minWidth: 180 }}
+          placeholder="Search order no. / phone / name…"
+          value={qInput}
+          onChange={(e) => setQInput(e.target.value)}
+          aria-label="Search orders"
+        />
+        <select className="input" style={{ width: 160 }} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Order status">
+          <option value="">All statuses</option>
+          {ORDER_STATUSES.map((s) => (
+            <option key={s} value={s}>{label(s)}</option>
+          ))}
+        </select>
+        <select className="input" style={{ width: 160 }} value={payment} onChange={(e) => setPayment(e.target.value)} aria-label="Payment status">
+          <option value="">All payments</option>
+          {PAYMENT_STATUSES.map((s) => (
+            <option key={s} value={s}>{label(s)}</option>
+          ))}
+        </select>
+        <div className="row" style={{ gap: 6, alignItems: "center" }}>
+          <input className="input" type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" />
+          <span className="muted small">→</span>
+          <input className="input" type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
+        </div>
+        {hasFilters && (
+          <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
+            Clear
+          </button>
+        )}
+      </div>
+
       <div className="card">
         <table className="tbl">
           <thead>
@@ -72,39 +208,44 @@ function OrdersInner() {
                 <td colSpan={7} className="empty">Loading…</td>
               </tr>
             )}
-            {data?.items.map((o) => (
-              <tr
-                key={o.order_number}
-                onClick={() => setOpenOrder(o.order_number)}
-                onKeyDown={(e) => e.key === "Enter" && setOpenOrder(o.order_number)}
-                tabIndex={0}
-                style={{ cursor: "pointer" }}
-                aria-label={`View ${o.order_number}`}
-              >
-                <td style={{ fontWeight: 600, color: "var(--brand-dark)" }}>{o.order_number}</td>
-                <td>
-                  {o.customer_name}
-                  {o.customer_phone && <div className="muted small mono">{o.customer_phone}</div>}
-                </td>
-                <td className="muted">{dateShort(o.placed_at)}</td>
-                <td>
-                  <span className={`pill ${statusPill(o.status)}`}>{o.status.replace(/_/g, " ")}</span>
-                </td>
-                <td>
-                  <span className={`pill ${statusPill(o.payment_status)}`}>{o.payment_status.replace(/_/g, " ")}</span>
-                </td>
-                <td className="num">{o.item_count}</td>
-                <td className="num" style={{ fontWeight: 600 }}>{inr(o.grand_total)}</td>
-              </tr>
-            ))}
+            {!loading &&
+              data?.items.map((o) => (
+                <tr
+                  key={o.order_number}
+                  onClick={() => setOpenOrder(o.order_number)}
+                  onKeyDown={(e) => e.key === "Enter" && setOpenOrder(o.order_number)}
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                  aria-label={`View ${o.order_number}`}
+                >
+                  <td style={{ fontWeight: 600, color: "var(--brand-dark)" }}>{o.order_number}</td>
+                  <td>
+                    {o.customer_name}
+                    {o.customer_phone && <div className="muted small mono">{o.customer_phone}</div>}
+                  </td>
+                  <td className="muted">{dateShort(o.placed_at)}</td>
+                  <td>
+                    <span className={`pill ${statusPill(o.status)}`}>{label(o.status)}</span>
+                  </td>
+                  <td>
+                    <span className={`pill ${statusPill(o.payment_status)}`}>{label(o.payment_status)}</span>
+                  </td>
+                  <td className="num">{o.item_count}</td>
+                  <td className="num" style={{ fontWeight: 600 }}>{inr(o.grand_total)}</td>
+                </tr>
+              ))}
             {!loading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty">No orders{status ? " in this status" : " yet"}.</td>
+                <td colSpan={7} className="empty">
+                  {hasFilters ? "No orders match these filters." : "No orders yet."}
+                </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} total={data?.total ?? 0} pageSize={PAGE_SIZE} onPage={setPage} />
 
       {openOrder && (
         <OrderDrawer orderNumber={openOrder} onClose={() => setOpenOrder(null)} onChanged={refetch} />

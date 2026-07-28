@@ -1,7 +1,7 @@
 """Staff order fulfilment — shipments (orders:fulfil), refunds (orders:refund)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -25,11 +25,24 @@ async def list_orders_admin(
     db: DbSession,
     actor: FulfilStaff,
     status_filter: Annotated[str | None, Query(alias="status")] = None,
-    q: Annotated[str | None, Query()] = None,
+    payment_status: Annotated[str | None, Query()] = None,
+    q: Annotated[str | None, Query(max_length=80, description="order no. / phone / name")] = None,
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict:
-    """All customer orders for the ops queue."""
-    total, items = await orders_svc.list_orders_admin(db, status_filter=status_filter, q=q, limit=limit)
+    """All customer orders for the ops queue — filterable and paginated."""
+    total, items = await orders_svc.list_orders_admin(
+        db,
+        status_filter=status_filter,
+        payment_filter=payment_status,
+        q=q,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset,
+    )
     return {"total": total, "items": items}
 
 
