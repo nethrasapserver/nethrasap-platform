@@ -54,6 +54,81 @@ function TileIcon({ d }: { d: string }) {
   );
 }
 
+/** Compact rupee labels for chart axes: ₹950 · ₹8.6k · ₹1.2L */
+function compactInr(paise: number): string {
+  const r = paise / 100;
+  if (r >= 100_000) return `₹${(r / 100_000).toFixed(r % 100_000 ? 1 : 0)}L`;
+  if (r >= 1_000) return `₹${(r / 1_000).toFixed(r % 1_000 ? 1 : 0)}k`;
+  return `₹${Math.round(r)}`;
+}
+
+function fmtDay(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+/** Daily revenue bar chart: y-axis, gridlines, baseline, date ticks. Always
+    draws the full frame — an empty or all-zero window shows flat day stubs
+    with a centred note, never a blank panel. */
+function RevenueChart({ series, days }: { series: TrendPoint[]; days: number }) {
+  // Synthesize the day axis when the API returns nothing for the window.
+  const points: TrendPoint[] =
+    series.length > 0
+      ? series
+      : Array.from({ length: days }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (days - 1 - i));
+          return { date: d.toISOString().slice(0, 10), revenue_paise: 0, orders: 0 };
+        });
+  const max = Math.max(1, ...points.map((p) => p.revenue_paise));
+  const allZero = points.every((p) => p.revenue_paise === 0);
+  // Date ticks: every day at 7d, sparser as the window widens.
+  const tickEvery = points.length > 60 ? 15 : points.length > 14 ? 5 : 1;
+
+  return (
+    <div className="chart">
+      <div className="chart-y" aria-hidden="true">
+        <span>{allZero ? "" : compactInr(max)}</span>
+        <span>{allZero ? "" : compactInr(max / 2)}</span>
+        <span>₹0</span>
+      </div>
+      <div className="chart-plot">
+        <div className="chart-grid" aria-hidden="true">
+          <i style={{ top: 0 }} />
+          <i style={{ top: "50%" }} />
+        </div>
+        <div className="chart-bars" style={{ gap: points.length > 40 ? 2 : 5 }}>
+          {points.map((p) => (
+            <div key={p.date} className="chart-slot" title={`${fmtDay(p.date)}: ${inr(p.revenue_paise)}`}>
+              <div
+                className={`chart-bar ${p.revenue_paise > 0 ? "" : "zero"}`}
+                style={p.revenue_paise > 0 ? { height: `${Math.max(4, (p.revenue_paise / max) * 166)}px` } : undefined}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="chart-x" style={{ gap: points.length > 40 ? 2 : 5 }} aria-hidden="true">
+          {points.map((p, i) => (
+            <span key={p.date}>
+              {i % tickEvery === 0 || i === points.length - 1 ? fmtDay(p.date) : ""}
+            </span>
+          ))}
+        </div>
+        {allZero && <div className="chart-note">No revenue in this period</div>}
+      </div>
+    </div>
+  );
+}
+
+/** Structured empty state for the ops queue cards — keeps the panel's frame. */
+function PanelEmpty({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div className="dash-empty">
+      <span className="ic"><TileIcon d={icon} /></span>
+      <span>{text}</span>
+    </div>
+  );
+}
+
 /** Sparkline with a flat translucent area fill + emphasized endpoint. */
 function Spark({ id, series, line, fill, dot }: { id: string; series: number[]; line: string; fill: string; dot: string }) {
   if (series.length < 2) return null;
@@ -102,7 +177,6 @@ export default function DashboardHome() {
   const series = trend.data?.series ?? [];
   const revSeries = series.map((p) => p.revenue_paise);
   const orderSeries = series.map((p) => p.orders);
-  const maxRev = Math.max(1, ...revSeries);
   const maxTop = Math.max(1, ...(top.data?.items ?? []).map((x) => x.revenue_paise));
 
   return (
@@ -168,29 +242,7 @@ export default function DashboardHome() {
             <span className="eyebrow">daily</span>
           </div>
           <div className="panel-body">
-            {series.length === 0 ? (
-              <div className="muted small" style={{ padding: "40px 0", textAlign: "center" }}>No revenue in this window.</div>
-            ) : (
-              <>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: series.length > 40 ? 2 : 6, height: 170 }}>
-                  {series.map((p) => (
-                    <div key={p.date} className="grow" style={{ textAlign: "center", minWidth: 0 }} title={`${p.date}: ${inr(p.revenue_paise)}`}>
-                      <div
-                        style={{
-                          height: `${(p.revenue_paise / maxRev) * 150}px`,
-                          minHeight: 3,
-                          background: p.revenue_paise > 0 ? "var(--brand-600)" : "var(--line)",
-                          borderRadius: "4px 4px 0 0",
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="muted small" style={{ marginTop: 8 }}>
-                  {series[0]?.date} → {series.at(-1)?.date}
-                </div>
-              </>
-            )}
+            <RevenueChart series={series} days={days} />
           </div>
         </div>
 
@@ -209,7 +261,20 @@ export default function DashboardHome() {
                 <span className="mono small" style={{ textAlign: "right" }}>{inr(t.revenue_paise)}</span>
               </div>
             ))}
-            {top.data && top.data.items.length === 0 && <div className="muted small">No sales yet.</div>}
+            {top.data && top.data.items.length === 0 && (
+              <>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div key={i} className="bar-row is-ghost">
+                    <span className="muted">—</span>
+                    <span className="bar-track" />
+                    <span className="mono small muted" style={{ textAlign: "right" }}>₹0</span>
+                  </div>
+                ))}
+                <div className="muted small" style={{ textAlign: "center", marginTop: 4 }}>
+                  No sales in this period.
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -230,7 +295,12 @@ export default function DashboardHome() {
                   <span className="mono small">{inr(e.quoted_total)}</span>
                 </div>
               ))}
-              {pendingQuotes.data && pendingQuotes.data.length === 0 && <div className="muted small">Nothing awaiting approval.</div>}
+              {pendingQuotes.data && pendingQuotes.data.length === 0 && (
+                <PanelEmpty
+                  icon="M9 12l2 2 4-4M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z"
+                  text="Nothing awaiting approval. Quotes drafted by sales appear here for release."
+                />
+              )}
             </div>
           </div>
         )}
@@ -250,7 +320,12 @@ export default function DashboardHome() {
                   <span className={`pill ${s.available <= 0 ? "pill-err" : "pill-warn"}`}>{s.available} left</span>
                 </div>
               ))}
-              {lowStock.data && lowStock.data.length === 0 && <div className="muted small">All stock healthy.</div>}
+              {lowStock.data && lowStock.data.length === 0 && (
+                <PanelEmpty
+                  icon="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"
+                  text="All stock healthy. Items appear when they fall below their reorder point."
+                />
+              )}
             </div>
           </div>
         )}
@@ -269,7 +344,12 @@ export default function DashboardHome() {
                   <span className="mono small">{inr(o.grand_total)}</span>
                 </Link>
               ))}
-              {recentOrders.data && recentOrders.data.items.length === 0 && <div className="muted small">No orders yet.</div>}
+              {recentOrders.data && recentOrders.data.items.length === 0 && (
+                <PanelEmpty
+                  icon="M6 6h15l-1.5 8H8L6 3H3M9 20a1.6 1.6 0 100-3.2A1.6 1.6 0 009 20zm9 0a1.6 1.6 0 100-3.2A1.6 1.6 0 0018 20z"
+                  text="No orders yet. New orders land here as they are placed."
+                />
+              )}
             </div>
           </div>
         )}
