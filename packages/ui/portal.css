@@ -287,6 +287,19 @@ button.kpi:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 
 }
 .subtab:hover { color: var(--ink); }
 .subtab.on { background: var(--brand-700); border-color: var(--brand-700); color: var(--cream); }
+/* Chart chrome: legend rows (donuts) + series toggles (line charts). */
+.legend-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: none; background: none; padding: 3px 0; font: inherit; font-size: .84rem;
+  color: var(--ink-2); text-align: left; cursor: default; transition: opacity .15s var(--ease);
+}
+.legend-row .legend-lab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-toggle {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px;
+  border-radius: 999px; border: 1px solid var(--line-2); background: var(--field);
+  font: inherit; font-size: .78rem; font-weight: 600; color: var(--ink-2); cursor: pointer;
+}
+.chip-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
 
 /* ---------- List-page filter toolbar (shared across all portal lists) ---------- */
 .filterbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }

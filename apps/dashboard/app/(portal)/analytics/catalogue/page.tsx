@@ -1,6 +1,6 @@
 "use client";
 
-import { BarList, DistBar } from "@/components/Charts";
+import { Donut } from "@/components/Charts";
 import { useAuth } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
 
@@ -73,20 +73,27 @@ export default function CatalogueAnalytics() {
 
       <div className="tile b2">
         <h3>Products by category</h3>
-        <BarList rows={cats.map((c) => ({ label: c.name, value: c.product_count })).sort((a, b) => b.value - a.value).slice(0, 8)} />
+        <Donut
+          parts={cats.map((c) => ({ label: c.name, value: c.product_count })).sort((a, b) => b.value - a.value).slice(0, 8)}
+          centerLabel="products"
+        />
       </div>
       <div className="tile b2">
         <h3>Catalogue mix</h3>
-        <DistBar
+        <Donut
+          size={150}
+          centerLabel="visibility"
           parts={[
-            { label: "Live", value: live, color: "var(--brand-600)" },
-            { label: "Draft", value: all.length - live, color: "var(--clay)" },
+            { label: "Live", value: live, color: "#606c38" },
+            { label: "Draft", value: all.length - live, color: "#dda15e" },
           ]}
         />
-        <DistBar
+        <Donut
+          size={150}
+          centerLabel="regulation"
           parts={[
-            { label: "OTC", value: all.length - rx, color: "var(--ice-600, #2b6b7f)" },
-            { label: "Rx", value: rx, color: "var(--copper)" },
+            { label: "OTC", value: all.length - rx, color: "#2b6b7f" },
+            { label: "Rx (scheduled)", value: rx, color: "#bc6c25" },
           ]}
         />
       </div>
@@ -94,11 +101,12 @@ export default function CatalogueAnalytics() {
       {canStock && (
         <div className="tile b2">
           <h3>Stock health</h3>
-          <DistBar
+          <Donut
+            centerLabel="SKUs"
             parts={[
-              { label: "Healthy", value: levels.filter((l) => !l.is_low && l.available > 0).length, color: "var(--brand-600)" },
-              { label: "Low", value: levels.filter((l) => l.is_low && l.available > 0).length, color: "var(--clay)" },
-              { label: "Out", value: levels.filter((l) => l.available <= 0).length, color: "var(--danger)" },
+              { label: "Healthy", value: levels.filter((l) => !l.is_low && l.available > 0).length, color: "#606c38" },
+              { label: "Low", value: levels.filter((l) => l.is_low && l.available > 0).length, color: "#dda15e" },
+              { label: "Out", value: levels.filter((l) => l.available <= 0).length, color: "#b94824" },
             ]}
           />
           <p className="muted small" style={{ margin: 0 }}>
@@ -110,9 +118,10 @@ export default function CatalogueAnalytics() {
         <h3>
           Top sellers <span className="eyebrow">units · 90 days</span>
         </h3>
-        <BarList
-          rows={(top.data?.items ?? []).map((t) => ({ label: t.product_name, value: t.units }))}
-          format={(n) => `${n} units`}
+        <Donut
+          parts={(top.data?.items ?? []).map((t) => ({ label: t.product_name, value: t.units }))}
+          format={(n) => `${n}`}
+          centerLabel="units"
         />
       </div>
     </div>

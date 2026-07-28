@@ -59,18 +59,37 @@ export default function FunnelAnalytics() {
 
       <div className="tile b4">
         <h3>The funnel</h3>
-        <div style={{ display: "grid", gap: 14 }}>
-          {stages.map((s) => (
-            <div key={s.key}>
-              <div className="row spread small" style={{ marginBottom: 4 }}>
-                <span style={{ fontWeight: 600 }}>{s.label}</span>
-                <span className="mono">{s.value}</span>
+        <div style={{ display: "grid", gap: 6 }}>
+          {stages.map((s, i) => {
+            const pct = Math.round((s.value / max) * 100);
+            const prev = i > 0 ? stages[i - 1].value : null;
+            const carried = prev ? Math.round((s.value / Math.max(1, prev)) * 100) : null;
+            return (
+              <div key={s.key} style={{ textAlign: "center" }} title={`${s.label}: ${s.value}`}>
+                <div
+                  style={{
+                    width: `${Math.max(16, pct)}%`,
+                    margin: "0 auto",
+                    background: s.color,
+                    color: "#fff",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: ".84rem",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    transition: "width .25s ease",
+                  }}
+                >
+                  {s.label} · {s.value}
+                </div>
+                {carried != null && (
+                  <div className="muted" style={{ fontSize: ".68rem", margin: "2px 0" }}>{carried}% carried through</div>
+                )}
               </div>
-              <div style={{ height: 14, borderRadius: 99, background: "var(--paper-3)", overflow: "hidden" }}>
-                <div style={{ width: `${(s.value / max) * 100}%`, height: "100%", background: s.color, borderRadius: 99 }} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

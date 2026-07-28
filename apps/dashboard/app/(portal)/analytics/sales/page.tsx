@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Donut } from "@/components/Charts";
 import { inr } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
 
@@ -64,6 +65,26 @@ export default function SalesAnalytics() {
           <h3>Target attainment</h3>
           <div className="big">{avgAttainment != null ? `${avgAttainment}%` : "—"}</div>
           <span className="muted small">{withTargets.length ? "average, this month" : "no targets set this month"}</span>
+        </div>
+
+        <div className="tile b2">
+          <h3>
+            Revenue share <span className="eyebrow">by rep</span>
+          </h3>
+          <Donut
+            parts={reps.map((r) => ({ label: r.name ?? r.phone, value: r.revenue_paise }))}
+            format={(n) => inr(n)}
+            centerLabel="attributed"
+          />
+        </div>
+        <div className="tile b2">
+          <h3>
+            Orders share <span className="eyebrow">by rep</span>
+          </h3>
+          <Donut
+            parts={reps.map((r) => ({ label: r.name ?? r.phone, value: r.orders }))}
+            centerLabel="orders"
+          />
         </div>
 
         <div className="tile b4">

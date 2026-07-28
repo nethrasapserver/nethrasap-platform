@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BarList, DistBar, RevenueChart, Spark, type TrendPoint } from "@/components/Charts";
+import { compactInr, Donut, RevenueChart, Spark, type TrendPoint } from "@/components/Charts";
 import { inr } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
 
@@ -100,37 +100,35 @@ export default function AnalyticsOverview() {
           <h3>
             Orders by status <span className="eyebrow">latest {sample.length}</span>
           </h3>
-          <BarList rows={countBy("status")} />
+          <Donut parts={countBy("status")} centerLabel="orders" />
         </div>
         <div className="tile b2">
           <h3>
             Payment mix <span className="eyebrow">latest {sample.length}</span>
           </h3>
-          <BarList rows={countBy("payment_status")} />
+          <Donut parts={countBy("payment_status")} centerLabel="orders" />
         </div>
 
         <div className="tile b2">
           <h3>
             Top products <span className="eyebrow">by revenue</span>
           </h3>
-          <BarList
-            rows={(top.data?.items ?? []).map((t) => ({
-              label: t.product_name,
-              value: t.revenue_paise,
-              sub: `${t.units} unit${t.units === 1 ? "" : "s"}`,
-            }))}
-            format={(n) => inr(n)}
+          <Donut
+            parts={(top.data?.items ?? []).map((t) => ({ label: t.product_name, value: t.revenue_paise }))}
+            format={(n) => compactInr(n)}
+            centerLabel="revenue"
           />
         </div>
         <div className="tile b2">
           <h3>
             Order health <span className="eyebrow">latest {sample.length}</span>
           </h3>
-          <DistBar
+          <Donut
+            centerLabel="orders"
             parts={[
-              { label: "Delivered", value: sample.filter((o) => o.status === "delivered").length, color: "var(--brand-600)" },
-              { label: "In progress", value: sample.filter((o) => ["placed", "confirmed", "packed", "dispatched", "out_for_delivery"].includes(o.status)).length, color: "var(--clay)" },
-              { label: "Cancelled/failed", value: sample.filter((o) => ["cancelled", "payment_failed", "refunded"].includes(o.status)).length, color: "var(--danger)" },
+              { label: "Delivered", value: sample.filter((o) => o.status === "delivered").length, color: "#606c38" },
+              { label: "In progress", value: sample.filter((o) => ["placed", "confirmed", "packed", "dispatched", "out_for_delivery"].includes(o.status)).length, color: "#dda15e" },
+              { label: "Cancelled/failed", value: sample.filter((o) => ["cancelled", "payment_failed", "refunded"].includes(o.status)).length, color: "#b94824" },
             ]}
           />
           <p className="muted small" style={{ margin: 0 }}>
