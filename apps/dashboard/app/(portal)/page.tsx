@@ -251,23 +251,28 @@ export default function DashboardHome() {
             <h3>Top products</h3>
             <span className="eyebrow">by revenue</span>
           </div>
-          <div className="panel-body" style={{ display: "grid", gap: 12 }}>
-            {(top.data?.items ?? []).map((t) => (
-              <div key={t.product_name} className="bar-row">
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.product_name}</span>
+          <div className="panel-body" style={{ display: "grid", gap: 16 }}>
+            {(top.data?.items ?? []).map((t, i) => (
+              <div key={t.product_name} className="bar-row" title={`${t.product_name} — ${t.units} units · ${inr(t.revenue_paise)}`}>
+                <span className="bar-rank">{i + 1}</span>
+                <span className="bar-name">
+                  <b>{t.product_name}</b>
+                  <small>{t.units} unit{t.units === 1 ? "" : "s"} sold</small>
+                </span>
                 <span className="bar-track">
                   <span className="bar-fill" style={{ display: "block", width: `${(t.revenue_paise / maxTop) * 100}%` }} />
                 </span>
-                <span className="mono small" style={{ textAlign: "right" }}>{inr(t.revenue_paise)}</span>
+                <span className="bar-amt">{inr(t.revenue_paise)}</span>
               </div>
             ))}
             {top.data && top.data.items.length === 0 && (
               <>
                 {Array.from({ length: 5 }, (_, i) => (
                   <div key={i} className="bar-row is-ghost">
-                    <span className="muted">—</span>
+                    <span className="bar-rank">{i + 1}</span>
+                    <span className="bar-name"><b>—</b></span>
                     <span className="bar-track" />
-                    <span className="mono small muted" style={{ textAlign: "right" }}>₹0</span>
+                    <span className="bar-amt">₹0</span>
                   </div>
                 ))}
                 <div className="muted small" style={{ textAlign: "center", marginTop: 4 }}>

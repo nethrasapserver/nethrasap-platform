@@ -153,8 +153,19 @@ a.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 .panel-head .eyebrow { color: var(--ice-600); }
 .panel-head h3 { margin: 0; font-size: .95rem; }
 .panel-body { padding: var(--sp-5); }
-.bar-row { display: grid; grid-template-columns: 110px 1fr 64px; gap: 10px; align-items: center; font-size: .8rem; }
+/* Top products: the name is the star (large, room to breathe); the bar is a
+   compact fixed-width meter beside it rather than a full-width stripe. */
+.bar-row { display: grid; grid-template-columns: 20px 1fr 92px 84px; gap: 12px; align-items: center; }
+.bar-row .bar-rank { font-size: .78rem; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.bar-row .bar-name { min-width: 0; }
+.bar-row .bar-name b {
+  display: block; font-size: .92rem; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bar-row .bar-name small { font-size: .74rem; color: var(--ink-3); font-weight: 500; }
+.bar-row .bar-amt { font-size: .92rem; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .bar-row.is-ghost .bar-track { opacity: .6; }
+.bar-row.is-ghost .bar-name b, .bar-row.is-ghost .bar-amt { color: var(--ink-3); font-weight: 500; }
 
 /* ---------- Revenue bar chart ---------- */
 .chart { display: grid; grid-template-columns: 48px 1fr; gap: 10px; }
@@ -181,7 +192,7 @@ a.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
   position: absolute; inset: 0 0 22px 0; display: grid; place-items: center;
   color: var(--ink-3); font-size: .82rem;
 }
-.bar-track { height: 8px; border-radius: 99px; background: var(--paper-3); overflow: hidden; }
+.bar-track { height: 6px; border-radius: 99px; background: var(--paper-3); overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 99px; background: var(--brand-600); }
 
 /* ---------- Status pills (order/kyc/hr states) ---------- */
