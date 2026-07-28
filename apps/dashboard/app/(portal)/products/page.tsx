@@ -111,8 +111,8 @@ export default function CataloguePage() {
       {/* KPI cards double as status filters */}
       <KpiRow
         items={[
-          { label: "All products", value: stats.total, sub: "in the catalogue", icon: KPI_ICONS.tag, tone: "brand", onClick: () => setStatusFilter("all"), active: statusFilter === "all" },
-          { label: "Live", value: stats.live, sub: "visible on the storefront", icon: KPI_ICONS.check, tone: "ok", onClick: () => setStatusFilter("live"), active: statusFilter === "live" },
+          { label: "All products", value: stats.total, sub: "in the catalogue", icon: KPI_ICONS.tag, tone: "brand", onClick: () => setStatusFilter("all") },
+          { label: "Live", value: stats.live, sub: "visible on the storefront", icon: KPI_ICONS.eye, tone: "ok", onClick: () => setStatusFilter("live"), active: statusFilter === "live" },
           { label: "Drafts", value: stats.draft, sub: "unpublished", icon: KPI_ICONS.box, tone: "info", onClick: () => setStatusFilter("draft"), active: statusFilter === "draft" },
           { label: "Out of stock", value: stats.oos, sub: "need replenishment", icon: KPI_ICONS.warn, tone: "danger", onClick: () => setStatusFilter("oos"), active: statusFilter === "oos" },
         ]}

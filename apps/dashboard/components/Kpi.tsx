@@ -17,7 +17,7 @@ export interface KpiItem {
     stats by default; give an item onClick to make it a filter tile. */
 export function KpiRow({ items }: { items: KpiItem[] }) {
   return (
-    <div className="kpi-row">
+    <div className="kpi-row page-kpis">
       {items.map((it) => {
         const cls = `kpi k-flat t-${it.tone ?? "brand"} ${it.active ? "is-active" : ""}`;
         const inner = (
@@ -64,4 +64,5 @@ export const KPI_ICONS = {
   chat: "M21 11.5a8.4 8.4 0 01-9 8.4 8.6 8.6 0 01-3.9-.9L3 21l2-4.9a8.4 8.4 0 1116-4.6z",
   warn: "M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z",
   calendar: "M8 2v4M16 2v4M3 9h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z",
+  eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7zM12 15a3 3 0 100-6 3 3 0 000 6z",
 } as const;

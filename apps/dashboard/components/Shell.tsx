@@ -37,7 +37,7 @@ const NAV: NavSection[] = [
     title: "Commerce",
     items: [
       { href: "/orders", label: "Orders", icon: "orders" },
-      { href: "/catalogue", label: "Products", icon: "catalogue", perm: "catalogue:write" },
+      { href: "/products", label: "Products", icon: "catalogue", perm: "catalogue:write" },
       { href: "/categories", label: "Categories", icon: "categories", perm: "catalogue:write" },
       { href: "/inventory", label: "Inventory", icon: "inventory", perm: "inventory:write" },
     ],
