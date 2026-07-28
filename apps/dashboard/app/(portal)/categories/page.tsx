@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
@@ -71,6 +72,15 @@ export default function CategoriesPage() {
           + New category
         </button>
       </div>
+
+      <KpiRow
+        items={[
+          { label: "Categories", value: all.length, sub: "total", icon: KPI_ICONS.tag, tone: "brand" },
+          { label: "Live", value: all.filter((c) => c.is_active).length, sub: "on the storefront", icon: KPI_ICONS.check, tone: "ok" },
+          { label: "Hidden", value: all.filter((c) => !c.is_active).length, sub: "not shown to buyers", icon: KPI_ICONS.box, tone: "info" },
+          { label: "Products", value: all.reduce((n, c) => n + c.product_count, 0), sub: "across all categories", icon: KPI_ICONS.orders, tone: "clay" },
+        ]}
+      />
 
       <div className="card pad filterbar">
         <input

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
@@ -45,6 +46,15 @@ export default function InventoryPage() {
       <div className="page-head">
         <h1>Inventory</h1>
       </div>
+
+      <KpiRow
+        items={[
+          { label: "Tracked SKUs", value: all.length, sub: "variants with stock records", icon: KPI_ICONS.box, tone: "brand" },
+          { label: "Units on hand", value: all.reduce((n, l) => n + l.on_hand, 0).toLocaleString("en-IN"), sub: "across the warehouse", icon: KPI_ICONS.tag, tone: "info" },
+          { label: "Low stock", value: all.filter((l) => l.is_low).length, sub: "below reorder point", icon: KPI_ICONS.warn, tone: "clay", onClick: () => setStock("low"), active: stock === "low" },
+          { label: "Out of stock", value: all.filter((l) => l.available <= 0).length, sub: "unavailable to sell", icon: KPI_ICONS.warn, tone: "danger", onClick: () => setStock("out"), active: stock === "out" },
+        ]}
+      />
 
       <div className="card pad filterbar">
         <input

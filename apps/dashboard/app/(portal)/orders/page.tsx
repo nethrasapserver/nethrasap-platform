@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { OrderDrawer } from "@/components/OrderDrawer";
 import { Pagination } from "@/components/Pagination";
 import { Select } from "@/components/Select";
@@ -90,6 +91,20 @@ function OrdersInner() {
     offset: (page - 1) * pageSize,
   });
 
+  // Page KPIs — cheap count queries (limit=1, read total), independent of the
+  // filters, refreshed together with the list after any drawer action.
+  const kTotal = useApi<{ total: number }>("/admin/orders", { limit: 1 });
+  const kFulfil = useApi<{ total: number }>("/admin/orders", { limit: 1, status: "confirmed" });
+  const kTransit = useApi<{ total: number }>("/admin/orders", { limit: 1, status: "dispatched" });
+  const kDelivered = useApi<{ total: number }>("/admin/orders", { limit: 1, status: "delivered" });
+  function refetchAll() {
+    refetch();
+    kTotal.refetch();
+    kFulfil.refetch();
+    kTransit.refetch();
+    kDelivered.refetch();
+  }
+
   const hasFilters = Boolean(q || status || payment || from || to);
 
   function clearFilters() {
@@ -155,6 +170,15 @@ function OrdersInner() {
           </button>
         </div>
       </div>
+
+      <KpiRow
+        items={[
+          { label: "Total orders", value: kTotal.data?.total ?? "…", sub: "all time", icon: KPI_ICONS.orders, tone: "brand" },
+          { label: "To fulfil", value: kFulfil.data?.total ?? "…", sub: "confirmed, awaiting dispatch", icon: KPI_ICONS.box, tone: "clay" },
+          { label: "In transit", value: kTransit.data?.total ?? "…", sub: "dispatched", icon: KPI_ICONS.truck, tone: "info" },
+          { label: "Delivered", value: kDelivered.data?.total ?? "…", sub: "completed sales", icon: KPI_ICONS.check, tone: "ok" },
+        ]}
+      />
 
       {/* Filter toolbar */}
       <div className="card pad filterbar">
@@ -252,7 +276,7 @@ function OrdersInner() {
       <Pagination page={page} total={data?.total ?? 0} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
 
       {openOrder && (
-        <OrderDrawer orderNumber={openOrder} onClose={() => setOpenOrder(null)} onChanged={refetch} />
+        <OrderDrawer orderNumber={openOrder} onClose={() => setOpenOrder(null)} onChanged={refetchAll} />
       )}
     </div>
   );

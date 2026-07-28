@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
@@ -23,12 +24,12 @@ export default function LeavePage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [status]);
-  const { data, loading, refetch } = useApi<{ items: Leave[] }>(
-    "/hr/leave",
-    status ? { status } : undefined,
-  );
+  // Fetch everything; the status filter applies client-side so the KPI
+  // cards always reflect the full picture.
+  const { data, loading, refetch } = useApi<{ items: Leave[] }>("/hr/leave");
   const toast = useToast();
-  const rows = data?.items ?? [];
+  const all = data?.items ?? [];
+  const rows = status ? all.filter((l) => l.status === status) : all;
   const pageItems = paginate(rows, page, pageSize);
 
   async function decide(id: string, approve: boolean) {
@@ -46,6 +47,15 @@ export default function LeavePage() {
       <div className="page-head">
         <h1>Leave requests</h1>
       </div>
+
+      <KpiRow
+        items={[
+          { label: "Pending", value: all.filter((l) => l.status === "pending").length, sub: "awaiting decision", icon: KPI_ICONS.warn, tone: "clay", onClick: () => setStatus("pending"), active: status === "pending" },
+          { label: "Approved", value: all.filter((l) => l.status === "approved").length, sub: "granted", icon: KPI_ICONS.check, tone: "ok", onClick: () => setStatus("approved"), active: status === "approved" },
+          { label: "Rejected", value: all.filter((l) => l.status === "rejected").length, sub: "declined", icon: KPI_ICONS.warn, tone: "danger", onClick: () => setStatus("rejected"), active: status === "rejected" },
+          { label: "Days requested", value: all.filter((l) => l.status === "pending").reduce((n, l) => n + l.days, 0), sub: "pending leave days", icon: KPI_ICONS.calendar, tone: "info" },
+        ]}
+      />
 
       <div className="card pad filterbar">
         <Select

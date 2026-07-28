@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { Drawer } from "@/components/Drawer";
@@ -53,6 +54,15 @@ export default function EmployeesPage() {
           + Add employee
         </button>
       </div>
+
+      <KpiRow
+        items={[
+          { label: "Employees", value: all.length, sub: "on the books", icon: KPI_ICONS.people, tone: "brand" },
+          { label: "Active", value: all.filter((e) => e.status === "active").length, sub: "currently employed", icon: KPI_ICONS.check, tone: "ok" },
+          { label: "Departments", value: departments.length, sub: "teams", icon: KPI_ICONS.tag, tone: "info" },
+          { label: "Monthly payroll", value: inr(all.reduce((n, e) => n + e.basic_salary + e.allowances, 0)), sub: "basic + allowances", icon: KPI_ICONS.money, tone: "clay" },
+        ]}
+      />
 
       <div className="card pad filterbar">
         <input

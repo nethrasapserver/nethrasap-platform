@@ -3,6 +3,7 @@
 import type { Schemas } from "@nethrasap/api-client";
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
@@ -39,6 +40,17 @@ export default function VerificationsPage() {
   });
   const [reviewId, setReviewId] = useState<string | null>(null);
 
+  // Page KPIs — count queries, refreshed together with the queue.
+  const kPending = useApi<VerificationList>("/verifications", { limit: 1, status: "pending" });
+  const kApproved = useApi<VerificationList>("/verifications", { limit: 1, status: "approved" });
+  const kRejected = useApi<VerificationList>("/verifications", { limit: 1, status: "rejected" });
+  function refetchAll() {
+    refetch();
+    kPending.refetch();
+    kApproved.refetch();
+    kRejected.refetch();
+  }
+
   const rows = data?.items ?? [];
 
   return (
@@ -46,6 +58,38 @@ export default function VerificationsPage() {
       <div className="page-head">
         <h1>Verifications</h1>
       </div>
+
+      <KpiRow
+        items={[
+          {
+            label: "Pending review",
+            value: kPending.data?.total ?? "…",
+            sub: "buyers waiting to unlock pricing",
+            icon: KPI_ICONS.warn,
+            tone: "clay",
+            onClick: () => setFilter("pending"),
+            active: filter === "pending",
+          },
+          {
+            label: "Approved",
+            value: kApproved.data?.total ?? "…",
+            sub: "verified accounts",
+            icon: KPI_ICONS.check,
+            tone: "ok",
+            onClick: () => setFilter("approved"),
+            active: filter === "approved",
+          },
+          {
+            label: "Rejected",
+            value: kRejected.data?.total ?? "…",
+            sub: "sent back with notes",
+            icon: KPI_ICONS.warn,
+            tone: "danger",
+            onClick: () => setFilter("rejected"),
+            active: filter === "rejected",
+          },
+        ]}
+      />
 
       <div className="card pad filterbar">
         <Select
@@ -133,7 +177,7 @@ export default function VerificationsPage() {
           onClose={() => setReviewId(null)}
           onDone={() => {
             setReviewId(null);
-            refetch();
+            refetchAll();
           }}
         />
       )}

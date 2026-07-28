@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { ApiError } from "@nethrasap/api-client";
@@ -45,25 +46,27 @@ const APPROVAL_PILL: Record<string, string> = {
 };
 
 export default function EnquiriesPage() {
-  // Filter is either a status value or "approval:pending" for the review queue.
+  // Filter is either a status value or "approval:pending" for the review
+  // queue; both apply client-side so the KPI cards always see the full set.
   const [filter, setFilter] = useState("");
-  const query = filter.startsWith("approval:")
-    ? { approval: filter.slice("approval:".length) }
-    : filter
-      ? { status: filter }
-      : undefined;
-  const { data, loading, refetch } = useApi<Enquiry[]>("/admin/enquiries", query);
+  const { data, loading, refetch } = useApi<Enquiry[]>("/admin/enquiries");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   useEffect(() => setPage(1), [search, filter]);
-  const rows = (data ?? []).filter((e) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      e.reference.toLowerCase().includes(q) ||
-      e.items.some((i) => i.product_name.toLowerCase().includes(q))
-    );
+  const all = data ?? [];
+  const rows = all.filter((e) => {
+    if (filter === "approval:pending" && e.approval_status !== "pending") return false;
+    if (filter && !filter.startsWith("approval:") && e.status !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (
+        !e.reference.toLowerCase().includes(q) &&
+        !e.items.some((i) => i.product_name.toLowerCase().includes(q))
+      )
+        return false;
+    }
+    return true;
   });
   const pageItems = paginate(rows, page, pageSize);
   const { can } = useAuth();
@@ -97,6 +100,15 @@ export default function EnquiriesPage() {
         <h1>Enquiries (RFQ)</h1>
       </div>
 
+      <KpiRow
+        items={[
+          { label: "Enquiries", value: all.length, sub: "all time", icon: KPI_ICONS.chat, tone: "brand" },
+          { label: "Pending", value: all.filter((e) => e.status === "pending").length, sub: "need a quote", icon: KPI_ICONS.warn, tone: "clay", onClick: () => setFilter("pending"), active: filter === "pending" },
+          { label: "Awaiting approval", value: all.filter((e) => e.approval_status === "pending").length, sub: "drafted, not released", icon: KPI_ICONS.check, tone: "info", onClick: () => setFilter("approval:pending"), active: filter === "approval:pending" },
+          { label: "Converted", value: all.filter((e) => e.status === "converted").length, sub: "became orders", icon: KPI_ICONS.orders, tone: "ok", onClick: () => setFilter("converted"), active: filter === "converted" },
+        ]}
+      />
+
       <div className="card pad filterbar">
         <input
           className="input fsearch"
@@ -125,7 +137,7 @@ export default function EnquiriesPage() {
             Clear
           </button>
         )}
-        <span className="muted small fcount">{rows.length} of {(data ?? []).length}</span>
+        <span className="muted small fcount">{rows.length} of {all.length}</span>
       </div>
 
       <div className="card">

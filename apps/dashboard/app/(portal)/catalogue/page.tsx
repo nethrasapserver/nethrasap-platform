@@ -3,6 +3,7 @@
 import type { ProductDetail } from "@nethrasap/api-client";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "@/components/Drawer";
+import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
@@ -97,12 +98,6 @@ export default function CataloguePage() {
   useEffect(() => setPage(1), [query, statusFilter, catFilter]);
   const pageItems = paginate(products, page, pageSize);
 
-  const TILES: { key: StatusFilter; label: string; value: number; tone: string }[] = [
-    { key: "all", label: "All products", value: stats.total, tone: "t-brand" },
-    { key: "live", label: "Live", value: stats.live, tone: "t-ok" },
-    { key: "draft", label: "Drafts", value: stats.draft, tone: "t-muted" },
-    { key: "oos", label: "Out of stock", value: stats.oos, tone: "t-warn" },
-  ];
 
   return (
     <div>
@@ -113,19 +108,15 @@ export default function CataloguePage() {
         </button>
       </div>
 
-      {/* Stat tiles double as status filters */}
-      <div className="prod-stats">
-        {TILES.map((t) => (
-          <button
-            key={t.key}
-            className={`prod-stat ${t.tone} ${statusFilter === t.key ? "on" : ""}`}
-            onClick={() => setStatusFilter(t.key)}
-          >
-            <span className="prod-stat-val">{t.value}</span>
-            <span className="prod-stat-lab">{t.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* KPI cards double as status filters */}
+      <KpiRow
+        items={[
+          { label: "All products", value: stats.total, sub: "in the catalogue", icon: KPI_ICONS.tag, tone: "brand", onClick: () => setStatusFilter("all"), active: statusFilter === "all" },
+          { label: "Live", value: stats.live, sub: "visible on the storefront", icon: KPI_ICONS.check, tone: "ok", onClick: () => setStatusFilter("live"), active: statusFilter === "live" },
+          { label: "Drafts", value: stats.draft, sub: "unpublished", icon: KPI_ICONS.box, tone: "info", onClick: () => setStatusFilter("draft"), active: statusFilter === "draft" },
+          { label: "Out of stock", value: stats.oos, sub: "need replenishment", icon: KPI_ICONS.warn, tone: "danger", onClick: () => setStatusFilter("oos"), active: statusFilter === "oos" },
+        ]}
+      />
 
       {/* Toolbar */}
       <div className="card pad filterbar">

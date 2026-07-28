@@ -107,6 +107,19 @@ body { background: var(--paper); }
 a.kpi { transition: transform .14s var(--ease), box-shadow .14s var(--ease); }
 a.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-md); }
 
+/* Flat page-level KPI cards (white console): colored icon chip per tone;
+   button variants double as filter tiles. */
+.kpi.k-flat { background: var(--card); border: 1px solid var(--line); }
+button.kpi { font: inherit; text-align: left; cursor: pointer; }
+button.kpi:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 2px; }
+.kpi.k-flat.t-brand .ic { background: var(--brand-700); color: var(--cream); }
+.kpi.k-flat.t-clay .ic { background: var(--clay); color: #fff; }
+.kpi.k-flat.t-info .ic { background: var(--info); color: #fff; }
+.kpi.k-flat.t-copper .ic { background: var(--copper); color: #fff; }
+.kpi.k-flat.t-ok .ic { background: var(--ok); color: #fff; }
+.kpi.k-flat.t-danger .ic { background: var(--danger); color: #fff; }
+.kpi.k-flat.is-active { border-color: var(--brand-600); box-shadow: 0 0 0 1px var(--brand-600) inset; }
+
 /* Dashboard date-range segmented control */
 .range-seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; background: var(--card); }
 .range-seg button {
