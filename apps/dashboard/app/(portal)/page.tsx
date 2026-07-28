@@ -343,7 +343,7 @@ export default function DashboardHome() {
             </div>
             <div className="panel-body dash-list">
               {(recentOrders.data?.items ?? []).map((o) => (
-                <Link key={o.order_number} href={`/orders/${o.order_number}`} className="dash-row dash-row-link">
+                <Link key={o.order_number} href={`/orders?open=${o.order_number}`} className="dash-row dash-row-link">
                   <b className="mono">{o.order_number}</b>
                   <span className="muted small" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.customer_name}</span>
                   <span className="mono small">{inr(o.grand_total)}</span>

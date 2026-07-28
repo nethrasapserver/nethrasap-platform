@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { OrderDrawer } from "@/components/OrderDrawer";
 import { dateShort, inr, statusPill } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
@@ -19,9 +19,18 @@ interface AdminOrder {
 }
 
 export default function OrdersPage() {
+  return (
+    <Suspense fallback={<div className="card empty">Loading…</div>}>
+      <OrdersInner />
+    </Suspense>
+  );
+}
+
+function OrdersInner() {
   const [status, setStatus] = useState("");
-  const [openOrder, setOpenOrder] = useState<string | null>(null);
-  const { data, loading } = useApi<{ items: AdminOrder[]; total: number }>(
+  // Deep-linkable: /orders?open=NS-2026-00015 opens that order's drawer.
+  const [openOrder, setOpenOrder] = useState<string | null>(useSearchParams().get("open"));
+  const { data, loading, refetch } = useApi<{ items: AdminOrder[]; total: number }>(
     "/admin/orders",
     status ? { status } : undefined,
   );
@@ -72,16 +81,7 @@ export default function OrdersPage() {
                 style={{ cursor: "pointer" }}
                 aria-label={`View ${o.order_number}`}
               >
-                <td>
-                  <Link
-                    href={`/orders/${o.order_number}`}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ fontWeight: 600, color: "var(--brand-dark)" }}
-                    title="Open full view"
-                  >
-                    {o.order_number}
-                  </Link>
-                </td>
+                <td style={{ fontWeight: 600, color: "var(--brand-dark)" }}>{o.order_number}</td>
                 <td>
                   {o.customer_name}
                   {o.customer_phone && <div className="muted small mono">{o.customer_phone}</div>}
@@ -106,7 +106,9 @@ export default function OrdersPage() {
         </table>
       </div>
 
-      {openOrder && <OrderDrawer orderNumber={openOrder} onClose={() => setOpenOrder(null)} />}
+      {openOrder && (
+        <OrderDrawer orderNumber={openOrder} onClose={() => setOpenOrder(null)} onChanged={refetch} />
+      )}
     </div>
   );
 }
