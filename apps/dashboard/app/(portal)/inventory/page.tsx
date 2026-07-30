@@ -1,5 +1,6 @@
 "use client";
 
+import type { Schemas } from "@nethrasap/api-client";
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { KPI_ICONS, KpiRow } from "@/components/Kpi";
@@ -10,18 +11,7 @@ import { dateTime } from "@/lib/format";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
 
-interface Level {
-  level_id: string;
-  variant_id: string;
-  product_id: string;
-  product_name: string;
-  pack_size: string;
-  on_hand: number;
-  reserved: number;
-  available: number;
-  reorder_point: number;
-  is_low: boolean;
-}
+type Level = Schemas["StockLevelOut"];
 
 export default function InventoryPage() {
   // low_only is a required param upstream; stock states filter client-side.

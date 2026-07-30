@@ -1,7 +1,9 @@
 // Shared, typed client for the Nethrasap FastAPI backend.
-// Types are generated from the live OpenAPI schema — run `npm run generate`
-// (backend must be up) whenever backend endpoints change. CI regenerates and
-// fails on drift, so frontend types can never silently diverge from the API.
+// Types are generated from the live OpenAPI schema — run `make api-types`
+// (backend must be up) whenever backend endpoints change. The `api-types-drift`
+// job in .github/workflows/ci.yml boots the API, regenerates schema.d.ts with
+// the pinned openapi-typescript, and fails the build on any diff — so frontend
+// types can never silently diverge from the API.
 
 import type { components } from "./schema";
 
@@ -17,6 +19,13 @@ export type CategoryItem = Schemas["CategoryItem"];
 export type CartOut = Schemas["CartOut"];
 export type OrderDetail = Schemas["OrderDetail"];
 export type OrderListItem = Schemas["OrderListItem"];
+export type AdminProductOut = Schemas["AdminProductOut"];
+export type StockLevelOut = Schemas["StockLevelOut"];
+export type WishlistOut = Schemas["WishlistOut"];
+export type CompareOut = Schemas["CompareOut"];
+export type SavedItemOut = Schemas["SavedItemOut"];
+export type PaymentMethodInfo = Schemas["PaymentMethodInfo"];
+export type PaymentMethodsResponse = Schemas["PaymentMethodsResponse"];
 
 export const API_PREFIX = "/api/v1";
 

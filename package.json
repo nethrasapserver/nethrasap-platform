@@ -11,6 +11,15 @@
     "dev:dashboard": "npm run dev --workspace nethrasap-dashboard",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
     "generate:api": "npm run generate --workspace @nethrasap/api-client"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.15",
+    "eslint-plugin-jsx-a11y": "^6.10.0",
+    "prettier": "^3.3.3"
   }
 }

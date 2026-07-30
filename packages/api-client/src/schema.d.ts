@@ -396,6 +396,47 @@ export interface paths {
         patch: operations["update_category_api_v1_admin_categories__category_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/categories/{category_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Category Image Slot
+         * @description Presigned PUT slot for the category tile image.
+         */
+        post: operations["category_image_slot_api_v1_admin_categories__category_id__image_post"];
+        /** Category Image Clear */
+        delete: operations["category_image_clear_api_v1_admin_categories__category_id__image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/categories/{category_id}/image/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Category Image Url
+         * @description Set the tile image from a public URL (works without object storage).
+         */
+        post: operations["category_image_url_api_v1_admin_categories__category_id__image_url_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/coupons": {
         parameters: {
             query?: never;
@@ -586,7 +627,7 @@ export interface paths {
         };
         /**
          * List Orders Admin
-         * @description All customer orders for the ops queue.
+         * @description All customer orders for the ops queue — filterable and paginated.
          */
         get: operations["list_orders_admin_api_v1_admin_orders_get"];
         put?: never;
@@ -2462,6 +2503,19 @@ export interface components {
              */
             is_active: boolean;
         };
+        /** CategoryImageSlotRequest */
+        CategoryImageSlotRequest: {
+            /**
+             * Content Type
+             * @enum {string}
+             */
+            content_type: "image/jpeg" | "image/png" | "image/webp";
+        };
+        /** CategoryImageUrlRequest */
+        CategoryImageUrlRequest: {
+            /** Url */
+            url: string;
+        };
         /** CategoryItem */
         CategoryItem: {
             /**
@@ -3835,10 +3889,14 @@ export interface components {
             /** Note */
             note?: string | null;
         };
-        /** RefreshRequest */
+        /**
+         * RefreshRequest
+         * @description Refresh/logout body. The token normally rides in the httpOnly
+         *     `nethra_rt` cookie now; the body field remains for pre-cookie clients.
+         */
         RefreshRequest: {
             /** Refresh Token */
-            refresh_token: string;
+            refresh_token?: string | null;
         };
         /** RefundRequest */
         RefundRequest: {
@@ -5211,6 +5269,111 @@ export interface operations {
             };
         };
     };
+    category_image_slot_api_v1_admin_categories__category_id__image_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryImageSlotRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    category_image_clear_api_v1_admin_categories__category_id__image_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    category_image_url_api_v1_admin_categories__category_id__image_url_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryImageUrlRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_coupons_api_v1_admin_coupons_get: {
         parameters: {
             query?: never;
@@ -5620,8 +5783,13 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string | null;
+                payment_status?: string | null;
+                /** @description order no. / phone / name */
                 q?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
                 limit?: number;
+                offset?: number;
             };
             header?: {
                 authorization?: string | null;
@@ -8342,11 +8510,13 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                nethra_rt?: string | null;
+            };
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["RefreshRequest"];
+                "application/json": components["schemas"]["RefreshRequest"] | null;
             };
         };
         responses: {
@@ -8373,13 +8543,17 @@ export interface operations {
     logout_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+            };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                nethra_rt?: string | null;
+            };
         };
-        requestBody: {
+        requestBody?: {
             content: {
-                "application/json": components["schemas"]["RefreshRequest"];
+                "application/json": components["schemas"]["RefreshRequest"] | null;
             };
         };
         responses: {

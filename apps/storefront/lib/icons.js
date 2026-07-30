@@ -2,7 +2,7 @@ import React from "react";
 /* Inline icon set — exported on window.Icons. Each icon is a React functional component.
    Internally each icon is defined by an array of path/circle/rect descriptors. */
   function make(parts) {
-    return function (props) {
+    return function Icon(props) {
       var size = props && props.size != null ? props.size : 18;
       var stroke = props && props.stroke != null ? props.stroke : 1.7;
       var className = props && props.className ? props.className : "";

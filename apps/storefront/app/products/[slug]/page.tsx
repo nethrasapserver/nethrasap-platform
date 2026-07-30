@@ -1,6 +1,8 @@
 import type { ProductDetail, ProductListItem } from "@nethrasap/api-client";
+import { ApiError } from "@nethrasap/api-client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { BuyBox, StockBand } from "@/components/BuyBox";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductGallery } from "@/components/ProductGallery";
@@ -9,14 +11,21 @@ import { serverApi } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-async function getProduct(slug: string): Promise<ProductDetail | null> {
+/* cache() dedupes within the request, so generateMetadata and the page share
+   one fetch. Only a genuine API 404 becomes null (→ notFound()); anything
+   else — 5xx, timeout, network — rethrows into error.tsx. Mapping outages to
+   404 would de-index live products. */
+const getProduct = cache(async (slug: string): Promise<ProductDetail | null> => {
   try {
     return await serverApi().get<ProductDetail>(`/products/${slug}`);
-  } catch {
-    return null;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
   }
-}
+});
 
+/* Related items are decoration — if this call fails the rail simply doesn't
+   render, which is deliberate: a broken sidebar must never 500 the product. */
 async function getRelated(slug: string): Promise<ProductListItem[]> {
   try {
     return await serverApi().get<ProductListItem[]>(`/products/${slug}/related`);

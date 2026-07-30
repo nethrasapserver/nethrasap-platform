@@ -15,9 +15,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={{ push }}>
       {children}
-      <div className="toast-host">
+      {/* Polite live region so screen readers announce inserted toasts;
+          error toasts escalate to role="alert" (assertive). */}
+      <div className="toast-host" role="status" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.err ? "err" : ""}`}>
+          <div key={t.id} className={`toast ${t.err ? "err" : ""}`} role={t.err ? "alert" : undefined}>
             {t.text}
           </div>
         ))}

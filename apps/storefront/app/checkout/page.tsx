@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { Schemas } from "@nethrasap/api-client";
 import { PhoneField } from "@nethrasap/ui/fields";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -17,18 +18,10 @@ interface PlaceResponse {
   gateway?: { gateway: string; gateway_order_id: string; gateway_key_id: string | null; amount: number } | null;
 }
 
-// Response of GET /checkout/payment-methods. Local interface until the next
-// `make api-types` regeneration folds it into the generated schema.
-interface PaymentMethodInfo {
-  id: string;
-  label: string;
-  kind: "offline" | "gateway";
-  description?: string | null;
-}
-interface PaymentMethodsResponse {
-  methods: PaymentMethodInfo[];
-  default: string;
-}
+// Response of GET /checkout/payment-methods — straight from the generated
+// OpenAPI schema (availability is config-driven, never hardcoded here).
+type PaymentMethodInfo = Schemas["PaymentMethodInfo"];
+type PaymentMethodsResponse = Schemas["PaymentMethodsResponse"];
 
 export default function CheckoutPage() {
   const { user, loading } = useAuth();

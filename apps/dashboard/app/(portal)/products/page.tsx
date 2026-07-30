@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProductDetail } from "@nethrasap/api-client";
+import type { ProductDetail, Schemas } from "@nethrasap/api-client";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { KPI_ICONS, KpiRow } from "@/components/Kpi";
@@ -24,26 +24,22 @@ interface ProductImg {
   is_primary: boolean;
 }
 
-/* Admin list row — includes unpublished products the public API hides. */
-interface AdminProduct {
-  id: string;
-  slug: string;
-  name: string;
+/* Admin list row — includes unpublished products the public API hides.
+   GET /admin/products has no response_model (it returns raw dicts from
+   backend/app/services/admin_catalogue.py:list_products_admin), so the
+   generated AdminProductOut — which models serialise_admin_product, used by
+   the create/update/publish endpoints — is missing the list-only fields
+   added below, and carries `variants` + untyped `images` the list rows
+   don't have. Drop the extension once the backend types the list response. */
+type AdminProduct = Omit<Schemas["AdminProductOut"], "variants" | "images"> & {
   image_key: string | null;
-  category_slug: string;
   category_name: string;
-  sub_category: string | null;
-  schedule: string;
-  stock_status: string;
-  is_active: boolean;
-  is_featured: boolean;
-  gst_rate_pct: number;
   variant_count: number;
   price_min: number | null;
   description: string | null;
   attributes: Record<string, unknown>;
   images: ProductImg[];
-}
+};
 
 const DOSE_SLOTS = ["morning", "afternoon", "night"] as const;
 

@@ -2,7 +2,7 @@
 
 import {
   connectRealtime,
-  type ProductListItem,
+  type Schemas,
 } from "@nethrasap/api-client";
 import {
   createContext,
@@ -16,20 +16,11 @@ import { WS_BASE, api } from "./api";
 import { useAuth } from "./auth";
 import { useToast } from "./toast";
 
-// Response shapes of /wishlist and /compare. Local interfaces until the next
-// `make api-types` regeneration folds them into the generated schema.
-export interface SavedItem {
-  product: ProductListItem;
-  added_at: string;
-}
-export interface WishlistOut {
-  items: SavedItem[];
-  product_ids: string[];
-  count: number;
-}
-export interface CompareOut extends WishlistOut {
-  max_items: number;
-}
+// Response shapes of /wishlist and /compare — straight from the generated
+// OpenAPI schema now that the endpoints declare response models.
+export type SavedItem = Schemas["SavedItemOut"];
+export type WishlistOut = Schemas["WishlistOut"];
+export type CompareOut = Schemas["CompareOut"];
 
 interface SavedState {
   wishlist: WishlistOut | null;

@@ -67,5 +67,61 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck --workspaces --if-present
+      - name: Lint
+        run: npm run lint --workspaces --if-present
       - name: Build
         run: npm run build --workspaces --if-present
+
+  api-types-drift:
+    name: Generated API types match the backend
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nethrasap
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: nethrasap_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nethrasap" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql://nethrasap:ci_password@localhost:5432/nethrasap_test
+      TEST_DATABASE_URL: postgresql://nethrasap:ci_password@localhost:5432/nethrasap_test
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-only-secret-not-production
+      ENVIRONMENT: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        working-directory: backend
+        run: uv sync --frozen
+      - name: Start API and wait for health
+        working-directory: backend
+        run: |
+          uv run uvicorn app.main:app --port 8000 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/api/v1/health >/dev/null 2>&1; then
+              echo "API is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::API did not become healthy within 60s"
+          exit 1
+      - name: Regenerate types from the live OpenAPI schema
+        run: npx -y openapi-typescript@7.13.0 http://localhost:8000/openapi.json -o packages/api-client/src/schema.d.ts
+      - name: Fail on drift
+        run: |
+          git diff --exit-code packages/api-client/src/schema.d.ts || {
+            echo "::error::packages/api-client/src/schema.d.ts is out of date with the backend's OpenAPI schema. Start the backend locally and run \`make api-types\`, then commit the regenerated file."
+            exit 1
+          }

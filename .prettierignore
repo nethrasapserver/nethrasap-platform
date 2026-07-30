@@ -1,0 +1,22 @@
+# Dependencies and build output
+node_modules
+.next
+dist
+build
+
+# Backend is Python (ruff-formatted) — not Prettier's domain
+backend/
+
+# Generated files
+packages/api-client/src/schema.d.ts
+apps/*/next-env.d.ts
+package-lock.json
+
+# Infra/deploy manifests managed by hand — keep diffs minimal
+infra/
+render.yaml
+docker-compose.yml
+
+# Docs: keep Markdown out of format enforcement for now (avoids churn in
+# files owned by other devs); remove these lines to bring docs under Prettier.
+*.md

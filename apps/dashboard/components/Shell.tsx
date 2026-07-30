@@ -102,7 +102,12 @@ export function PortalChrome({ children }: { children: React.ReactNode }) {
               {items.map((i) => {
                 const active = i.href === "/" ? pathname === "/" : pathname.startsWith(i.href);
                 return (
-                  <Link key={i.href} href={i.href} className={`pside-link ${active ? "on" : ""}`}>
+                  <Link
+                    key={i.href}
+                    href={i.href}
+                    className={`pside-link ${active ? "on" : ""}`}
+                    aria-current={active ? "page" : undefined}
+                  >
                     <I d={IC[i.icon]} />
                     {i.label}
                   </Link>

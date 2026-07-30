@@ -1048,3 +1048,8 @@
   .cta-actions { width: 100%; flex-direction: column; }
   .cta-actions .btn { width: 100%; }
 }
+
+/* ---------- Active nav (aria-current set in Shell.tsx) ----------
+   The attribute is the accessibility contract; this just lets sighted users
+   see the same thing. Colour only — no weight change, so nothing reflows. */
+.nav-links a[aria-current="page"] { color: var(--brand-700); }

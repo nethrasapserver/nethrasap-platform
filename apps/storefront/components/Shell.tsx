@@ -217,10 +217,18 @@ function UserMenu() {
 }
 
 /* ---------- Header ---------- */
+const HEADER_NAV = [
+  { href: "/products", label: "Products" },
+  { href: "/categories", label: "Categories" },
+  { href: "/track", label: "Track" },
+  { href: "/about", label: "About" },
+];
+
 export function Header() {
   const { user } = useAuth();
   const { count } = useCart();
   const { wishlist } = useSaved();
+  const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const savedCount = wishlist?.count ?? 0;
 
@@ -249,10 +257,15 @@ export function Header() {
         </button>
 
         <nav className="nav-links" aria-label="Browse">
-          <Link href="/products">Products</Link>
-          <Link href="/categories">Categories</Link>
-          <Link href="/track">Track</Link>
-          <Link href="/about">About</Link>
+          {HEADER_NAV.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              aria-current={pathname === l.href || pathname.startsWith(`${l.href}/`) ? "page" : undefined}
+            >
+              {l.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="header-actions">
@@ -297,7 +310,7 @@ export function BottomNav() {
       {items.map((it) => {
         const on = it.href === "/" ? pathname === "/" : pathname.startsWith(it.href);
         return (
-          <Link key={it.label} href={it.href} className={on ? "on" : ""}>
+          <Link key={it.label} href={it.href} className={on ? "on" : ""} aria-current={on ? "page" : undefined}>
             {it.badge ? <span className="bdot">{it.badge}</span> : null}
             <I d={it.icon} size={20} />
             {it.label}
