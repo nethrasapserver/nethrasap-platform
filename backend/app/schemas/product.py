@@ -39,6 +39,10 @@ class ProductVariantOut(BaseModel):
     unit_label: str
     barcode: str | None = None
     is_default: bool
+    # Live units sellable right now: SUM(on_hand - reserved) across warehouses.
+    # None = variant is UNTRACKED (no stock_levels rows) — the frontend falls
+    # back to the product-level `stock_status` instead of a unit count.
+    available_units: int | None = None
     prices: list[ProductPriceRow] = []
 
 
@@ -114,6 +118,9 @@ class ProductDetail(ProductListItem):
     description: str | None = None
     hsn_code: str | None = None
     specs: list[dict] = []
+    # Free-form product attributes (JSONB) passed through verbatim — benefits /
+    # indications / dosage / tags / manufacturer etc. live here, no columns.
+    attributes: dict = {}
     info: ProductInfo = Field(default_factory=ProductInfo)
     variants: list[ProductVariantOut] = []
     images: list[ProductImageOut] = []

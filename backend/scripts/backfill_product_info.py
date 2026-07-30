@@ -30,6 +30,57 @@ def _core_name(name: str) -> str:
     return name.split(" ")[0]
 
 
+def _highlights_for(product: Product, category_slug: str, rx: bool) -> list[str]:
+    core = _core_name(product.name)
+    if category_slug in DEVICE:
+        return [
+            "Clinically validated measurement accuracy",
+            "Latex-free, medical-grade construction",
+            "Simple at-home and clinical operation",
+            "Serviced and supported in India",
+        ]
+    if category_slug in CONSUMABLE:
+        return [
+            "Sterile, single-use unless stated otherwise",
+            "Medical-grade, latex-free material",
+            "Tamper-evident sealed packaging",
+            "Batch-traceable sourcing",
+        ]
+    if category_slug in COLD_CHAIN:
+        return [
+            "Unbroken GDP cold chain, temperature logged",
+            "Cold-chain indicator on every pack",
+            "CDSCO-approved, batch-traceable sourcing",
+            "Administered by healthcare professionals",
+        ]
+    if category_slug in SUPPLEMENT:
+        return [
+            f"{core} to support daily nutrition",
+            "Quality-tested, label-verified contents",
+            "Tamper-evident sealed packaging",
+            "Batch-traceable sourcing",
+        ]
+    first = f"{core} — prescription-grade formulation" if rx else f"{core} — trusted OTC formulation"
+    return [
+        first,
+        "CDSCO-approved, batch-traceable sourcing",
+        "Blister-sealed, tamper-evident packaging",
+        "Stored and shipped under audited conditions",
+    ]
+
+
+def _tags_for(product: Product, category_slug: str) -> list[str]:
+    tags = [_core_name(product.name)]
+    if product.sub_category:
+        tags.append(product.sub_category)
+    tags.append(category_slug.replace("-", " ").title())
+    if product.schedule.value != "NONE":
+        tags.append(f"Schedule {product.schedule.value}")
+    # De-dupe while preserving order.
+    seen: set[str] = set()
+    return [t for t in tags if t and not (t.lower() in seen or seen.add(t.lower()))]
+
+
 def _info_for(product: Product, category_slug: str) -> dict:
     core = _core_name(product.name)
     rx = product.schedule.value != "NONE"
@@ -46,6 +97,9 @@ def _info_for(product: Product, category_slug: str) -> dict:
         "mfg_date": mm(mfg),
         "expiry_date": mm(exp),
         "shelf_life_months": 24,
+        # PDP buy-box checklist + tag chips (approved PDP layout, 2026-07-31).
+        "highlights": _highlights_for(product, category_slug, rx),
+        "tags": _tags_for(product, category_slug),
     }
 
     if category_slug in DEVICE:

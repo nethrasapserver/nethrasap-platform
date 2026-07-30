@@ -1,14 +1,19 @@
 "use client";
 
 import type { ProductDetail } from "@nethrasap/api-client";
+import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { inr } from "@/lib/format";
 import { useSaved } from "@/lib/saved";
 
-type Variant = ProductDetail["variants"][number];
-type Price = NonNullable<Variant["prices"]>[number];
+type VariantOut = ProductDetail["variants"][number];
+/* `available_units` lands with the parallel backend change (null/absent =
+   untracked → fall back to product-level stock_status). Typed structurally
+   until the generated schema catches up. */
+type Variant = VariantOut & { available_units?: number | null };
+type Price = NonNullable<VariantOut["prices"]>[number];
 
 /** Price row for the viewer's tier (falls back to the customer tier). */
 function priceForRole(variant: Variant | undefined, role: string | undefined): Price | null {
@@ -16,14 +21,16 @@ function priceForRole(variant: Variant | undefined, role: string | undefined): P
   return prices.find((p) => p.role === role) ?? prices.find((p) => p.role === "customer") ?? prices[0] ?? null;
 }
 
-function AddOrStep({ variantId, disabled, large, quote }: { variantId: string; disabled: boolean; large?: boolean; quote?: boolean }) {
+function AddOrStep({ variantId, disabled, large, quote, label }: {
+  variantId: string; disabled: boolean; large?: boolean; quote?: boolean; label?: string;
+}) {
   const { qtyForVariant, incVariant, decVariant } = useCart();
   const qty = qtyForVariant(variantId);
   if (qty === 0) {
     return (
       <button type="button" className={large ? "btn btn-primary grow btn-lg" : "add-btn"} disabled={disabled}
         onClick={() => incVariant(variantId)}>
-        {disabled ? "Out of stock" : quote ? "Add to quote request" : "Add to cart"}
+        {disabled ? "Out of stock" : quote ? "Add to quote request" : label ?? "Add to cart"}
       </button>
     );
   }
@@ -36,36 +43,72 @@ function AddOrStep({ variantId, disabled, large, quote }: { variantId: string; d
   );
 }
 
-/** Stock is banded, never an exact count — an exact number tells competitors
- *  what we hold. (Owner decision, 2026-07-21.) */
+/** Banded fallback when a variant doesn't track exact units (owner decision,
+ *  2026-07-21 — banded copy stays for untracked stock). */
 function StockBand({ status }: { status: string }) {
-  if (status === "out_of_stock") return <span className="pill pill-out">Out of stock</span>;
+  if (status === "out_of_stock") return <span className="pill pill-muted">Out of stock</span>;
   if (status === "low_stock") return <span className="pill pill-low">Only a few left</span>;
-  if (status === "discontinued") return <span className="pill pill-out">Discontinued</span>;
+  if (status === "discontinued") return <span className="pill pill-muted">Discontinued</span>;
   return <span className="pill pill-ok">In stock</span>;
+}
+
+/** Exact-count pill per the approved mockup. `units` null = untracked. */
+function StockPill({ units, status }: { units: number | null; status: string }) {
+  if (status === "discontinued") return <span className="pill pill-muted">Discontinued</span>;
+  if (units == null) return <StockBand status={status} />;
+  if (units <= 0) return <span className="pill pill-muted">Out of stock</span>;
+  if (units <= 5) return <span className="pill pill-low">Only {units} left</span>;
+  return <span className="pill pill-ok">● In stock — {units} units</span>;
 }
 
 export function BuyBox({ product }: { product: ProductDetail }) {
   const { user } = useAuth();
   const { isSaved, isCompared, toggleSaved, toggleCompared } = useSaved();
+  const variants = product.variants as Variant[];
   const [variantId, setVariantId] = useState(
-    product.variants.find((v) => v.is_default)?.id ?? product.variants[0]?.id ?? "",
+    variants.find((v) => v.is_default)?.id ?? variants[0]?.id ?? "",
   );
 
-  const variant = product.variants.find((v) => v.id === variantId);
+  const variant = variants.find((v) => v.id === variantId);
   const price = priceForRole(variant, user?.role);
-  const outOfStock = product.stock_status === "out_of_stock";
+  const discontinued = product.stock_status === "discontinued";
+  const units = variant?.available_units ?? null;
+  const outOfStock = units != null ? units <= 0 : product.stock_status === "out_of_stock";
   const quote = product.is_quote_only;
   // For a fixed product with multiple packs, price_min→max is a pack band.
   const hasPackBand = !quote && product.variants.length > 1 && product.price_max > product.price_min;
   const savings = !quote && price && price.mrp > price.selling_price ? price.mrp - price.selling_price : 0;
+  const offPct = savings > 0 && price ? Math.round((savings / price.mrp) * 100) : 0;
   const range = price && price.range_min != null && price.range_max != null
     ? { min: price.range_min, max: price.range_max }
     : null;
 
+  // Trade-tier hint: anonymous/customer viewers see the wholesale band when a
+  // retailer/clinician price row exists on the selected variant.
+  const tradeRows = (variant?.prices ?? []).filter((p) => p.role === "retailer" || p.role === "clinician");
+  const tradeMin = tradeRows.length
+    ? Math.min(...tradeRows.map((p) => p.range_min ?? p.selling_price))
+    : null;
+  const tradeMax = tradeRows.length
+    ? Math.max(...tradeRows.map((p) => p.range_max ?? p.selling_price))
+    : null;
+  const showRoleHint = !quote && (!user || user.role === "customer") && tradeMin != null && tradeMax != null;
+
+  // Benefits checklist from the free-form attributes JSONB (hide if absent).
+  // Cast through unknown: the generated type models the bare `dict` as
+  // Record<string, never>, which would collapse every property to never.
+  const attrs = ((product as { attributes?: unknown }).attributes ?? {}) as Record<string, unknown>;
+  const highlights = Array.isArray(attrs.highlights)
+    ? attrs.highlights.filter((h): h is string => typeof h === "string" && h.trim().length > 0)
+    : [];
+
   return (
     <>
       <div className="buybox">
+        <div className="stockline">
+          <StockPill units={units} status={product.stock_status} />
+        </div>
+
         {quote ? (
           <>
             <span className="pill pill-info" style={{ marginBottom: 10 }}>Quote-based pricing</span>
@@ -88,21 +131,26 @@ export function BuyBox({ product }: { product: ProductDetail }) {
             )}
             <div className="buy-price">
               <span className="amount">{inr(price?.selling_price)}</span>
-              {savings > 0 && <span className="mrp">{inr(price?.mrp)}</span>}
-              {savings > 0 && <span className="pill pill-ok">Save {inr(savings)}</span>}
+              {savings > 0 && <span className="mrp">MRP {inr(price?.mrp)}</span>}
+              {offPct > 0 && <span className="off-pct">{offPct}% off</span>}
             </div>
-            <p className="buy-tax small muted">
-              Inclusive of all taxes
-              {price && price.gst_amount > 0 && <> · includes {inr(price.gst_amount)} GST @ {price.gst_rate_pct}%</>}
-            </p>
+            <p className="buy-tax small muted">Inclusive of all taxes</p>
           </>
+        )}
+
+        {showRoleHint && (
+          <p className="rolehint">
+            Retailers &amp; clinicians: wholesale rate{" "}
+            <b>{tradeMin === tradeMax ? inr(tradeMin) : `${inr(tradeMin)} – ${inr(tradeMax)}`}</b> after KYC —{" "}
+            <Link href="/account">complete verification</Link>
+          </p>
         )}
 
         {product.variants.length > 1 && (
           <div className="field" style={{ margin: "16px 0 0" }}>
             <label>Pack size</label>
             <div className="pack-picker">
-              {product.variants.map((v) => {
+              {variants.map((v) => {
                 const p = priceForRole(v, user?.role);
                 const vr = p && p.range_min != null && p.range_max != null;
                 return (
@@ -119,13 +167,38 @@ export function BuyBox({ product }: { product: ProductDetail }) {
           </div>
         )}
 
-        <div className="row" style={{ gap: 10, marginTop: 16 }}>
-          {variantId && <AddOrStep variantId={variantId} disabled={outOfStock || !variant} large quote={quote} />}
-        </div>
-        {quote && (
-          <p className="small muted" style={{ margin: "8px 0 0" }}>
-            Add packs to your request — a sales rep sends a firm quote you can accept or negotiate.
+        {highlights.length > 0 && (
+          <ul className="buy-perks">
+            {highlights.map((h) => (
+              <li key={h}>{h}</li>
+            ))}
+          </ul>
+        )}
+
+        {/* Discontinued products keep the page for SEO but lose the buy row. */}
+        {discontinued ? (
+          <p className="small muted" style={{ marginTop: 16 }}>
+            This product has been discontinued and can no longer be ordered.
           </p>
+        ) : (
+          <>
+            <div className="row" style={{ gap: 10, marginTop: 16 }}>
+              {variantId && (
+                <AddOrStep variantId={variantId} disabled={outOfStock || !variant} large quote={quote}
+                  label={price ? `Add to cart — ${inr(price.selling_price)}` : undefined} />
+              )}
+              {!quote && (
+                <Link href="/cart" className="btn btn-outline">
+                  Get bulk quote
+                </Link>
+              )}
+            </div>
+            {quote && (
+              <p className="small muted" style={{ margin: "8px 0 0" }}>
+                Add packs to your request — a sales rep sends a firm quote you can accept or negotiate.
+              </p>
+            )}
+          </>
         )}
 
         <div className="row" style={{ gap: 10, marginTop: 10 }}>
@@ -139,11 +212,16 @@ export function BuyBox({ product }: { product: ProductDetail }) {
           </button>
         </div>
 
-        <ul className="buy-perks">
-          <li>Free delivery on orders above ₹500</li>
-          <li>{product.delivery_time_mins ?? 90}-minute delivery in serviceable pincodes</li>
-          {user && user.role !== "customer" && <li>{user.role} pricing applied to your account</li>}
-        </ul>
+        <div className="offer-strip">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M1 8h13v8H1zM14 11h4l3 3v2h-7z" />
+            <circle cx="6" cy="18" r="1.8" />
+            <circle cx="17" cy="18" r="1.8" />
+          </svg>
+          <span>
+            <b>Free shipping</b> on orders above ₹499 · COD available
+          </span>
+        </div>
 
         {product.schedule && product.schedule !== "NONE" && (
           <p className="buy-rx small">
@@ -153,17 +231,19 @@ export function BuyBox({ product }: { product: ProductDetail }) {
       </div>
 
       {/* Sticky mobile buy bar */}
-      <div className="buybar">
-        <div>
-          <div className="mono" style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-            {quote && range ? `${inr(range.min)}–${inr(range.max)}` : inr(price?.selling_price)}
+      {!discontinued && (
+        <div className="buybar">
+          <div>
+            <div className="mono" style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+              {quote && range ? `${inr(range.min)}–${inr(range.max)}` : inr(price?.selling_price)}
+            </div>
+            <div className="small muted" style={{ lineHeight: 1.2 }}>
+              {variant?.pack_size} · {quote ? "quote-based" : "incl. taxes"}
+            </div>
           </div>
-          <div className="small muted" style={{ lineHeight: 1.2 }}>
-            {variant?.pack_size} · {quote ? "quote-based" : "incl. taxes"}
-          </div>
+          {variantId && <AddOrStep variantId={variantId} disabled={outOfStock || !variant} large quote={quote} />}
         </div>
-        {variantId && <AddOrStep variantId={variantId} disabled={outOfStock || !variant} large quote={quote} />}
-      </div>
+      )}
     </>
   );
 }

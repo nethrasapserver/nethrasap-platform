@@ -18,6 +18,7 @@ from ..models.catalogue import (
     StockStatus,
 )
 from ..integrations import storage
+from ..models.inventory import StockLevel
 from ..models.user import User, UserRole, UserStatus
 from . import pricing
 
@@ -357,12 +358,29 @@ async def get_product_by_slug(
     if product is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "product not found")
 
+    # Live availability, one grouped query for every variant of this product.
+    # A variant with NO stock_levels row is UNTRACKED → available_units is None
+    # and the storefront falls back to product.stock_status (b3-b4 policy).
+    available_by_variant: dict[Any, int] = {}
+    variant_ids = [v.id for v in product.variants]
+    if variant_ids:
+        rows = await db.execute(
+            select(
+                StockLevel.variant_id,
+                func.sum(StockLevel.on_hand - StockLevel.reserved),
+            )
+            .where(StockLevel.variant_id.in_(variant_ids))
+            .group_by(StockLevel.variant_id)
+        )
+        available_by_variant = {variant_id: int(total) for variant_id, total in rows}
+
     base = _serialize_product(product, price_role)
     return {
         **base,
         "description": product.description,
         "hsn_code": product.hsn_code,
         "specs": product.specs or [],
+        "attributes": product.attributes or {},
         "info": _build_info(product),
         "variants": [
             {
@@ -371,6 +389,7 @@ async def get_product_by_slug(
                 "unit_label": v.unit_label,
                 "barcode": v.barcode,
                 "is_default": v.is_default,
+                "available_units": available_by_variant.get(v.id),
                 "prices": [
                     {
                         "role": p.role.value,
@@ -397,7 +416,9 @@ async def get_product_by_slug(
                 "is_primary": img.is_primary,
                 "sort_order": img.sort_order,
             }
-            for img in product.images
+            # Primary first so the PDP gallery opens on the hero shot, then the
+            # admin-curated sort_order (the relationship's default ordering).
+            for img in sorted(product.images, key=lambda i: (not i.is_primary, i.sort_order))
         ],
     }
 

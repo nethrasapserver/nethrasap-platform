@@ -3600,6 +3600,11 @@ export interface components {
              * @default []
              */
             specs: Record<string, never>[];
+            /**
+             * Attributes
+             * @default {}
+             */
+            attributes: Record<string, never>;
             info?: components["schemas"]["ProductInfo"];
             /**
              * Variants
@@ -3814,6 +3819,8 @@ export interface components {
             barcode?: string | null;
             /** Is Default */
             is_default: boolean;
+            /** Available Units */
+            available_units?: number | null;
             /**
              * Prices
              * @default []

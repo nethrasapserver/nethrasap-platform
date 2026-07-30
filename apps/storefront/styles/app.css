@@ -1046,3 +1046,110 @@
    The attribute is the accessibility contract; this just lets sighted users
    see the same thing. Colour only — no weight change, so nothing reflows. */
 .nav-links a[aria-current="page"] { color: var(--brand-700); }
+
+/* ============================================================
+   PDP v2 — owner-approved mockup (docs/mockups/pdp-sample.html)
+   Additive section only; PDP-scoped classes. All surfaces pure
+   white per owner decision 2026-07-30 (the details table's
+   ice-50 label column is an owner-approved exception and keeps
+   the existing .attr-table styling above).
+   ============================================================ */
+
+/* Gallery: white stage + fixed row of three sub-image tiles. */
+.gallery-main { position: relative; background: var(--paper); }
+.g-badge {
+  position: absolute; top: 14px; left: 14px; z-index: 1;
+  background: var(--brand-50); color: var(--ink);
+  font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--brand-300);
+}
+.g-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.g-thumb {
+  aspect-ratio: 1; padding: 0; overflow: hidden; cursor: pointer;
+  border: 1.5px solid var(--line); border-radius: var(--r-md);
+  background: var(--paper); display: grid; place-items: center; color: var(--brand-400);
+}
+.g-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.g-thumb.on { border-color: var(--brand-600); box-shadow: 0 0 0 3px var(--brand-50); }
+.g-thumb.is-empty { cursor: default; }
+
+/* Buy column header lines */
+.pack-line { color: var(--ink-2); font-weight: 600; margin: 2px 0 0; }
+.rating-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; font-size: .88rem; }
+.rating-row a { color: var(--ink-2); }
+
+/* Stock pill row + grey pill for out-of-stock/discontinued */
+.stockline { display: flex; gap: 10px; align-items: center; margin: 0 0 10px; }
+.pill-muted { background: var(--paper-3); color: var(--ink-3); }
+
+/* Price row extras */
+.buy-price .off-pct { font-weight: 700; font-size: .9rem; color: var(--ink); }
+
+/* Trade-tier hint banner */
+.rolehint {
+  margin: 10px 0 0; font-size: .83rem; display: inline-block;
+  background: var(--brand-50); border: 1px solid var(--brand-100); color: var(--ink);
+  border-radius: var(--r-md); padding: 8px 12px;
+}
+.rolehint a { color: var(--brand-700); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Offer strip — dashed, white, per mockup */
+.offer-strip {
+  display: flex; gap: 9px; align-items: center; margin-top: 14px;
+  font-size: .85rem; color: var(--ink-2); background: var(--paper);
+  border: 1px dashed var(--line-2); border-radius: var(--r-md); padding: 9px 13px;
+}
+.offer-strip svg { flex: none; stroke: var(--brand-600); fill: none; }
+
+/* Trust badges — four bordered white cards, olive line icons */
+.trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+.trust-grid > div {
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper);
+  text-align: center; padding: 14px 6px; font-size: .78rem; font-weight: 700;
+  color: var(--ink); letter-spacing: .02em;
+}
+.trust-grid svg {
+  display: block; width: 26px; height: 26px; margin: 0 auto 7px;
+  stroke: var(--brand-600); fill: none; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* Fully-bordered attribute table (indications & dosage) — mockup style */
+.pdp-attrs { width: 100%; max-width: 720px; border-collapse: collapse; font-size: .9rem; }
+.pdp-attrs th, .pdp-attrs td {
+  padding: 9px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top;
+}
+.pdp-attrs th { width: 230px; color: var(--ink-3); font-weight: 600; background: var(--paper); font-size: .88rem; }
+
+/* Tags row */
+.tags-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.tag-chip {
+  font-size: .78rem; border: 1px solid var(--line-2); border-radius: 999px;
+  padding: 4px 12px; color: var(--ink-2); background: var(--paper);
+}
+
+/* Composition (ingredients) table */
+.ing-table { border-collapse: collapse; font-size: .88rem; }
+.ing-table th, .ing-table td { border: 1px solid var(--line); padding: 8px 14px; text-align: left; }
+.ing-table th {
+  background: var(--paper); font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--ink-3);
+}
+
+/* Review cards */
+.review-card {
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--paper);
+  padding: 14px 16px; max-width: 560px;
+}
+.review-card + .review-card { margin-top: 10px; }
+.review-card .who {
+  font-weight: 700; font-size: .88rem;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.review-card .vp { color: var(--ok); font-size: .75rem; font-weight: 700; }
+.review-card p { margin: 6px 0 0; font-size: .9rem; color: var(--ink-2); line-height: 1.6; }
+.review-card > .small { display: block; margin-top: 6px; }
+
+@media (max-width: 560px) {
+  .trust-grid { grid-template-columns: repeat(2, 1fr); }
+}
