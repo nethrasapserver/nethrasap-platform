@@ -8,26 +8,14 @@
   position: relative; overflow: hidden;
   min-height: 100vh; display: grid; place-items: center;
   padding: var(--sp-8) var(--sp-5) var(--sp-10);
-  background:
-    radial-gradient(65% 45% at 12% -5%, var(--brand-50), transparent 62%),
-    radial-gradient(60% 45% at 92% 105%, var(--ice-100), transparent 62%),
-    var(--paper);
-}
-/* Blister-pack dot grid, faded out behind the card so it never fights the
-   form. Echoes the dotted connectors used in the About flow. */
-.auth-page::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: radial-gradient(circle, rgba(96, 108, 56, .14) 1.2px, transparent 1.2px);
-  background-size: 26px 26px;
-  -webkit-mask-image: radial-gradient(58% 52% at 50% 45%, transparent 35%, #000 88%);
-  mask-image: radial-gradient(58% 52% at 50% 45%, transparent 35%, #000 88%);
+  /* Owner decision 2026-07-30: auth pages sit on pure white — the tinted
+     radial washes and the blister-pack dot grid are retired. */
+  background: #ffffff;
 }
 
 .auth-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-/* Soft colour wash for depth. */
-.auth-bg .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; }
-.auth-bg .orb-1 { width: 460px; height: 460px; top: -160px; left: -140px; background: var(--brand-200); }
-.auth-bg .orb-2 { width: 420px; height: 420px; bottom: -170px; right: -120px; background: var(--ice-200); }
+/* Colour-wash orbs retired (white-background decision 2026-07-30). */
+.auth-bg .orb { display: none; }
 
 /* Capsules — the one motif that could only belong to a pharmacy platform. */
 .auth-bg .cap {

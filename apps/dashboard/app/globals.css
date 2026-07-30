@@ -21,7 +21,7 @@ body { font-size: 14px; }
 .tbl { width: 100%; border-collapse: collapse; }
 .tbl th {
   text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--ice-200);
-  background: var(--ice-50);
+  background: #ffffff;
   font-family: var(--font-mono-stack); font-size: .64rem; text-transform: uppercase;
   letter-spacing: .1em; color: var(--ice-700); font-weight: 500;
 }
