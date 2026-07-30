@@ -303,7 +303,7 @@ async def place_order(
             )
         )
     else:
-        rzp = razorpay.create_order(
+        rzp = await razorpay.create_order(
             amount_paise=totals["grand_total"],
             receipt=order.order_number,
             notes={"order_number": order.order_number, "user_phone": user.phone},

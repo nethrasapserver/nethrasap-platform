@@ -50,6 +50,7 @@ def make_access_token(
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": sub,
+        "typ": "access",
         "role": role,
         "kyc": kyc_status,
         "perm": permissions,
@@ -64,12 +65,17 @@ def make_access_token(
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
-    return jwt.decode(
+    payload = jwt.decode(
         token,
         _settings.jwt_secret,
         algorithms=[_settings.jwt_alg],
         options={"require": ["exp", "sub"]},
     )
+    # A phone-proof (or any non-access) token must never authenticate as a
+    # user session, even though it is signed with the same secret.
+    if payload.get("typ") != "access":
+        raise jwt.InvalidTokenError("not an access token")
+    return payload
 
 
 # --- Phone-proof tokens -------------------------------------------------------

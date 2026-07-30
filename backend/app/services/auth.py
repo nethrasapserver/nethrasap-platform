@@ -27,7 +27,7 @@ from ..models.user import (
     UserStatus,
 )
 from ..phone import mask_phone
-from ..redis import get_role_permission_version
+from ..redis import get_redis, get_role_permission_version
 from ..security import (
     hash_password,
     hash_refresh_token,
@@ -330,8 +330,23 @@ async def refresh_session(
     return user, access, new_refresh, ttl
 
 
-async def revoke_session(db: AsyncSession, *, refresh_token: str) -> None:
-    """Logout — mark the session revoked."""
+async def deny_access_jti(jti: str | None) -> None:
+    """Revoke a still-live access token by jti (checked in deps on every
+    request). Best-effort: the refresh session is already revoked, so a Redis
+    hiccup here only leaves the access token valid until its ≤15-min expiry."""
+    if not jti:
+        return
+    try:
+        ttl = settings.access_token_ttl_min * 60
+        await get_redis().set(f"jti:deny:{jti}", "1", ex=ttl)
+    except Exception:
+        log.warning("auth.jti_deny_failed")
+
+
+async def revoke_session(
+    db: AsyncSession, *, refresh_token: str, access_jti: str | None = None
+) -> None:
+    """Logout — mark the session revoked and kill the presented access token."""
     presented_hash = hash_refresh_token(refresh_token)
     await db.execute(
         update(DbSession)
@@ -342,6 +357,7 @@ async def revoke_session(db: AsyncSession, *, refresh_token: str) -> None:
         .values(revoked_at=datetime.now(UTC))
     )
     await db.commit()
+    await deny_access_jti(access_jti)
 
 
 async def load_permissions(db: AsyncSession, user: User) -> list[str]:

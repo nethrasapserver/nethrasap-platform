@@ -306,7 +306,7 @@ async def delete_image(db: AsyncSession, actor: User, image_id: uuid.UUID) -> No
             nxt.is_primary = True
     await _audit(db, actor, "product_image.deleted", "product_image", str(image_id), {})
     await db.commit()
-    storage.delete_object(key)
+    await storage.delete_object_async(key)
     await _catalogue_event("product.updated", "product", str(product_id))
 
 

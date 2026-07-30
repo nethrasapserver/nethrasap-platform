@@ -67,7 +67,10 @@ class PasswordResetRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str = Field(min_length=10, max_length=200)
+    """Refresh/logout body. The token normally rides in the httpOnly
+    `nethra_rt` cookie now; the body field remains for pre-cookie clients."""
+
+    refresh_token: str | None = Field(default=None, min_length=10, max_length=200)
 
 
 class TokenPair(BaseModel):

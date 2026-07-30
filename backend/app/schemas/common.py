@@ -24,5 +24,9 @@ class Paginated(BaseModel, Generic[T]):
 
 
 class ErrorResponse(BaseModel):
+    """Standard error envelope returned by every global exception handler."""
+
     detail: str
     code: str | None = None
+    request_id: str | None = None
+    errors: list[dict] | None = None  # per-field details on 422s

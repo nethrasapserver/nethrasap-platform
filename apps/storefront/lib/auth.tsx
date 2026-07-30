@@ -7,7 +7,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import { api, setAccessToken, setOnUnauthorized } from "./api";
@@ -22,11 +21,24 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** One-time migration: pre-cookie sessions kept the refresh token in
+ *  localStorage under "nethra.rt". Consume it for a single body-based refresh
+ *  and remove it — the backend rotates the session into the httpOnly
+ *  `nethra_rt` cookie on that response, and we never persist it again. */
+function takeLegacyRefreshToken(): string | null {
+  try {
+    const rt = localStorage.getItem("nethra.rt");
+    if (rt !== null) localStorage.removeItem("nethra.rt");
+    return rt;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const refreshToken = useRef<string | null>(null);
 
   const loadMe = useCallback(async () => {
     try {
@@ -39,30 +51,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setSession = useCallback(
     async (t: TokenPair) => {
+      // Access token stays in memory only; the refresh token was set by the
+      // backend as an httpOnly cookie on this same response.
       setAccessToken(t.access_token);
-      refreshToken.current = t.refresh_token;
-      try {
-        localStorage.setItem("nethra.rt", t.refresh_token);
-      } catch {
-        /* ignore */
-      }
       await loadMe();
     },
     [loadMe],
   );
 
   const refresh = useCallback(async () => {
-    const rt = refreshToken.current ?? localStorage.getItem("nethra.rt");
-    if (!rt) {
-      setLoading(false);
-      return;
-    }
+    const legacyRt = takeLegacyRefreshToken();
     try {
-      const t = await api.post<TokenPair>("/auth/refresh", { refresh_token: rt });
+      // Empty body: the httpOnly `nethra_rt` cookie identifies the session.
+      // A legacy localStorage token (old sessions) is sent once, then gone.
+      const t = await api.post<TokenPair>(
+        "/auth/refresh",
+        legacyRt !== null ? { refresh_token: legacyRt } : {},
+      );
       await setSession(t);
     } catch {
       setAccessToken(null);
-      localStorage.removeItem("nethra.rt");
       setUser(null);
     } finally {
       setLoading(false);
@@ -70,15 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setSession]);
 
   const logout = useCallback(async () => {
-    const rt = refreshToken.current ?? localStorage.getItem("nethra.rt");
     try {
-      if (rt) await api.post("/auth/logout", { refresh_token: rt });
+      // The cookie identifies the session; the backend clears both auth
+      // cookies in the response.
+      await api.post("/auth/logout", {});
     } catch {
       /* ignore */
     }
     setAccessToken(null);
-    refreshToken.current = null;
-    localStorage.removeItem("nethra.rt");
     setUser(null);
     router.push("/");
   }, [router]);

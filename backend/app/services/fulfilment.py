@@ -214,7 +214,7 @@ async def refund_order(
     if amount <= 0 or amount > refundable:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"refund amount must be 1..{refundable} paise")
 
-    resp = razorpay.refund(
+    resp = await razorpay.refund(
         captured.gateway_payment_id or "stub_payment",
         amount_paise=amount,
         notes={"order_number": order.order_number, "reason": reason or ""},

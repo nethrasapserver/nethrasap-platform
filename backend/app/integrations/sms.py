@@ -10,6 +10,7 @@ Providers implement one method; which one runs is chosen by `SMS_PROVIDER`:
 """
 from __future__ import annotations
 
+import asyncio
 from abc import ABC, abstractmethod
 
 from ..config import get_settings
@@ -33,7 +34,13 @@ class ConsoleSmsProvider(SmsProvider):
 
     def send(self, *, to: str, body: str) -> None:
         self.outbox.setdefault(to, []).append(body)
-        log.info("sms.console", to=to, body=body)
+        if get_settings().is_dev:
+            # Dev/test only: the full body (incl. OTP) must be readable locally.
+            log.info("sms.console", to=to, body=body)
+        else:
+            # Config validation blocks console in production, but staging (or a
+            # misconfigured env) must never log OTPs or unmasked phone numbers.
+            log.info("sms.console", to=mask_phone(to), body_len=len(body), body="<redacted>")
 
 
 class Msg91Provider(SmsProvider):  # pragma: no cover - needs credentials
@@ -83,6 +90,12 @@ def send_sms(*, to: str, body: str) -> None:
         log.exception("sms.send_failed", to=mask_phone(to))
 
 
+async def send_sms_async(*, to: str, body: str) -> None:
+    """Async facade for calls from the event loop: the provider interface is
+    sync (real providers do blocking HTTP), so hop to a thread."""
+    await asyncio.to_thread(send_sms, to=to, body=body)
+
+
 # --- Message templates (centralised so copy changes touch one file) --------
 
 
@@ -93,6 +106,12 @@ def send_otp(*, to: str, code: str, purpose: str) -> None:
         to=to,
         body=f"{code} is your Nethrasap {purpose} code. Valid 5 minutes. Do not share it.",
     )
+
+
+async def send_otp_async(*, to: str, code: str, purpose: str) -> None:
+    """Async facade for `send_otp` (see `send_sms_async`); propagates provider
+    errors just like the sync version."""
+    await asyncio.to_thread(send_otp, to=to, code=code, purpose=purpose)
 
 
 def send_order_confirmation(*, to: str, order_number: str, grand_total_paise: int) -> None:

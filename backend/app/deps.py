@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from dataclasses import dataclass
 from typing import Annotated, Any
 
@@ -10,8 +11,8 @@ from sqlalchemy import select
 
 from .config import get_settings
 from .db import DbSession
-from .models.user import User
-from .redis import get_role_permission_version
+from .models.user import User, UserStatus
+from .redis import get_redis, get_role_permission_version
 from .security import decode_access_token
 
 CART_COOKIE = "nethrasap.session"
@@ -49,6 +50,20 @@ def _extract_bearer(authorization: str | None) -> str | None:
     return parts[1].strip() or None
 
 
+async def _jti_denied(jti: str | None) -> bool:
+    """True if the token's jti was revoked (logout). Fail-open in dev/test —
+    Redis being down must not lock the API out locally; in production an
+    unreachable denylist must not let revoked tokens through."""
+    if not jti:
+        return False
+    try:
+        return bool(await get_redis().exists(f"jti:deny:{jti}"))
+    except Exception:
+        if get_settings().environment in ("dev", "test"):
+            return False
+        raise
+
+
 async def _user_from_token(db, token: str) -> User | None:
     try:
         payload = decode_access_token(token)
@@ -57,7 +72,15 @@ async def _user_from_token(db, token: str) -> User | None:
     sub = payload.get("sub")
     if not sub:
         return None
-    result = await db.execute(select(User).where(User.id == sub))
+    try:
+        user_id = uuid.UUID(str(sub))
+    except ValueError:
+        # Attacker-controlled sub (e.g. a phone-proof token) must be a clean
+        # auth failure, never a 500 from the UUID cast in the query.
+        return None
+    if await _jti_denied(payload.get("jti")):
+        return None
+    result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
 
 
@@ -79,6 +102,11 @@ async def current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user.status == UserStatus.suspended:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="account suspended",
         )
     return user
 
@@ -160,6 +188,13 @@ def require_permission(needed: str):
     ) -> User:
         claims = await _token_claims(authorization)
 
+        if await _jti_denied(claims.get("jti")):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         current_pv = await get_role_permission_version(str(claims.get("role", "")))
         if int(claims.get("pv", 0)) != current_pv:
             raise HTTPException(
@@ -174,10 +209,23 @@ def require_permission(needed: str):
                 detail=f"requires permission: {needed}",
             )
 
-        result = await db.execute(select(User).where(User.id == claims["sub"]))
+        try:
+            user_id = uuid.UUID(str(claims["sub"]))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from None
+        result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
+        if user.status == UserStatus.suspended:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="account suspended",
+            )
         return user
 
     return _dep

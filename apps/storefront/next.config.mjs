@@ -21,9 +21,10 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    // Local dev convenience: proxy API calls to the FastAPI backend so the
-    // browser talks same-origin. In production the storefront calls
-    // NEXT_PUBLIC_API_BASE directly.
+    // LOAD-BEARING in every environment: all browser REST calls go through
+    // this same-origin rewrite so the httpOnly auth cookies are first-party.
+    // Production MUST set API_PROXY_TARGET (baked at build; serverApi also
+    // reads it at runtime). Only WebSockets bypass the proxy.
     const api = process.env.API_PROXY_TARGET ?? "http://localhost:8000";
     return [{ source: "/api/v1/:path*", destination: `${api}/api/v1/:path*` }];
   },

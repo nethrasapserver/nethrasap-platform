@@ -9,8 +9,10 @@ from pydantic import BaseModel, Field
 
 from ...config import get_settings
 from ...db import DbSession
+from ...deps import ClientMeta
 from ...integrations import razorpay
 from ...logging import get_logger
+from ...redis import rate_limit
 from ...services import payments as svc
 
 log = get_logger("api.payments")
@@ -54,8 +56,10 @@ class ConfirmRequest(BaseModel):
 
 
 @router.post("/checkout/confirm")
-async def checkout_confirm(payload: ConfirmRequest, db: DbSession) -> dict:
+async def checkout_confirm(payload: ConfirmRequest, db: DbSession, meta: ClientMeta) -> dict:
     """Client-side confirmation from the Razorpay Checkout modal."""
+    if not await rate_limit(f"checkout:ip:{meta.get('ip')}", limit=30, window_seconds=15 * 60):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many requests")
     return await svc.confirm_from_client(
         db,
         gateway_order_id=payload.razorpay_order_id,

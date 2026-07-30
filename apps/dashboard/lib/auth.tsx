@@ -5,7 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, setAccessToken, setOnUnauthorized } from "./api";
 
+// Keep in sync with STAFF_ROLES in middleware.ts (edge runtime can't import
+// this client module, so the list is duplicated by design).
 const STAFF_ROLES = ["sales", "manager", "admin"];
+
+// Pre-cookie-auth builds persisted the refresh token here. Read once for
+// migration, then delete — the refresh token now lives only in the httpOnly
+// `nethra_rt` cookie the backend sets.
+const LEGACY_RT_KEY = "nethra.dash.rt";
 
 interface AuthState {
   user: MeResponse | null;
@@ -37,40 +44,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (t: TokenPair) => {
+      // The login response also set the httpOnly `nethra_rt` cookie; only the
+      // short-lived access token is kept, in memory.
       setAccessToken(t.access_token);
-      localStorage.setItem("nethra.dash.rt", t.refresh_token);
       await loadMe();
     },
     [loadMe],
   );
 
   const logout = useCallback(async () => {
-    const rt = localStorage.getItem("nethra.dash.rt");
     try {
-      if (rt) await api.post("/auth/logout", { refresh_token: rt });
+      // Empty JSON body — the backend revokes the refresh token from the
+      // `nethra_rt` cookie and clears it.
+      await api.post("/auth/logout", {});
     } catch {
       /* ignore */
     }
     setAccessToken(null);
-    localStorage.removeItem("nethra.dash.rt");
+    localStorage.removeItem(LEGACY_RT_KEY); // legacy cleanup, harmless if absent
     setUser(null);
     router.push("/login");
   }, [router]);
 
   const bootstrap = useCallback(async () => {
-    const rt = localStorage.getItem("nethra.dash.rt");
-    if (!rt) {
+    // One-time migration: consume a legacy localStorage refresh token if one
+    // exists, then delete it. Otherwise refresh purely off the cookie.
+    const legacyRt = localStorage.getItem(LEGACY_RT_KEY);
+    if (legacyRt) localStorage.removeItem(LEGACY_RT_KEY);
+
+    // `nethra_auth` is the readable role-hint cookie set alongside the
+    // httpOnly refresh cookie — if neither it nor a legacy token exists,
+    // skip the doomed refresh call (e.g. first visit to /login).
+    const hasSession = document.cookie.split("; ").some((c) => c.startsWith("nethra_auth="));
+    if (!legacyRt && !hasSession) {
       setLoading(false);
       return;
     }
     try {
-      const t = await api.post<TokenPair>("/auth/refresh", { refresh_token: rt });
+      const t = await api.post<TokenPair>(
+        "/auth/refresh",
+        legacyRt ? { refresh_token: legacyRt } : {},
+      );
       setAccessToken(t.access_token);
-      localStorage.setItem("nethra.dash.rt", t.refresh_token);
       await loadMe();
     } catch {
       setAccessToken(null);
-      localStorage.removeItem("nethra.dash.rt");
     } finally {
       setLoading(false);
     }
@@ -85,7 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Route guard: only staff roles may use the dashboard.
+  // Route guard: only staff roles may use the dashboard. middleware.ts already
+  // gates on the `nethra_auth` cookie before the bundle is served; this client
+  // gate stays as the in-app source of truth (real /auth/me role, token expiry
+  // mid-session) and keeps the no-flash behaviour.
   useEffect(() => {
     if (loading) return;
     const onLogin = pathname === "/login";

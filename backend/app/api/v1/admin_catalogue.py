@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel, Field
 
 from ...db import DbSession
@@ -224,11 +224,38 @@ async def update_coupon(
 
 # --- CSV import ---------------------------------------------------------------------
 
+# Catalogue CSVs are a few hundred KB at most; 5 MB is generous headroom while
+# still keeping an unbounded `file.read()` from OOMing the process.
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
+_CSV_CONTENT_TYPES = ("text/csv", "application/csv", "application/vnd.ms-excel")
+
 
 @router.post("/admin/imports/catalogue", response_model=ImportReport)
 async def import_catalogue(
     db: DbSession, actor: CatalogueAdmin, file: Annotated[UploadFile, File()]
 ) -> ImportReport:
-    raw = await file.read()
+    if file.content_type not in _CSV_CONTENT_TYPES:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            f"expected a CSV upload ({', '.join(_CSV_CONTENT_TYPES)}), got {file.content_type!r}",
+        )
+    # Cheap reject via the declared size first, then enforce the cap while
+    # reading in chunks — the declared size is client-controlled and can lie.
+    if file.size is not None and file.size > MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"CSV import is limited to {MAX_IMPORT_BYTES} bytes",
+        )
+    chunks: list[bytes] = []
+    received = 0
+    while chunk := await file.read(64 * 1024):
+        received += len(chunk)
+        if received > MAX_IMPORT_BYTES:
+            raise HTTPException(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                f"CSV import is limited to {MAX_IMPORT_BYTES} bytes",
+            )
+        chunks.append(chunk)
+    raw = b"".join(chunks)
     report = await svc.import_catalogue_csv(db, actor, raw)
     return ImportReport(**report)

@@ -10,6 +10,7 @@ when Redis is down so flows still work before `docker compose up`.
 """
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
@@ -56,7 +57,9 @@ async def enqueue_job(name: str, *args: Any, **kwargs: Any) -> None:
 
 
 async def send_sms_task(ctx: dict, *, to: str, body: str) -> None:
-    sms.send_sms(to=to, body=body)
+    # Provider interface is sync (real providers do blocking HTTP) — hop to a
+    # thread so a slow gateway can't stall the worker's event loop.
+    await asyncio.to_thread(sms.send_sms, to=to, body=body)
 
 
 async def generate_invoice_pdf(ctx: dict, *, order_number: str) -> None:

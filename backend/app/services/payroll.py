@@ -99,7 +99,7 @@ async def generate_payslip_pdfs(db: AsyncSession, run_id: uuid.UUID) -> int:
         emp = (await db.execute(select(Employee).where(Employee.id == slip.employee_id))).scalar_one()
         pdf = _render_payslip(emp, slip, run.period)
         key = storage.make_key("payslips", content_type="application/pdf", prefix=emp.code)
-        storage.put_bytes(key, pdf, content_type="application/pdf")
+        await storage.put_bytes_async(key, pdf, content_type="application/pdf")
         slip.pdf_storage_key = key
         generated += 1
         if emp.phone:

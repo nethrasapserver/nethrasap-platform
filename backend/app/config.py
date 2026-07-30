@@ -88,6 +88,24 @@ class Settings(BaseSettings):
                 f"with ENVIRONMENT={self.environment}. Generate one with: "
                 "python3 -c 'import secrets; print(secrets.token_urlsafe(64))'"
             )
+        if self.environment == "production":
+            if self.sms_provider == "console":
+                raise ValueError(
+                    "SMS_PROVIDER=console only logs messages (and would leak OTPs into "
+                    "production logs) — refusing to start with ENVIRONMENT=production. "
+                    "Configure a real provider (msg91/exotel/twilio)."
+                )
+            if not (
+                self.storage_endpoint
+                and self.storage_access_key_id
+                and self.storage_secret_access_key
+            ):
+                raise ValueError(
+                    "Object storage is unconfigured (STORAGE_ENDPOINT / "
+                    "STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY) — the stub "
+                    "silently discards uploads, so refusing to start with "
+                    "ENVIRONMENT=production."
+                )
         return self
 
     @property

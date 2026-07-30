@@ -17,6 +17,7 @@ but URLs point at an obviously-fake host and nothing is stored.
 """
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -123,6 +124,15 @@ def put_bytes(key: str, data: bytes, *, content_type: str) -> None:
     )
 
 
+async def put_bytes_async(key: str, data: bytes, *, content_type: str) -> None:
+    """Async-safe `put_bytes`: boto3 blocks on the network, so hop to a thread.
+
+    Use this from async handlers/services/worker tasks — the sync `put_bytes`
+    stalls the event loop for the whole upload.
+    """
+    await asyncio.to_thread(put_bytes, key, data, content_type=content_type)
+
+
 def delete_object(key: str) -> None:
     """Best-effort delete (image replaced, request withdrawn)."""
     if not is_configured():
@@ -132,6 +142,11 @@ def delete_object(key: str) -> None:
         _client().delete_object(Bucket=get_settings().storage_bucket, Key=key)
     except Exception:
         log.exception("storage.delete_failed", key=key)
+
+
+async def delete_object_async(key: str) -> None:
+    """Async-safe `delete_object` (see `put_bytes_async`)."""
+    await asyncio.to_thread(delete_object, key)
 
 
 def put_invoice_pdf(*, invoice_number: str, pdf_bytes: bytes | None = None) -> str:

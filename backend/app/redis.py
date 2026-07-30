@@ -31,6 +31,20 @@ async def close_redis() -> None:
 
 # --- Rate limiting ----------------------------------------------------------
 
+# Tests flip this to exercise the limiter (see tests/test_rate_limits.py);
+# it must stay False everywhere else so limits never leak between tests.
+FORCE_IN_TESTS = False
+
+# INCR + EXPIRE must be one atomic step: a crash between them would leave a
+# counter with no TTL that blocks the key forever once it crosses the limit.
+_RATE_LIMIT_LUA = """
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
+
 
 async def rate_limit(key: str, *, limit: int, window_seconds: int) -> bool:
     """Fixed-window counter. Returns True if the call is allowed.
@@ -40,17 +54,15 @@ async def rate_limit(key: str, *, limit: int, window_seconds: int) -> bool:
     limiter in production must not disable brute-force protection.
     """
     settings = get_settings()
-    if settings.environment == "test":
+    if settings.environment == "test" and not FORCE_IN_TESTS:
         # Redis state survives the per-test DB rollback, so limits would leak
         # between tests/runs. The limiter itself gets its own unit tests.
         return True
     rkey = f"rl:{key}"
     try:
         r = get_redis()
-        count = await r.incr(rkey)
-        if count == 1:
-            await r.expire(rkey, window_seconds)
-        return count <= limit
+        count = await r.eval(_RATE_LIMIT_LUA, 1, rkey, window_seconds)
+        return int(count) <= limit
     except Exception:
         if get_settings().is_dev:
             log.warning("rate_limit.redis_unavailable_fail_open", key=key)

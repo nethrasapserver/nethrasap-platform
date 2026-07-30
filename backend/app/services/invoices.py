@@ -299,7 +299,7 @@ async def generate_for_order(db: AsyncSession, order_number: str) -> str | None:
     seller = await _seller_identity(db)
     pdf = _render_pdf(order, invoice.invoice_number, seller)
     key = storage.make_key("invoices", content_type="application/pdf", prefix=invoice.invoice_number)
-    storage.put_bytes(key, pdf, content_type="application/pdf")
+    await storage.put_bytes_async(key, pdf, content_type="application/pdf")
     invoice.pdf_storage_key = key
     invoice.issued_at = datetime.now(UTC)
     await db.commit()

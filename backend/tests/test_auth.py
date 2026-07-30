@@ -167,21 +167,29 @@ async def test_refresh_rotates_tokens_and_invalidates_old(client):
     sign = await signup(client, "+919876500012")
     refresh1 = sign.json()["refresh_token"]
 
+    # This test exercises BODY-token rotation; the auth endpoints also set the
+    # nethra_rt cookie, which takes precedence — keep the jar empty throughout.
+    client.cookies.clear()
+
     # First refresh — should rotate and return a new pair.
     r1 = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh1})
     assert r1.status_code == 200, r1.text
     refresh2 = r1.json()["refresh_token"]
     assert refresh2 != refresh1
 
-    # New refresh works.
+    # New refresh works. (Refresh responses re-set the cookie on every
+    # rotation, so clear the jar before each body-based call.)
+    client.cookies.clear()
     r2 = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh2})
     assert r2.status_code == 200
 
     # Re-using the original (revoked) token must fail and trip reuse detection.
+    client.cookies.clear()
     r3 = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh1})
     assert r3.status_code == 401
 
     # Any subsequent token also dead because reuse-detection revoked them all.
+    client.cookies.clear()
     r4 = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh2})
     assert r4.status_code == 401
 
