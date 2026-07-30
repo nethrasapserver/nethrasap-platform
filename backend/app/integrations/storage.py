@@ -114,6 +114,23 @@ def public_url(key: str) -> str:
     return f"{base}/{key}"
 
 
+def image_url(key: str | None) -> str | None:
+    """Nullable-key variant of `public_url` for API serializers.
+
+    Serializers store either an R2 key (real uploads) or an absolute URL
+    (dev seeds / set-by-URL flows) — or nothing at all. This maps all three
+    to something a client can drop straight into an <img src>:
+        None / ""            -> None
+        "https://..."        -> unchanged (seed-data compatibility)
+        "products/2026/..."  -> STORAGE_PUBLIC_BASE_URL-prefixed public URL
+    """
+    if not key:
+        return None
+    if key.startswith(("http://", "https://")):
+        return key
+    return public_url(key)
+
+
 def put_bytes(key: str, data: bytes, *, content_type: str) -> None:
     """Upload bytes directly (server-side generated files: invoices, payslips)."""
     if not is_configured():

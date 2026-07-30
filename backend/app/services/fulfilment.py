@@ -31,6 +31,7 @@ from ..models.order import (
 from ..models.user import User
 from ..realtime import publish_event
 from ..realtime.channels import role_channel, user_channel
+from . import outbox
 from .inventory import LineReservation, fulfil_for_order
 
 log = get_logger("services.fulfilment")
@@ -174,17 +175,19 @@ async def update_shipment_status(
     if ship_status == ShipmentStatus.delivered:
         order.shipment.delivered_at = now
         order.delivered_at = now
-
-    await db.commit()
-    await _notify(order, type="order.status_changed", note=f"shipment {ship_status.value}")
-    if ship_status == ShipmentStatus.delivered:
-        sms.send_sms(to=_phone(order), body=f"Nethrasap: order {order.order_number} delivered. Thank you!")
         # COD orders have no payment-capture moment, so delivery is when the
         # sale completes — issue the tax invoice now (prepaid orders already
         # got theirs at capture; generate_for_order is idempotent either way).
-        from ..worker import enqueue_job
+        # Recorded in the same transaction (transactional outbox) so a crash
+        # after commit can't lose it.
+        await outbox.enqueue_via_outbox(db, "generate_invoice_pdf", order_number=order.order_number)
 
-        await enqueue_job("generate_invoice_pdf", order_number=order.order_number)
+    await db.commit()
+    if ship_status == ShipmentStatus.delivered:
+        await outbox.dispatch_pending(db)  # best-effort; worker sweep is the backstop
+    await _notify(order, type="order.status_changed", note=f"shipment {ship_status.value}")
+    if ship_status == ShipmentStatus.delivered:
+        sms.send_sms(to=_phone(order), body=f"Nethrasap: order {order.order_number} delivered. Thank you!")
     return await _detail(db, order_number)
 
 

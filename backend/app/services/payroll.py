@@ -21,6 +21,7 @@ from ..logging import get_logger
 from ..models.audit import AuditLog
 from ..models.hr import Employee, EmployeeStatus, PayrollRun, PayrollRunStatus, Payslip
 from ..models.user import User
+from . import outbox
 
 log = get_logger("services.payroll")
 
@@ -72,11 +73,11 @@ async def run_payroll(db: AsyncSession, actor: User, *, period: date) -> dict[st
     db.add(AuditLog(actor_user_id=actor.id, action="hr.payroll_run", entity_type="payroll_run",
                     entity_id=str(run.id), payload={"period": period.isoformat(), "net": total,
                                                     "employees": len(employees)}))
+    # Kick off PDF generation off the request path. Recorded in the same
+    # transaction (transactional outbox) so a crash after commit can't lose it.
+    await outbox.enqueue_via_outbox(db, "generate_payslips", run_id=str(run.id))
     await db.commit()
-
-    # Kick off PDF generation off the request path.
-    from ..worker import enqueue_job
-    await enqueue_job("generate_payslips", run_id=str(run.id))
+    await outbox.dispatch_pending(db)  # best-effort; worker sweep is the backstop
 
     log.info("hr.payroll_run", period=period.isoformat(), employees=len(employees), net=total)
     return {"run_id": run.id, "period": period.isoformat(), "total_net_paise": total,

@@ -31,6 +31,7 @@ from ..models.order import (
 )
 from ..realtime import publish_event
 from ..realtime.channels import role_channel, user_channel
+from . import outbox
 from .inventory import LineReservation, release_for_order
 
 log = get_logger("services.payments")
@@ -82,14 +83,16 @@ async def apply_captured(
             payload={"order_number": order.order_number, "amount": payment.amount},
         )
     )
+    # PDF invoice generation runs off the request path. Recorded in the same
+    # transaction (transactional outbox) so a crash after commit can't lose it.
+    await outbox.enqueue_via_outbox(db, "generate_invoice_pdf", order_number=order.order_number)
     await db.commit()
+    await outbox.dispatch_pending(db)  # best-effort; worker sweep is the backstop
 
     await _notify(order, type="order.confirmed", extra={"payment_status": "captured"})
     sms.send_order_confirmation(
         to=_order_phone(order), order_number=order.order_number, grand_total_paise=order.grand_total
     )
-    # PDF invoice generation runs off the request path.
-    await _enqueue_invoice(order.order_number)
     log.info("payment.captured", order_number=order.order_number)
     return True
 
@@ -196,9 +199,3 @@ async def _notify(order: Order, *, type: str, extra: dict[str, Any]) -> None:
 def _order_phone(order: Order) -> str:
     addr = order.shipping_address or {}
     return addr.get("phone") or ""
-
-
-async def _enqueue_invoice(order_number: str) -> None:
-    from ..worker import enqueue_job
-
-    await enqueue_job("generate_invoice_pdf", order_number=order_number)

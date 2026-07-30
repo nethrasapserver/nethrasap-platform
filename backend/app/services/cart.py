@@ -10,6 +10,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..integrations import storage
 from ..logging import get_logger
 from ..models.cart import Cart, CartItem, Coupon
 from ..models.catalogue import (
@@ -361,7 +362,7 @@ async def serialise_cart(db: AsyncSession, cart: Cart, user: User | None = None)
                     "name": product.name if product else "",
                     "unit_label": variant.unit_label if variant else "",
                     "stock_status": product.stock_status.value if product else "in_stock",
-                    "image_storage_key": primary_image.storage_key if primary_image else None,
+                    "image_storage_key": storage.image_url(primary_image.storage_key) if primary_image else None,
                 },
             }
         )

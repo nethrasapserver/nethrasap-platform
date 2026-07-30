@@ -59,6 +59,7 @@ from .order import (
     ShipmentStatus,
 )
 from .otp import OtpCode, OtpPurpose
+from .outbox import JobOutbox, OutboxStatus
 from .pincode import Pincode
 from .rbac import Permission, Role, RolePermission
 from .sales import SalesAssignment, SalesTarget
@@ -96,6 +97,8 @@ __all__ = [
     "StockStatus",
     "OtpCode",
     "OtpPurpose",
+    "JobOutbox",
+    "OutboxStatus",
     "Pincode",
     "Permission",
     "Role",

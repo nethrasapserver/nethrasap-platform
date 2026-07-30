@@ -14,7 +14,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
-from arq import create_pool
+from arq import create_pool, cron
 from arq.connections import ArqRedis, RedisSettings
 
 from .config import get_settings
@@ -82,6 +82,21 @@ async def generate_payslips(ctx: dict, *, run_id: str) -> None:
         await payroll.generate_payslip_pdfs(db, uuid.UUID(run_id))
 
 
+async def dispatch_outbox(ctx: dict) -> None:
+    """Cron sweep: re-dispatch job_outbox rows still `pending` (crash recovery
+    for the enqueue-after-commit window) and surface the dead-letter depth."""
+    from .db import SessionLocal
+    from .services import outbox
+
+    async with SessionLocal() as db:
+        dispatched = await outbox.dispatch_pending(db)
+        if dispatched:
+            log.info("outbox.sweep_dispatched", count=dispatched)
+        failed = await outbox.count_failed(db)
+        if failed:
+            log.warning("outbox.failed_rows_awaiting_inspection", count=failed)
+
+
 _TASKS: dict[str, Callable[..., Awaitable[None]]] = {
     "send_sms_task": send_sms_task,
     "generate_invoice_pdf": generate_invoice_pdf,
@@ -103,6 +118,9 @@ async def shutdown(ctx: dict) -> None:
 
 class WorkerSettings:
     functions: ClassVar = [send_sms_task, generate_invoice_pdf, generate_payslips]
+    # Every 60s: re-dispatch outbox rows a crashed API process committed but
+    # never got onto the queue (arq default `second=0` → once per minute).
+    cron_jobs: ClassVar = [cron(dispatch_outbox)]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)

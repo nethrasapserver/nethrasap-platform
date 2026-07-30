@@ -434,7 +434,7 @@ async def list_products_admin(db: AsyncSession) -> list[dict[str, Any]]:
                 "id": p.id,
                 "slug": p.slug,
                 "name": p.name,
-                "image_key": primary.storage_key if primary else None,
+                "image_key": storage.image_url(primary.storage_key if primary else None),
                 "category_slug": p.category.slug if p.category else "",
                 "category_name": p.category.name if p.category else "",
                 "sub_category": p.sub_category,
@@ -448,7 +448,10 @@ async def list_products_admin(db: AsyncSession) -> list[dict[str, Any]]:
                 "description": p.description,
                 "attributes": p.attributes or {},
                 "images": [
-                    {"id": str(i.id), "storage_key": i.storage_key, "alt": i.alt, "is_primary": i.is_primary}
+                    # The dashboard drops storage_key straight into <img src>, so
+                    # serve a renderable URL (keys pass through image_url; absolute
+                    # seed/set-by-URL values are untouched).
+                    {"id": str(i.id), "storage_key": storage.image_url(i.storage_key), "alt": i.alt, "is_primary": i.is_primary}
                     for i in sorted(p.images, key=lambda x: (not x.is_primary, x.sort_order))
                 ],
             }
@@ -470,7 +473,7 @@ async def list_categories_admin(db: AsyncSession) -> list[dict[str, Any]]:
             "sku_prefix": c.sku_prefix,
             "glyph": c.glyph,
             "sort_order": c.sort_order,
-            "image_key": storage.public_url(c.image_key) if c.image_key else None,
+            "image_key": storage.image_url(c.image_key),
             "is_active": c.is_active,
             "product_count": counts.get(c.id, 0),
         }
@@ -545,7 +548,7 @@ def serialise_admin_product(p: Product) -> dict[str, Any]:
         "images": [
             {
                 "id": i.id,
-                "storage_key": i.storage_key,
+                "storage_key": storage.image_url(i.storage_key),
                 "public_url": storage.public_url(i.storage_key),
                 "alt": i.alt,
                 "is_primary": i.is_primary,
