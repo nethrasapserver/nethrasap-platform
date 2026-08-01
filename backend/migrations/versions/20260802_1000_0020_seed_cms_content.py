@@ -183,7 +183,7 @@ ABOUT_BLOCKS += [
 GLOBAL_BLOCKS: list[tuple[str, dict]] = []
 # Shell.tsx Announce
 GLOBAL_BLOCKS += [
-    ("announcement", {"lead": "Pan-India delivery", "text": "across serviceable pincodes · GDP-compliant cold chain · CDSCO-verified sourcing"}),
+    ("announcement", {"text": "Pan-India delivery across serviceable pincodes · GDP-compliant cold chain · CDSCO-verified sourcing"}),
 ]
 # Shell.tsx HEADER_NAV
 GLOBAL_BLOCKS += [
@@ -207,7 +207,7 @@ GLOBAL_BLOCKS += [
         "footer_column",
         {
             "heading": "Shop",
-            "links": [
+            "items": [
                 {"label": "All products", "href": "/products"},
                 {"label": "Categories", "href": "/categories"},
                 {"label": "Compare", "href": "/compare"},
@@ -220,7 +220,7 @@ GLOBAL_BLOCKS += [
         "footer_column",
         {
             "heading": "Account",
-            "links": [
+            "items": [
                 {"label": "Sign in", "href": "/login"},
                 {"label": "Register as retailer / clinician", "href": "/signup"},
                 {"label": "My orders", "href": "/account"},
@@ -232,7 +232,7 @@ GLOBAL_BLOCKS += [
         "footer_column",
         {
             "heading": "Buying for",
-            "links": [
+            "items": [
                 {"label": "Retail pharmacies", "href": None},
                 {"label": "Clinicians & hospitals", "href": None},
                 {"label": "Home care", "href": None},
@@ -247,10 +247,10 @@ GLOBAL_BLOCKS += [
 ]
 # TrustBadges.tsx (PDP) — each badge carries multiple SVG path `d` strings.
 GLOBAL_BLOCKS += [
-    ("pdp_trust_badge", {"label": "CDSCO-verified", "paths": ["M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z", "M9 12l2 2 4-4"]}),
-    ("pdp_trust_badge", {"label": "GDP cold chain", "paths": ["M12 2v20M4 6l16 12M20 6L4 18", "M12 2l-2 3h4zM12 22l-2-3h4z"]}),
-    ("pdp_trust_badge", {"label": "GMP facility", "paths": ["M3 21V10l6 3V10l6 3V10l6 3v8z", "M3 21h18", "M7 21v-4h3v4M14 21v-4h3v4"]}),
-    ("pdp_trust_badge", {"label": "Easy returns", "paths": ["M9 14L4 9l5-5", "M4 9h11a5 5 0 0 1 0 10h-4"]}),
+    ("pdp_trust_badge", {"label": "CDSCO-verified", "icon": "M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z M9 12l2 2 4-4"}),
+    ("pdp_trust_badge", {"label": "GDP cold chain", "icon": "M12 2v20M4 6l16 12M20 6L4 18 M12 2l-2 3h4zM12 22l-2-3h4z"}),
+    ("pdp_trust_badge", {"label": "GMP facility", "icon": "M3 21V10l6 3V10l6 3V10l6 3v8z M3 21h18 M7 21v-4h3v4M14 21v-4h3v4"}),
+    ("pdp_trust_badge", {"label": "Easy returns", "icon": "M9 14L4 9l5-5 M4 9h11a5 5 0 0 1 0 10h-4"}),
 ]
 
 PAGES: list[tuple[str, str, list[tuple[str, dict]]]] = [
