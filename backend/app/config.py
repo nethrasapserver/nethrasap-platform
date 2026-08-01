@@ -79,6 +79,13 @@ class Settings(BaseSettings):
     storage_access_key_id: str = ""
     storage_secret_access_key: str = ""
     storage_public_base_url: str = ""
+    # Browser-reachable S3 endpoint used ONLY to sign presigned PUT/GET URLs.
+    # Server-side ops (put_bytes/delete) always use storage_endpoint. These
+    # differ only when the backend reaches storage over a private network the
+    # browser can't (local MinIO: server=http://minio:9000, browser=http://
+    # localhost:9000). Left blank, presign uses storage_endpoint (R2 prod, where
+    # one internet host serves both).
+    storage_public_endpoint: str = ""
 
     # --- Tax invoice (seller identity) ---
     # Seller GSTIN printed on GST tax invoices. Env-driven so it can be set per

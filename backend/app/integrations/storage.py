@@ -50,19 +50,35 @@ def is_configured() -> bool:
 
 
 @lru_cache
-def _client():
+def _make_client(endpoint: str):
     import boto3
     from botocore.config import Config
 
     s = get_settings()
     return boto3.client(
         "s3",
-        endpoint_url=s.storage_endpoint,
+        endpoint_url=endpoint,
         aws_access_key_id=s.storage_access_key_id,
         aws_secret_access_key=s.storage_secret_access_key,
         region_name="auto",
         config=Config(signature_version="s3v4"),
     )
+
+
+def _client():
+    """Client for real server-side network ops (put_bytes/delete)."""
+    return _make_client(get_settings().storage_endpoint)
+
+
+def _presign_client():
+    """Client for signing browser-facing presigned URLs.
+
+    Uses storage_public_endpoint when set so the signed host matches what the
+    browser hits (local MinIO); falls back to the server endpoint otherwise.
+    Presigning is local HMAC math, so this never opens a connection.
+    """
+    s = get_settings()
+    return _make_client(s.storage_public_endpoint or s.storage_endpoint)
 
 
 def make_key(namespace: str, *, content_type: str, prefix: str = "") -> str:
@@ -78,7 +94,7 @@ def presigned_put(key: str, *, content_type: str) -> str:
     if not is_configured():
         log.warning("storage.presigned_put.stub", key=key)
         return f"{_STUB_BASE}/put/{key}"
-    return _client().generate_presigned_url(
+    return _presign_client().generate_presigned_url(
         "put_object",
         Params={
             "Bucket": get_settings().storage_bucket,
@@ -93,7 +109,7 @@ def presigned_get(key: str) -> str:
     """Short-lived read URL for a private object (KYC docs, invoices)."""
     if not is_configured():
         return f"{_STUB_BASE}/get/{key}"
-    return _client().generate_presigned_url(
+    return _presign_client().generate_presigned_url(
         "get_object",
         Params={"Bucket": get_settings().storage_bucket, "Key": key},
         ExpiresIn=PRESIGNED_GET_TTL,
