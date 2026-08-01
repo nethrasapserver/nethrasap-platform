@@ -120,11 +120,14 @@ async def seed_catalogue(db) -> None:
     for slug, name, brand, cat_slug, schedule, hsn, featured, packs in PRODUCTS:
         if (await db.execute(select(Product.id).where(Product.slug == slug))).scalar_one_or_none():
             continue
+        # `brand` was dropped as a column in migration 0017; keep it as the
+        # manufacturer attribute the PDP renders.
         product = Product(
-            slug=slug, name=name, brand=brand, category_id=cats[cat_slug].id,
+            slug=slug, name=name, category_id=cats[cat_slug].id,
             description=f"{name} by {brand}. Sourced through Nethrasap's audited cold-chain and GDP-compliant supply.",
             schedule=ScheduleClass(schedule), hsn_code=hsn, is_featured=featured,
             stock_status=StockStatus.in_stock, gst_rate_pct=12,
+            attributes={"manufacturer": brand},
         )
         db.add(product)
         await db.flush()

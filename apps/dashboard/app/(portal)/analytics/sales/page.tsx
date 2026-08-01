@@ -23,8 +23,9 @@ const RANGES = [7, 30, 90];
 /** Sales team — rep performance, targets and attainment. */
 export default function SalesAnalytics() {
   const [days, setDays] = useState(30);
-  const team = useApi<Rep[]>("/sales/team", { days });
-  const reps = team.data ?? [];
+  // The endpoint returns { team: Rep[] }, not a bare array — unwrap it.
+  const team = useApi<{ team: Rep[] }>("/sales/team", { days });
+  const reps = team.data?.team ?? [];
   const totalRevenue = reps.reduce((n, r) => n + r.revenue_paise, 0);
   const best = reps[0];
   const withTargets = reps.filter((r) => r.attainment_pct != null);
