@@ -52,7 +52,19 @@ async def apply_captured(
 ) -> bool:
     """Mark a payment captured and confirm its order. Returns True if this call
     performed the transition (False if it was already captured)."""
-    if payment.status == PaymentStatus.captured:
+    # H-14: lock the payment row and reload its status BEFORE the short-circuit.
+    # Concurrent webhook replays otherwise all pass the unlocked status read and
+    # each write duplicate history/audit/outbox rows (and duplicate SMS). Under
+    # the lock the second replay waits, then sees `captured` and no-ops.
+    # Lock the row and read its committed status without populate_existing —
+    # re-selecting the whole entity would expire the already-loaded `order`
+    # relationship and force a lazy load (MissingGreenlet) below.
+    locked_status = (
+        await db.execute(
+            select(Payment.status).where(Payment.id == payment.id).with_for_update()
+        )
+    ).scalar_one()
+    if locked_status == PaymentStatus.captured:
         return False
 
     now = datetime.now(UTC)
@@ -99,7 +111,14 @@ async def apply_captured(
 
 async def apply_failed(db: AsyncSession, *, payment: Payment, raw: dict[str, Any]) -> bool:
     """Mark a payment failed, fail the order, and release reserved stock."""
-    if payment.status in (PaymentStatus.failed, PaymentStatus.captured):
+    # H-14: same lock-before-short-circuit discipline as apply_captured so
+    # concurrent failure replays serialize and release stock exactly once.
+    locked_status = (
+        await db.execute(
+            select(Payment.status).where(Payment.id == payment.id).with_for_update()
+        )
+    ).scalar_one()
+    if locked_status in (PaymentStatus.failed, PaymentStatus.captured):
         return False
 
     now = datetime.now(UTC)

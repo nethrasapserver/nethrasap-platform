@@ -236,7 +236,15 @@ async def reserve_for_order(
     for line in sorted(lines, key=lambda x: str(x.variant_id)):
         level = await _get_level_for_update(db, line.variant_id, warehouse_id)
         if level is None:
-            continue  # untracked variant — sells freely
+            # UNTRACKED variant — no stock_levels row. This is a DELIBERATE,
+            # documented state (docs/b3-b4-plan.md "Tracked vs untracked
+            # policy"): a variant is unenforced/unlimited until its first
+            # `receive_stock` creates the row and flips it to tracked, so the
+            # existing catalogue keeps selling while stock is onboarded
+            # gradually. It is NOT an accidental oversell hole — reservation
+            # (and fulfil) intentionally pass through. Do not gate here without
+            # changing that policy (and the H-6 note to the lead).
+            continue  # untracked variant — sells freely by design
         available = level.on_hand - level.reserved
         if available < line.quantity:
             raise HTTPException(
@@ -278,15 +286,29 @@ async def release_for_order(
 async def fulfil_for_order(
     db: AsyncSession, *, lines: list[LineReservation], order_number: str, actor: User | None = None
 ) -> None:
-    """Convert reservation to a permanent deduction (dispatch). No commit."""
+    """Convert reservation to a permanent deduction (dispatch). No commit.
+
+    For a TRACKED variant (a stock_levels row exists) the dispatch must be
+    fully backed: the reservation and on-hand quantity both have to cover the
+    line. If either is short we RAISE 409 instead of clamping — silently
+    absorbing a shortfall (the old ``min``/``max`` clamp) is exactly what let a
+    phantom, unbacked order dispatch and drift the ledger. Raising here lets the
+    caller's transaction roll back so an unbacked order fails loudly rather than
+    corrupting stock. Untracked variants (no row) pass through as before.
+    """
     warehouse_id = await default_warehouse_id(db)
     for line in sorted(lines, key=lambda x: str(x.variant_id)):
         level = await _get_level_for_update(db, line.variant_id, warehouse_id)
         if level is None:
-            continue
-        take = min(line.quantity, level.reserved)
-        level.reserved -= take
-        level.on_hand = max(0, level.on_hand - line.quantity)
+            continue  # untracked variant — nothing to deduct (see B3 policy)
+        if level.reserved < line.quantity or level.on_hand < line.quantity:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"cannot fulfil (need {line.quantity}, reserved {level.reserved}, "
+                f"on_hand {level.on_hand})",
+            )
+        level.reserved -= line.quantity
+        level.on_hand -= line.quantity
         db.add(_ledger(
             variant_id=line.variant_id, warehouse_id=warehouse_id,
             movement=StockMovement.fulfillment, quantity=-line.quantity,

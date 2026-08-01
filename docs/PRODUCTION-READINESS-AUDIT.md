@@ -47,8 +47,8 @@ The architecture is genuinely strong. Failures cluster into three fixable themes
 
 | ID | Finding | Evidence | Location | Status |
 |---|---|---|---|---|
-| **CR-1** | **Concurrent refunds over-refund real money.** 5 parallel refunds on a ₹145.20 payment issued ₹726 (₹580 excess), each a real gateway call. No row lock, no `sum(refunds) ≤ amount` constraint; gateway call precedes commit. | `payment_amount 14520 / refund_rows 5 / total_refunded 72600` | `services/fulfilment.py:216-224` | ☐ Open |
-| **CR-2** | **RFQ conversion bypasses all inventory.** Sold + dispatched 500 units from a 6-unit warehouse; erased another order's reservation; phantom dispatch from `on_hand=0`; 494 units ledger drift. | cart order for 3 → 409; RFQ for 500 → convert → dispatch → 200 | `enquiries.convert` (no reserve); `inventory.py:287-289` | ☐ Open |
+| **CR-1** | **Concurrent refunds over-refund real money.** Fixed: refund now `SELECT … FOR UPDATE` locks the payment row, re-checks the bound under the lock, and calls the gateway only after. Applied to both `refund_order` and `cancel_order`. | Verified by test_gate1_payments + coupon-race proves the same lock pattern serializes under real parallelism | `services/fulfilment.py`, `services/orders.py` | ✅ **Fixed (Gate 1)** |
+| **CR-2** | **RFQ conversion bypasses all inventory.** Fixed: `convert` now reserves via the same `FOR UPDATE` path as checkout; `fulfil_for_order` raises 409 on shortfall instead of clamping. | Live: convert 500 vs 5 stock → 409 "insufficient stock", no order, 0 ledger rows | `services/enquiries.py`, `services/inventory.py` | ✅ **Fixed (Gate 1)** |
 | **CR-3** | **Committed deploy blueprint boots to a crash.** `ENVIRONMENT=production` + `SMS_PROVIDER=console` hits the config guard → hard boot fail; `STORAGE_*` unset does the same; `.onrender.com` base breaks guest carts/refresh; `NEXT_PUBLIC_DASHBOARD_URL` unset → localhost link. | `config.py:91-97` raises ValueError on that combo | `render.yaml:19,34-35,128-129` | ☐ Open |
 | **CR-4** | **Product search effectively unusable.** Whole-word only; no prefix/fuzzy; multi-word → 0. | `amox→0, para→0, "blood pressure"→0, "amoxicillin 500"→0` | storefront `/products` + ⌘K; backend `plainto_tsquery` | ☐ Open |
 | **CR-5** | **Role pricing wrong on listings — price shown ≠ charged.** Verified retailer browses retail prices on cards but is charged wholesale. | listing ₹2,116.80 vs PDP/cart ₹1,848 | listing serializer resolves customer tier regardless of role | ☐ Open |
@@ -62,19 +62,19 @@ The architecture is genuinely strong. Failures cluster into three fixable themes
 |---|---|---|---|
 | **H-1** | Unauthenticated order-book enumeration — omit `phone_last4` → any order's data; sequential numbers → whole book scrapeable; no rate limit. | `services/orders.py:316-345` (fail-open `else: pass`) | ☐ Open |
 | **H-2** | Nested-JSON DoS crashes every POST (RecursionError → 500), unauth; no request-body size cap. | `main.py:107` | ☐ Open |
-| **H-3** | Un-awaited `razorpay.refund()` in the order service — coroutine indexed; breaks paid-order cancellation when online payment is enabled. | `services/orders.py:235` | ☐ Open |
+| **H-3** | Un-awaited `razorpay.refund()` in the order service — coroutine indexed; breaks paid-order cancellation when online payment is enabled. | `services/orders.py:235` | ✅ **Fixed (Gate 1)** |
 | **H-4** | Migrations diverge from models, invisibly — tests use `create_all`; `alembic check` fails (33 server-default + 5 structural). **Related (found 2026-08-01):** (a) `alembic downgrade base` is broken — a downgrade re-adds NOT-NULL `order_items.brand_snapshot` over existing nulls; (b) `scripts/reset_db.py` calls Alembic from inside an asyncio loop → `RuntimeError`, so it never runs. | `tests/conftest.py:134-135`; downgrade chain; `scripts/reset_db.py:30-37` | ☐ Open |
 | **H-5** | No COD order can ever be refunded, and no record COD cash was collected (`captured_at` stays NULL forever). | fulfilment refund requires `captured`; delivery never captures COD | ☐ Open |
-| **H-6** | New variants are untracked and sell without limit — the default state of every admin-created variant (900 units / ₹90k ordered). | tracked-vs-untracked policy | ☐ Open |
-| **H-7** | Coupon `max_uses` unenforceable under concurrency; `used_count` is a lossy Python read-modify-write. | `checkout.py:342` | ☐ Open |
+| **H-6** | New variants are untracked and sell without limit — the default state of every admin-created variant (900 units / ₹90k ordered). | tracked-vs-untracked policy | ◑ Documented — needs product decision (see note) |
+| **H-7** | Coupon `max_uses` unenforceable under concurrency; `used_count` is a lossy Python read-modify-write. | `checkout.py:342` | ✅ **Fixed (Gate 1)** |
 | **H-8** | Guest cart destroyed on login — merge re-points items then cascade-deletes them. | `services/cart.py:120-125` + `models/cart.py:61` | ☐ Open |
-| **H-9** | GST charged on the pre-discount value (over-collects output tax, contra s.15(3) CGST); invoice has no GSTIN / CGST-SGST-IGST split. | `pricing.py`; `seller_gstin` defaults `""` | ☐ Open |
-| **H-10** | Top-products revenue double-counts GST (~+10.7%); the one dashboard number that fails "traceable to a DB row". | `analytics/top-products` returns `line_total + gst_amount` | ☐ Open |
+| **H-9** | GST charged on the pre-discount value (over-collects output tax, contra s.15(3) CGST); invoice has no GSTIN / CGST-SGST-IGST split. | `pricing.py`; `seller_gstin` defaults `""` | ✅ **Fixed (Gate 1)** |
+| **H-10** | Top-products revenue double-counts GST (~+10.7%); the one dashboard number that fails "traceable to a DB row". | `analytics/top-products` returns `line_total + gst_amount` | ✅ **Fixed (Gate 1)** |
 | ~~H-11~~ | Sales reps see every order incl. customer PII + company-wide financials. **Owner decision 2026-08-01: intended** — shared ops queue; customer name/phone is inherent to fulfilment. | `admin_orders.py` | ✅ **By design — closed** |
 | **H-12** | Dashboard can't add a 2nd pack size — the "…" menu opens the drawer over itself; clicks fire no request. | `dashboard products/page.tsx` z-order | ☐ Open |
 | **H-13** | A 403 renders as legitimate zero-data — manager sees an empty warehouse (0/0/0) against 22 SKUs / 4,791 units. | inventory read gated on `inventory:write`; 403 not surfaced | ☐ Open |
-| **H-14** | Webhook capture not idempotent under concurrency — 6 replays → 6 duplicate status/audit/outbox rows + 6 SMS. | `services/payments.py` | ☐ Open |
-| **H-15** | Cross-user idempotency-key leak — replaying another user's `client_request_id` returns their order number/total (201) and no-ops the caller's checkout. | `checkout.py:177-185` (no user_id filter) | ☐ Open |
+| **H-14** | Webhook capture not idempotent under concurrency — 6 replays → 6 duplicate status/audit/outbox rows + 6 SMS. | `services/payments.py` | ✅ **Fixed (Gate 1)** |
+| **H-15** | Cross-user idempotency-key leak — replaying another user's `client_request_id` returns their order number/total (201) and no-ops the caller's checkout. | `checkout.py:177-185` (no user_id filter) | ✅ **Fixed (Gate 1)** |
 | **H-16** | Header ⌘K search never submits — Enter fires no request; only preset chips work; no autocomplete. | storefront header search | ☐ Open |
 | **H-17** | Order page hangs forever on an unknown order number — API 404, no error state. | `orders/[orderNumber]` | ☐ Open |
 | **H-18** | Cart accepts quantities above available stock, no warning (checkout-place enforcement to re-verify). | storefront cart / PDP stepper | ☐ Open |

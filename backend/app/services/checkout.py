@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -27,7 +27,7 @@ from sqlalchemy.orm import selectinload
 from ..integrations import razorpay, sms
 from ..logging import get_logger
 from ..models.audit import AuditLog
-from ..models.cart import Cart
+from ..models.cart import Cart, Coupon
 from ..models.catalogue import (
     PriceRole,
     Product,
@@ -103,6 +103,10 @@ async def quote(
     gst_total = 0
     has_cold_chain = False
     price_changes: list[str] = []
+    # (taxable_value, gst_rate_pct) per sold line — used to re-derive order-level
+    # GST once the discount is known (H-9). Per-line gst_amount on each OrderItem
+    # is left untouched: line-level extraction stays exactly as audited.
+    taxable_lines: list[tuple[int, int]] = []
 
     for it in payable_items:
         variant = variants_by_id.get(it.variant_id)
@@ -125,6 +129,7 @@ async def quote(
         )
         subtotal += line.subtotal
         gst_total += line.gst_amount
+        taxable_lines.append((line.subtotal, line.gst_rate_pct))
         if variant.product.category and variant.product.category.slug == "cold-chain":
             has_cold_chain = True
 
@@ -135,8 +140,32 @@ async def quote(
         discount = 0
         price_changes.append(f"coupon {cart.coupon.code} no longer applies: {reason}")
 
+    # H-9: an invoice-shown discount reduces the taxable value (s.15(3) CGST), so
+    # output GST is charged on (taxable - discount), not the pre-discount base.
+    # Apportion the order-level discount across lines by taxable share so mixed
+    # GST rates stay correct; the last line absorbs the rounding remainder. A
+    # 100%-discount order therefore carries zero GST. When there is no discount
+    # gst_total keeps the exact per-line extraction summed above (no re-rounding).
+    discount = min(discount, subtotal)
+    if discount > 0 and subtotal > 0:
+        gst_total = 0
+        allocated = 0
+        last = len(taxable_lines) - 1
+        for idx, (line_taxable, rate) in enumerate(taxable_lines):
+            if idx == last:
+                line_disc = discount - allocated
+            else:
+                line_disc = (discount * line_taxable) // subtotal
+                allocated += line_disc
+            gst_total += pricing.gst_on_taxable(line_taxable - line_disc, rate)
+
+    taxable_after_discount = subtotal - discount
+    # Free-shipping threshold compares the tax-INCLUSIVE amount the customer
+    # actually pays for goods (post-discount taxable + its GST), matching the
+    # ₹500 promise; it previously compared the ex-GST base (raising the real bar
+    # to ~₹560).
     shipping = pricing.shipping_for(
-        subtotal_after_discount=subtotal - discount,
+        subtotal_after_discount=taxable_after_discount + gst_total,
         has_cold_chain=has_cold_chain,
     )
     grand_total = max(0, subtotal - discount + gst_total + shipping)
@@ -174,11 +203,17 @@ async def place_order(
 ) -> dict[str, Any]:
     # Idempotency FIRST: a retry with the same request id must replay the
     # existing order even though the first attempt already emptied the cart.
+    # H-15: scope the idempotency replay to the current user. client_request_id
+    # is only unique per-user in intent; without this filter, replaying another
+    # user's id returned THEIR order (and their totals) to the caller.
     existing = (
         await db.execute(
             select(Order)
             .options(selectinload(Order.payments))
-            .where(Order.client_request_id == client_request_id)
+            .where(
+                Order.client_request_id == client_request_id,
+                Order.user_id == user.id,
+            )
         )
     ).scalar_one_or_none()
     if existing is not None:
@@ -337,9 +372,32 @@ async def place_order(
         )
     )
 
-    # Bump coupon usage counter.
+    # Bump coupon usage counter — H-7: atomic, cap-enforcing redemption.
+    # A Python read-modify-write let concurrent checkouts all pass the unlocked
+    # eligibility check and clobber each other's write (max_uses=1 redeemed 4x,
+    # used_count landed on 1). This conditional UPDATE increments and enforces
+    # the cap in a single statement: the WHERE takes a row lock and re-checks
+    # used_count < max_uses, so exactly one racer wins. 0 rows updated == cap
+    # already reached -> reject with the same 400 the eligibility check uses.
     if cart.coupon and totals["discount"] > 0:
-        cart.coupon.used_count = (cart.coupon.used_count or 0) + 1
+        redeemed = (
+            await db.execute(
+                update(Coupon)
+                .where(
+                    Coupon.id == cart.coupon.id,
+                    (Coupon.max_uses.is_(None)) | (Coupon.used_count < Coupon.max_uses),
+                )
+                .values(used_count=Coupon.used_count + 1)
+                .returning(Coupon.used_count)
+            )
+        ).scalar_one_or_none()
+        if redeemed is None:
+            # Roll back the whole transaction: the order, its reserved stock and
+            # every side row must vanish since the coupon could not be claimed.
+            await db.rollback()
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "coupon usage limit reached"
+            )
 
     # Clear only the lines that were sold — quote-priced items stay in the
     # cart so the customer can still request a quote for them.
@@ -366,9 +424,14 @@ async def place_order(
     except IntegrityError as e:
         await db.rollback()
         # Most likely a duplicate `client_request_id` race — fetch & return.
+        # Scoped to the caller (H-15): a collision on another user's globally
+        # unique client_request_id must not hand back their order.
         retry = (
             await db.execute(
-                select(Order).where(Order.client_request_id == client_request_id)
+                select(Order).where(
+                    Order.client_request_id == client_request_id,
+                    Order.user_id == user.id,
+                )
             )
         ).scalar_one_or_none()
         if retry is not None:

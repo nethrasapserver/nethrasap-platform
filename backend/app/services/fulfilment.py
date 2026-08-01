@@ -22,6 +22,7 @@ from ..models.order import (
     Order,
     OrderStatus,
     OrderStatusHistory,
+    Payment,
     PaymentStatus,
     Refund,
     RefundStatus,
@@ -211,12 +212,25 @@ async def refund_order(
     if captured is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "no captured payment to refund")
 
+    # CR-1: lock the payment row FIRST so concurrent refunds serialize. A second
+    # refund blocks here until the first commits, then recomputes the refunded
+    # total under the lock — seeing the first refund row — and correctly bounds
+    # (or rejects) itself. Without this, parallel refunds each read a stale
+    # total and over-refund real money at the gateway.
+    (
+        await db.execute(
+            select(Payment).where(Payment.id == captured.id).with_for_update()
+        )
+    ).scalar_one()
+
     already_refunded = await _refunded_total(db, captured.id)
     refundable = captured.amount - already_refunded
     amount = amount_paise if amount_paise is not None else refundable
     if amount <= 0 or amount > refundable:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"refund amount must be 1..{refundable} paise")
 
+    # Gateway call happens only after the row is locked and the bound re-checked,
+    # so a losing concurrent refund never reaches the gateway.
     resp = await razorpay.refund(
         captured.gateway_payment_id or "stub_payment",
         amount_paise=amount,

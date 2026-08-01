@@ -230,7 +230,17 @@ def _render_pdf(order: Order, invoice_number: str, seller: dict[str, str]) -> by
     total_rows: list[tuple[str, int]] = [("Taxable value", order.subtotal)]
     if order.discount_total:
         total_rows.append(("Discount", -order.discount_total))
-    total_rows.append(("GST", order.gst_total))
+    # Split the stored GST into a CGST/SGST pair — the correct presentation for
+    # an intra-state supply, which is the only case for the single-state seed.
+    # Place-of-supply isn't modelled yet, so we always assume intra-state and
+    # split half/half; the two halves sum back to the exact stored gst_total
+    # (odd paise land on SGST). Switch to a single IGST row once inter-state
+    # place-of-supply is available. We render whatever gst_total the order
+    # already carries — the tax *base* is owned by checkout/pricing.
+    cgst = order.gst_total // 2
+    sgst = order.gst_total - cgst
+    total_rows.append(("CGST", cgst))
+    total_rows.append(("SGST", sgst))
     total_rows.append(("Shipping", order.shipping_total))
     for label, val in total_rows:
         c.drawString(120 * mm, y, label)
@@ -262,14 +272,25 @@ def _render_pdf(order: Order, invoice_number: str, seller: dict[str, str]) -> by
 
 
 async def _seller_identity(db: AsyncSession) -> dict[str, str]:
-    """Ops-editable seller block — app_settings keys override the defaults."""
+    """Seller block for the tax invoice.
+
+    Layering (most specific wins): ops-editable `app_settings` key >
+    env-driven config (currently only `seller_gstin`) > code default.
+    """
+    from ..config import get_settings
     from . import cms
+
+    defaults = dict(SELLER_DEFAULTS)
+    # Env-configured GSTIN is the compliance-critical field; let it fill the
+    # default so a deployment can set it without touching app_settings.
+    if get_settings().seller_gstin:
+        defaults["seller_gstin"] = get_settings().seller_gstin
 
     try:
         settings_map: dict[str, Any] = await cms.get_settings_map(db)
     except Exception:  # pragma: no cover — identity is decoration, never fatal
         settings_map = {}
-    return {key: str(settings_map.get(key) or default) for key, default in SELLER_DEFAULTS.items()}
+    return {key: str(settings_map.get(key) or default) for key, default in defaults.items()}
 
 
 async def generate_for_order(db: AsyncSession, order_number: str) -> str | None:

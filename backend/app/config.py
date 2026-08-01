@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     storage_secret_access_key: str = ""
     storage_public_base_url: str = ""
 
+    # --- Tax invoice (seller identity) ---
+    # Seller GSTIN printed on GST tax invoices. Env-driven so it can be set per
+    # deployment without a DB write; the ops-editable app_settings `seller_gstin`
+    # key (if present) still overrides this. Left blank the invoice omits the
+    # GSTIN line and the invoice is not a compliant Indian tax invoice — set it
+    # in production.
+    seller_gstin: str = ""
+
     # --- Payments ---
     # Comma-separated list of checkout methods offered to customers. COD-only
     # for launch; add upi/card/netbanking/wallet here once the Razorpay modal

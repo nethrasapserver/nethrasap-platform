@@ -105,12 +105,15 @@ async def top_products(db: AsyncSession, *, days: int = 30, limit: int = 10) -> 
             select(
                 OrderItem.product_name_snapshot,
                 func.sum(OrderItem.quantity),
-                func.sum(OrderItem.line_total + OrderItem.gst_amount),
+                # line_total is already tax-inclusive (gst_amount sits *within*
+                # it — see migration 0012 / services.invoices). Adding gst_amount
+                # again double-counted GST and overstated product revenue.
+                func.sum(OrderItem.line_total),
             )
             .join(Order, Order.id == OrderItem.order_id)
             .where(Order.status.in_(REVENUE_STATUSES), Order.placed_at >= since)
             .group_by(OrderItem.product_name_snapshot)
-            .order_by(func.sum(OrderItem.line_total + OrderItem.gst_amount).desc())
+            .order_by(func.sum(OrderItem.line_total).desc())
             .limit(limit)
         )
     ).all()

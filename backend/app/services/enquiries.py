@@ -385,6 +385,25 @@ async def convert_to_order(db: AsyncSession, rep: User, *, enquiry_id: uuid.UUID
         ))
     db.add(OrderStatusHistory(order_id=order.id, status=OrderStatus.confirmed, actor_user_id=rep.id, note=f"from {enq.reference}", at=now))
 
+    # Reserve stock through the SAME path cart checkout uses (services/checkout
+    # place_order → inventory.reserve_for_order, FOR UPDATE, ordered by
+    # variant_id). Runs in this transaction *before* commit: if any tracked
+    # variant is short, reserve_for_order raises 409 and the whole conversion
+    # rolls back (get_session rolls back on exception) — no order, no items, no
+    # ledger rows. Previously convert created the order without ever reserving,
+    # so an RFQ could sell stock the cart path had already refused (CR-2).
+    from .inventory import LineReservation, reserve_for_order
+
+    await reserve_for_order(
+        db,
+        lines=[
+            LineReservation(variant_id=variant.id, quantity=item.quantity)
+            for variant, item, _line in order_items
+        ],
+        order_number=order.order_number,
+        actor=rep,
+    )
+
     enq.status = EnquiryStatus.converted
     enq.converted_order_id = order.id
     db.add(_history(enq, rep, f"converted to {order.order_number}"))

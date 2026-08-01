@@ -9,8 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..integrations import razorpay as razorpay_stub
-from ..integrations import sms
+from ..integrations import razorpay, sms
 from ..logging import get_logger
 from ..models.audit import AuditLog
 from ..models.cart import CartItem
@@ -19,6 +18,7 @@ from ..models.order import (
     OrderItem,
     OrderStatus,
     OrderStatusHistory,
+    Payment,
     PaymentStatus,
     Refund,
     RefundStatus,
@@ -226,28 +226,48 @@ async def cancel_order(
         actor=user,
     )
 
-    # If a captured payment exists, initiate a refund. Stubbed for Phase 3.
+    # If a captured payment exists, initiate a refund.
     captured = next(
         (p for p in order.payments if p.status == PaymentStatus.captured),
         None,
     )
     if captured is not None:
-        refund_resp = razorpay_stub.refund(
-            captured.gateway_payment_id or "stub_payment",
-            amount_paise=captured.amount,
-            notes={"order_number": order.order_number, "reason": reason or ""},
-        )
-        db.add(
-            Refund(
-                payment_id=captured.id,
-                amount=captured.amount,
-                reason=reason,
-                status=RefundStatus.processing,
-                gateway_refund_id=refund_resp["id"],
-                raw_response=refund_resp,
+        # H-3: lock the payment row before refunding so concurrent cancels (or a
+        # cancel racing a staff refund) serialize. The second waits, then sees
+        # this refund via the recomputed total and refunds nothing extra —
+        # preventing a double refund of real money.
+        (
+            await db.execute(
+                select(Payment).where(Payment.id == captured.id).with_for_update()
             )
-        )
-        order.payment_status = PaymentStatus.refunded
+        ).scalar_one()
+        already_refunded = (
+            await db.execute(
+                select(func.coalesce(func.sum(Refund.amount), 0)).where(
+                    Refund.payment_id == captured.id
+                )
+            )
+        ).scalar_one()
+        refundable = captured.amount - already_refunded
+        if refundable > 0:
+            # H-3: refund is `async def` — must be awaited, else refund_resp is a
+            # coroutine and refund_resp["id"] raises TypeError at runtime.
+            refund_resp = await razorpay.refund(
+                captured.gateway_payment_id or "stub_payment",
+                amount_paise=refundable,
+                notes={"order_number": order.order_number, "reason": reason or ""},
+            )
+            db.add(
+                Refund(
+                    payment_id=captured.id,
+                    amount=refundable,
+                    reason=reason,
+                    status=RefundStatus.processing,
+                    gateway_refund_id=refund_resp["id"],
+                    raw_response=refund_resp,
+                )
+            )
+            order.payment_status = PaymentStatus.refunded
 
     db.add(
         AuditLog(

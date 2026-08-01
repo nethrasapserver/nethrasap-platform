@@ -45,6 +45,26 @@ def gst_within(inclusive_amount: int, gst_rate_pct: int | None = None) -> int:
     return (2 * inclusive_amount * rate + (100 + rate)) // (2 * (100 + rate))
 
 
+def gst_on_taxable(taxable_amount: int, gst_rate_pct: int | None = None) -> int:
+    """GST as a percentage *of* an already tax-EXCLUSIVE taxable value.
+
+    The additive counterpart of `gst_within`: where `gst_within` extracts tax
+    contained inside an inclusive price, this adds tax onto a bare taxable base
+
+        gst = taxable x rate / 100
+
+    For an undiscounted line the two agree exactly (taxable = inclusive x 100 /
+    (100 + rate), so taxable x rate/100 == inclusive x rate/(100+rate)); this
+    helper exists for the order level, where an invoice discount (s.15(3) CGST)
+    reduces the taxable base and GST must be recomputed on the reduced value.
+    Integer paise, ROUND_HALF_UP — same convention as `gst_within`.
+    """
+    rate = gst_rate_pct if gst_rate_pct is not None else DEFAULT_GST_RATE_PCT
+    if taxable_amount <= 0 or rate <= 0:
+        return 0
+    return (2 * taxable_amount * rate + 100) // 200
+
+
 def compute_line(quantity: int, unit_price: int, gst_rate_pct: int | None) -> LineMath:
     """`unit_price` is tax-inclusive; the customer pays quantity x unit_price."""
     if quantity < 1:
