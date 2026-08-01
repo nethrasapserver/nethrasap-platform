@@ -349,6 +349,48 @@ function ProductForm({
   const toggleDose = (slot: string) =>
     setDosage((d) => (d.includes(slot) ? d.filter((x) => x !== slot) : [...d, slot]));
 
+  /* Opening pack size + per-role pricing (create mode only — an existing
+     product's tiers are edited in the Prices drawer). Creating the variant
+     here is what stops new products landing unpriceable. */
+  const [pack, setPack] = useState({ pack_size: "", unit_label: "" });
+  const [quoteMode, setQuoteMode] = useState(false);
+  const [tiers, setTiers] = useState<Record<Role, PriceRowForm>>({
+    customer: { mrp: "", selling: "", rmin: "", rmax: "" },
+    clinician: { mrp: "", selling: "", rmin: "", rmax: "" },
+    retailer: { mrp: "", selling: "", rmin: "", rmax: "" },
+  });
+  const setTier = (role: Role, key: keyof PriceRowForm, v: string) =>
+    setTiers((t) => ({ ...t, [role]: { ...t[role], [key]: v } }));
+
+  /* A tier counts as filled once it has an MRP plus whichever second value the
+     chosen mode needs. Customer is the required tier; the others are optional
+     and simply fall back to customer pricing when left blank. */
+  const tierFilled = (role: Role) => {
+    const t = tiers[role];
+    if (toPaise(t.mrp) <= 0) return false;
+    return quoteMode
+      ? toPaise(t.rmin) > 0 && toPaise(t.rmax) > 0
+      : toPaise(t.selling) > 0;
+  };
+  const pricingReady =
+    editing || (!!pack.pack_size.trim() && !!pack.unit_label.trim() && tierFilled("customer"));
+
+  function tierPrices() {
+    return ROLES.filter(tierFilled).map((role) => {
+      const t = tiers[role];
+      // Quote-only rows still carry an anchor selling price; the band is what
+      // flips the storefront into "request a quote".
+      const selling = quoteMode ? toPaise(t.rmin) : toPaise(t.selling);
+      return {
+        role,
+        mrp: toPaise(t.mrp),
+        selling_price: selling,
+        range_min: quoteMode ? toPaise(t.rmin) : null,
+        range_max: quoteMode ? toPaise(t.rmax) : null,
+      };
+    });
+  }
+
   // Image management (immediate, independent of the Save button).
   const [images, setImages] = useState<ProductImg[]>(product?.images ?? []);
   const [imgUrl, setImgUrl] = useState("");
@@ -452,7 +494,15 @@ function ProductForm({
             is_primary: im.is_primary,
           });
         }
-        toast("Product created — add variants & prices next");
+        // Opening pack size + its role tiers, so the product is sellable
+        // (or quotable) the moment it is published.
+        await api.post(`/admin/products/${created.id}/variants`, {
+          pack_size: pack.pack_size.trim(),
+          unit_label: pack.unit_label.trim(),
+          is_default: true,
+          prices: tierPrices(),
+        });
+        toast(quoteMode ? "Product created — quote-only pricing set" : "Product created with prices");
       }
       onDone();
     } catch {
@@ -464,12 +514,12 @@ function ProductForm({
   return (
     <Drawer
       title={editing ? `Edit ${product.name}` : "New product"}
-      subtitle={editing ? product.slug : "Creates the product shell — add variants & prices next."}
+      subtitle={editing ? product.slug : "Details, opening pack size and role pricing — ready to publish."}
       onClose={onClose}
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn btn-primary" disabled={busy || !form.name} onClick={save}>
+          <button className="btn btn-primary" disabled={busy || !form.name || !pricingReady} onClick={save}>
             {busy ? "Saving…" : editing ? "Save changes" : "Create product"}
           </button>
         </>
@@ -561,6 +611,125 @@ function ProductForm({
         <label>Description</label>
         <textarea className="input" rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
       </div>
+
+      {!editing && (
+        <>
+          <div style={{ borderTop: "1px solid var(--line)", margin: "6px 0 14px" }} />
+          <h4 style={{ margin: "0 0 10px" }}>Pack size &amp; pricing</h4>
+          <p className="muted small" style={{ margin: "0 0 14px" }}>
+            Prices are set per pack size, per buyer role. More pack sizes can be added later.
+          </p>
+
+          <div className="row">
+            <div className="field grow">
+              <label>Pack size</label>
+              <input
+                className="input"
+                placeholder="e.g. Strip of 10"
+                value={pack.pack_size}
+                onChange={(e) => setPack((p) => ({ ...p, pack_size: e.target.value }))}
+              />
+            </div>
+            <div className="field grow">
+              <label>Unit label</label>
+              <input
+                className="input"
+                placeholder="e.g. 10 tablets"
+                value={pack.unit_label}
+                onChange={(e) => setPack((p) => ({ ...p, unit_label: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label style={{ display: "flex", gap: 9, alignItems: "center", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={quoteMode}
+                onChange={(e) => setQuoteMode(e.target.checked)}
+              />
+              <span>
+                Range price (quote-only)
+                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
+                  Buyers see an indicative band and raise an enquiry instead of buying directly.
+                  Leave unticked for a fixed price with Add to cart.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <table className="tbl" style={{ marginTop: 4 }}>
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>MRP ₹</th>
+                {quoteMode ? (
+                  <>
+                    <th>Range min ₹</th>
+                    <th>Range max ₹</th>
+                  </>
+                ) : (
+                  <th>Selling ₹</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {ROLES.map((role) => (
+                <tr key={role}>
+                  <td style={{ textTransform: "capitalize", fontWeight: 600 }}>
+                    {role}
+                    {role === "customer" && <span className="muted small"> (required)</span>}
+                  </td>
+                  <td>
+                    <input
+                      className="input"
+                      style={{ minWidth: 84 }}
+                      inputMode="decimal"
+                      value={tiers[role].mrp}
+                      onChange={(e) => setTier(role, "mrp", e.target.value)}
+                    />
+                  </td>
+                  {quoteMode ? (
+                    <>
+                      <td>
+                        <input
+                          className="input"
+                          style={{ minWidth: 84 }}
+                          inputMode="decimal"
+                          value={tiers[role].rmin}
+                          onChange={(e) => setTier(role, "rmin", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input"
+                          style={{ minWidth: 84 }}
+                          inputMode="decimal"
+                          value={tiers[role].rmax}
+                          onChange={(e) => setTier(role, "rmax", e.target.value)}
+                        />
+                      </td>
+                    </>
+                  ) : (
+                    <td>
+                      <input
+                        className="input"
+                        style={{ minWidth: 84 }}
+                        inputMode="decimal"
+                        value={tiers[role].selling}
+                        onChange={(e) => setTier(role, "selling", e.target.value)}
+                      />
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted small" style={{ margin: "8px 0 0" }}>
+            Leave clinician or retailer blank to charge them the customer price.
+          </p>
+        </>
+      )}
 
       <div style={{ borderTop: "1px solid var(--line)", margin: "6px 0 14px" }} />
       <h4 style={{ margin: "0 0 10px" }}>Product information</h4>
