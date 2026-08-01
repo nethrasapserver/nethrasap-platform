@@ -191,7 +191,11 @@ export default function CataloguePage() {
                 <td><span className={`pill ${statusPill(p.stock_status)}`}>{p.stock_status.replace(/_/g, " ")}</span></td>
                 <td><span className={`pill ${p.is_active ? "pill-ok" : "pill-muted"}`}>{p.is_active ? "Live" : "Draft"}</span></td>
                 <td className="num" style={{ fontWeight: 600 }}>{p.price_min != null ? inr(p.price_min) : "—"}</td>
-                <td className="num">
+                {/* Stop clicks in the actions cell from bubbling to the row's
+                    onClick (which opens the detail drawer). Without this the "…"
+                    menu trigger opened the drawer over the menu — the scrim
+                    (z-index 90) then swallowed every menu click (H-12). */}
+                <td className="num" onClick={(e) => e.stopPropagation()}>
                   <div className="prod-actions">
                     <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setEdit(p); }}>Edit</button>
                     <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setPriceFor(p); }}>Prices</button>
@@ -375,6 +379,18 @@ function ProductForm({
   const pricingReady =
     editing || (!!pack.pack_size.trim() && !!pack.unit_label.trim() && tierFilled("customer"));
 
+  /* A tier the user has started (a selling/range price entered) but left
+     without an MRP would be silently discarded by tierFilled — so surface it
+     and block the save instead of dropping the price (H-22). */
+  const tierPartial = (role: Role) => {
+    const t = tiers[role];
+    const hasPrice = quoteMode
+      ? toPaise(t.rmin) > 0 || toPaise(t.rmax) > 0
+      : toPaise(t.selling) > 0;
+    return hasPrice && toPaise(t.mrp) <= 0;
+  };
+  const incompleteTiers = editing ? [] : ROLES.filter(tierPartial);
+
   function tierPrices() {
     return ROLES.filter(tierFilled).map((role) => {
       const t = tiers[role];
@@ -453,6 +469,15 @@ function ProductForm({
   }
 
   async function save() {
+    // Never let a role tier with a price but no MRP through — it would be
+    // dropped without warning (H-22).
+    if (incompleteTiers.length > 0) {
+      toast(
+        `Add an MRP for ${incompleteTiers.join(", ")} — a price without an MRP isn't saved.`,
+        true,
+      );
+      return;
+    }
     setBusy(true);
     const attributes: Record<string, unknown> = { ...a };
     const setAttr = (k: string, v: string) => {
@@ -519,7 +544,7 @@ function ProductForm({
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn btn-primary" disabled={busy || !form.name || !pricingReady} onClick={save}>
+          <button className="btn btn-primary" disabled={busy || !form.name || !pricingReady || incompleteTiers.length > 0} onClick={save}>
             {busy ? "Saving…" : editing ? "Save changes" : "Create product"}
           </button>
         </>
@@ -728,6 +753,13 @@ function ProductForm({
           <p className="muted small" style={{ margin: "8px 0 0" }}>
             Leave clinician or retailer blank to charge them the customer price.
           </p>
+          {incompleteTiers.length > 0 && (
+            <p className="small" style={{ color: "var(--danger)", margin: "8px 0 0" }}>
+              {incompleteTiers.map((r) => r[0].toUpperCase() + r.slice(1)).join(" and ")}{" "}
+              {incompleteTiers.length > 1 ? "have" : "has"} a price but no MRP. Add an MRP
+              (or clear the price) — a tier without an MRP won&apos;t be saved.
+            </p>
+          )}
         </>
       )}
 
@@ -964,8 +996,29 @@ function PriceEditor({
     setForms((f) => ({ ...f, [vid]: { ...f[vid], [role]: { ...f[vid][role], [key]: value } } }));
   }
 
+  /* Tiers with a selling/range price entered but no MRP — filled() would drop
+     them silently on save, so flag them and block instead (H-22). */
+  const priceGaps: string[] = [];
+  if (detail) {
+    for (const v of detail.variants) {
+      const form = forms[v.id];
+      if (!form) continue;
+      for (const r of ROLES) {
+        const t = form[r];
+        const hasPrice = quoteMode
+          ? toPaise(t.rmin) > 0 || toPaise(t.rmax) > 0
+          : toPaise(t.selling) > 0;
+        if (hasPrice && toPaise(t.mrp) <= 0) priceGaps.push(`${v.pack_size} · ${r}`);
+      }
+    }
+  }
+
   async function save() {
     if (!detail) return;
+    if (priceGaps.length > 0) {
+      toast(`Add an MRP for ${priceGaps.join(", ")} — a price without an MRP isn't saved.`, true);
+      return;
+    }
     setBusy(true);
     try {
       for (const v of detail.variants) {
@@ -1013,7 +1066,7 @@ function PriceEditor({
           </button>
           <button
             className="btn btn-primary"
-            disabled={busy || !detail || detail.variants.length === 0}
+            disabled={busy || !detail || detail.variants.length === 0 || priceGaps.length > 0}
             onClick={save}
           >
             {busy ? "Saving…" : "Save prices"}
@@ -1055,6 +1108,13 @@ function PriceEditor({
               </span>
             </label>
           </div>
+
+          {priceGaps.length > 0 && (
+            <p className="small" style={{ color: "var(--danger)", margin: 0 }}>
+              These tiers have a price but no MRP and won&apos;t be saved until you add one
+              (or clear the price): {priceGaps.join(", ")}.
+            </p>
+          )}
 
           {detail.variants.map((v) => (
             <section key={v.id}>

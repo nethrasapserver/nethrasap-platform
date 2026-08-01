@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { api, setAccessToken, setOnUnauthorized } from "./api";
+import { useToast } from "./toast";
 
 interface AuthState {
   user: MeResponse | null;
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const toast = useToast();
 
   const loadMe = useCallback(async () => {
     try {
@@ -91,9 +93,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
+    // A dead session (refresh failed) must surface cleanly rather than let the
+    // UI keep pretending we're signed in and fail every action silently.
     setOnUnauthorized(() => {
       setAccessToken(null);
       setUser(null);
+      // Drop any stale legacy refresh-token hint so it can't linger.
+      try {
+        localStorage.removeItem("nethra.rt");
+      } catch {
+        /* ignore */
+      }
+      const { pathname, search } = window.location;
+      // Don't bounce (or loop) if we're already on an auth screen.
+      if (pathname.startsWith("/login") || pathname.startsWith("/signup")) return;
+      toast("Your session expired — please sign in.", true);
+      router.push(`/login?next=${encodeURIComponent(pathname + search)}`);
     });
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps

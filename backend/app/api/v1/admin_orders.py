@@ -64,6 +64,10 @@ class RefundRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class CodCollectRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
 @router.post("/admin/orders/{order_number}/shipment", response_model=OrderDetail)
 async def create_shipment(
     order_number: str, payload: ShipmentCreate, db: DbSession, actor: FulfilStaff
@@ -94,5 +98,18 @@ async def refund(
 ) -> OrderDetail:
     data = await svc.refund_order(
         db, actor, order_number=order_number, amount_paise=payload.amount_paise, reason=payload.reason
+    )
+    return OrderDetail.model_validate(data)
+
+
+@router.post("/admin/orders/{order_number}/cod-collected", response_model=OrderDetail)
+async def mark_cod_collected(
+    order_number: str, payload: CodCollectRequest, db: DbSession, actor: FulfilStaff
+) -> OrderDetail:
+    """H-5: record COD cash collected — captures the payment (idempotent) and
+    unlocks the refund path. Gated on orders:fulfil: collecting cash is a
+    delivery/ops action (sales/manager/admin); refunds stay orders:refund."""
+    data = await svc.mark_cod_collected(
+        db, actor, order_number=order_number, note=payload.note
     )
     return OrderDetail.model_validate(data)

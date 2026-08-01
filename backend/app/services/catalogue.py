@@ -1,6 +1,7 @@
 """Catalogue queries — products, categories, role-aware pricing."""
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from fastapi import HTTPException, status
@@ -206,6 +207,30 @@ def _default_variant_price_subquery(price_role: PriceRole):
     return func.coalesce(role_price.scalar_subquery(), customer_price.scalar_subquery())
 
 
+def _build_prefix_tsquery(q: str | None) -> str | None:
+    """Turn free text into a prefix + multi-word ``to_tsquery`` string.
+
+    Each whitespace/punctuation-delimited term becomes a ``:*`` prefix pattern
+    and the terms are ANDed together, so partial and multi-word searches match
+    the existing products tsvector without pg_trgm or a migration:
+
+        ``amox``            -> ``amox:*``            (matches "Amoxicillin")
+        ``amoxicillin 500`` -> ``amoxicillin:* & 500:*``
+        ``blood pressure``  -> ``blood:* & pressure:*``
+
+    Terms are reduced to alphanumeric runs (``re.findall``), which both splits
+    the query and strips punctuation that would otherwise raise a tsquery
+    syntax error. An all-empty / all-garbage query returns ``None`` so callers
+    skip the text filter entirely (and return the normal list, never a 500).
+    """
+    if not q:
+        return None
+    terms = re.findall(r"[0-9a-z]+", q.lower())
+    if not terms:
+        return None
+    return " & ".join(f"{term}:*" for term in terms)
+
+
 async def list_products(
     db: AsyncSession,
     *,
@@ -273,42 +298,35 @@ async def list_products(
         if price_max is not None:
             base = base.where(pexpr <= price_max)
 
+    # Free-text filter — PREFIX + MULTI-WORD match on the existing tsvector.
+    # Built once and shared by every sort branch so `amox`, `amoxicillin 500`
+    # and `blood pressure` all match; a garbage query yields None → no filter.
+    tsq_str = _build_prefix_tsquery(q)
+    ts_query = func.to_tsquery("english", tsq_str) if tsq_str else None
+    if ts_query is not None:
+        base = base.where(Product.search_tsv.op("@@")(ts_query))
+
     # Sort precedence: explicit non-relevance sorts always win.
     if sort == "price-asc":
         price_expr = _default_variant_price_subquery(price_role)
-        # Apply q filter (without ts_rank ordering) before sorting by price.
-        if q:
-            ts_query = func.plainto_tsquery("english", q)
-            base = base.where(Product.search_tsv.op("@@")(ts_query))
         base = base.order_by(price_expr.asc().nulls_last(), Product.name.asc())
     elif sort == "price-desc":
         price_expr = _default_variant_price_subquery(price_role)
-        if q:
-            ts_query = func.plainto_tsquery("english", q)
-            base = base.where(Product.search_tsv.op("@@")(ts_query))
         base = base.order_by(price_expr.desc().nulls_last(), Product.name.asc())
     elif sort == "rating":
-        if q:
-            ts_query = func.plainto_tsquery("english", q)
-            base = base.where(Product.search_tsv.op("@@")(ts_query))
         base = base.order_by(
             Product.rating.desc(),
             Product.reviews_count.desc(),
             Product.name.asc(),
         )
     elif sort == "popular":
-        if q:
-            ts_query = func.plainto_tsquery("english", q)
-            base = base.where(Product.search_tsv.op("@@")(ts_query))
         base = base.order_by(
             Product.reviews_count.desc(),
             Product.rating.desc(),
             Product.name.asc(),
         )
     else:  # relevance
-        if q:
-            ts_query = func.plainto_tsquery("english", q)
-            base = base.where(Product.search_tsv.op("@@")(ts_query))
+        if ts_query is not None:
             rank = func.ts_rank(Product.search_tsv, ts_query)
             base = base.order_by(rank.desc(), Product.name.asc())
         else:

@@ -1,7 +1,7 @@
 "use client";
 
-import type { Schemas } from "@nethrasap/api-client";
-import { useEffect, useState } from "react";
+import { ApiError, type Schemas } from "@nethrasap/api-client";
+import { useCallback, useEffect, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { KPI_ICONS, KpiRow } from "@/components/Kpi";
 import { Pagination, paginate } from "@/components/Pagination";
@@ -15,7 +15,29 @@ type Level = Schemas["StockLevelOut"];
 
 export default function InventoryPage() {
   // low_only is a required param upstream; stock states filter client-side.
-  const { data, loading, refetch } = useApi<Level[]>("/admin/inventory", { low_only: false });
+  // Fetched directly (not via useApi) so we can read ApiError.status: a 403 is
+  // a permission wall, not an empty warehouse, and must not render as zeros
+  // (H-13). Inventory is gated behind inventory:write upstream.
+  const [data, setData] = useState<Level[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    setForbidden(false);
+    setFailed(false);
+    try {
+      setData(await api.get<Level[]>("/admin/inventory", { low_only: false }));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      else setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
   const [receive, setReceive] = useState<Level | null>(null);
   const [view, setView] = useState<Level | null>(null);
   const [query, setQuery] = useState("");
@@ -39,6 +61,27 @@ export default function InventoryPage() {
         <h1>Inventory</h1>
       </div>
 
+      {forbidden && (
+        <div
+          className="card empty"
+          style={{ marginTop: 16, display: "grid", gap: 6, justifyItems: "center", textAlign: "center", padding: "40px 20px" }}
+        >
+          <strong>You don&apos;t have access to inventory</strong>
+          <span className="muted small">
+            Viewing and managing stock needs the inventory permission. Ask an admin if you need it.
+          </span>
+        </div>
+      )}
+
+      {failed && !forbidden && (
+        <div className="card empty" style={{ marginTop: 16, display: "grid", gap: 10, justifyItems: "center", padding: "40px 20px" }}>
+          <span>Could not load inventory.</span>
+          <button className="btn btn-outline btn-sm" onClick={() => refetch()}>Retry</button>
+        </div>
+      )}
+
+      {!forbidden && !failed && (
+      <>
       <KpiRow
         items={[
           { label: "Tracked SKUs", value: all.length, sub: "variants with stock records", icon: KPI_ICONS.box, tone: "brand" },
@@ -132,6 +175,8 @@ export default function InventoryPage() {
       </div>
 
       <Pagination page={page} total={rows.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+      </>
+      )}
 
       {view && (
         <LevelDrawer

@@ -23,6 +23,20 @@ ENV PYTHONUNBUFFERED=1 \
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
+# ---- test: builder + dev deps + tests, for CI and local runs (never shipped) ----
+# Placed before `runtime` so `runtime` stays the default build target (compose
+# builds the last stage). Build explicitly with:
+#   docker build -f infra/Dockerfile.backend --target test -t nethrasap-api-test .
+FROM builder AS test
+WORKDIR /app
+RUN uv sync --frozen
+COPY backend/app ./app
+COPY backend/migrations ./migrations
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/pyproject.toml ./pyproject.toml
+COPY backend/scripts ./scripts
+COPY backend/tests ./tests
+
 # ---- runtime: minimal image, no build tooling, no tests/dev scripts ----
 FROM python:3.12-slim AS runtime
 

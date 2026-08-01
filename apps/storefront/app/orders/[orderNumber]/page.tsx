@@ -1,6 +1,6 @@
 "use client";
 
-import { connectRealtime, type OrderDetail } from "@nethrasap/api-client";
+import { ApiError, connectRealtime, type OrderDetail } from "@nethrasap/api-client";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -18,13 +18,19 @@ export default function OrderDetailPage() {
   const isNew = useSearchParams().get("new");
   const { user, loading } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [status, setStatus] = useState<"loading" | "ok" | "notfound" | "error">("loading");
   const [live, setLive] = useState(false);
 
   const load = useCallback(async () => {
+    setStatus("loading");
     try {
       setOrder(await api.get<OrderDetail>(`/orders/${orderNumber}`));
-    } catch {
+      setStatus("ok");
+    } catch (e) {
       setOrder(null);
+      // 404 (unknown number) and 403 (not your order) are both "can't find it"
+      // for the buyer; anything else is a transient error worth retrying.
+      setStatus(e instanceof ApiError && (e.status === 404 || e.status === 403) ? "notfound" : "error");
     }
   }, [orderNumber]);
 
@@ -58,6 +64,42 @@ export default function OrderDetailPage() {
         </div>
       </div>
     );
+
+  if (status === "notfound")
+    return (
+      <div className="container section">
+        <div className="card pad" style={{ maxWidth: 520, display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>We couldn&apos;t find that order</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            No order matches <b className="mono">{orderNumber}</b> on your account. Double-check the
+            number, or look it up by number and phone.
+          </p>
+          <div className="row" style={{ gap: 8 }}>
+            <Link href="/track" className="btn btn-primary">Track an order</Link>
+            <Link href="/account" className="btn btn-outline">Your orders</Link>
+          </div>
+        </div>
+      </div>
+    );
+
+  if (status === "error")
+    return (
+      <div className="container section">
+        <div className="card pad" style={{ maxWidth: 520, display: "grid", gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Couldn&apos;t load this order</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            Something went wrong while fetching this order. Please try again.
+          </p>
+          <div className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn btn-primary" onClick={() => load()}>
+              Try again
+            </button>
+            <Link href="/account" className="btn btn-outline">Your orders</Link>
+          </div>
+        </div>
+      </div>
+    );
+
   if (!order) return <div className="container section muted">Loading order…</div>;
 
   const stepIndex = STEPS.indexOf(order.status);

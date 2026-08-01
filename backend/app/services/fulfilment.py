@@ -23,6 +23,7 @@ from ..models.order import (
     OrderStatus,
     OrderStatusHistory,
     Payment,
+    PaymentMethod,
     PaymentStatus,
     Refund,
     RefundStatus,
@@ -189,6 +190,94 @@ async def update_shipment_status(
     await _notify(order, type="order.status_changed", note=f"shipment {ship_status.value}")
     if ship_status == ShipmentStatus.delivered:
         sms.send_sms(to=_phone(order), body=f"Nethrasap: order {order.order_number} delivered. Thank you!")
+    return await _detail(db, order_number)
+
+
+# --- COD cash collection ------------------------------------------------------
+
+# Cash changes hands once the parcel is with the courier, so collection is only
+# meaningful from dispatch onward. This stays an explicit staff action — we do
+# NOT auto-collect on delivery.
+_COD_COLLECTABLE_STATUSES = (
+    OrderStatus.dispatched,
+    OrderStatus.out_for_delivery,
+    OrderStatus.delivered,
+)
+
+
+async def mark_cod_collected(
+    db: AsyncSession,
+    actor: User,
+    *,
+    order_number: str,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """H-5: record that COD cash was collected and capture the payment.
+
+    A COD order never reaches `captured` on its own, so `captured_at` stays NULL
+    and the refund path (which requires a captured payment) is impossible. This
+    admin action captures the COD payment — recording the cash AND unlocking
+    refunds. It is idempotent (a second call no-ops) and locks the payment row
+    FOR UPDATE, exactly like the Gate-1 refund/capture code.
+    """
+    order = await _load(db, order_number)
+    if order.payment_method != PaymentMethod.cod:
+        raise HTTPException(status.HTTP_409_CONFLICT, "order is not a COD order")
+
+    cod = next((p for p in order.payments if p.method == PaymentMethod.cod), None)
+    if cod is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "no COD payment on this order")
+
+    # Lock the payment row FIRST so concurrent collects serialise; the second
+    # caller blocks here, then re-reads the (now captured) status under the lock
+    # and no-ops instead of double-capturing.
+    (
+        await db.execute(select(Payment).where(Payment.id == cod.id).with_for_update())
+    ).scalar_one()
+    await db.refresh(cod)  # fresh status/captured_at under the lock
+
+    # Idempotent: already collected (or beyond) → no-op, return current detail.
+    if cod.captured_at is not None or cod.status in (
+        PaymentStatus.captured,
+        PaymentStatus.partial_refund,
+        PaymentStatus.refunded,
+    ):
+        return await _detail(db, order_number)
+
+    if order.status not in _COD_COLLECTABLE_STATUSES:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"COD cash can only be collected from dispatch onward; "
+            f"order is '{order.status.value}'",
+        )
+
+    now = datetime.now(UTC)
+    cod.status = PaymentStatus.captured
+    cod.captured_at = now
+    order.payment_status = PaymentStatus.captured
+    db.add(
+        AuditLog(
+            actor_user_id=actor.id,
+            action="order.cod_collected",
+            entity_type="order",
+            entity_id=str(order.id),
+            payload={
+                "order_number": order.order_number,
+                "amount": cod.amount,
+                "note": note,
+            },
+        )
+    )
+    await db.commit()
+    await _notify(order, type="order.cod_collected", note="COD cash collected")
+    sms.send_sms(
+        to=_phone(order),
+        body=(
+            f"Nethrasap: cash of Rs {cod.amount / 100:,.2f} received for order "
+            f"{order.order_number}. Thank you!"
+        ),
+    )
+    log.info("order.cod_collected", order_number=order_number, amount=cod.amount)
     return await _detail(db, order_number)
 
 

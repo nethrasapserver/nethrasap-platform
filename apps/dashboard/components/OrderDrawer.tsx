@@ -80,6 +80,18 @@ export function OrderDrawer({
     }
   }
 
+  // Records that the delivery agent collected the cash for a COD order. Backend
+  // endpoint is being added this gate — see notes for the lead to confirm.
+  async function collectCod() {
+    try {
+      await api.post(`/admin/orders/${orderNumber}/cod-collected`);
+      toast("COD marked collected");
+      mutated();
+    } catch {
+      toast("Could not mark COD collected", true);
+    }
+  }
+
   if (view === "dispatch") {
     return (
       <DispatchDrawer orderNumber={orderNumber} onClose={() => setView("detail")} onDone={mutated} />
@@ -99,6 +111,14 @@ export function OrderDrawer({
   const canDispatch = o && can("orders:fulfil") && ["confirmed", "packed"].includes(o.status);
   const canRefund = o && can("orders:refund") && ["captured", "partial_refund"].includes(o.payment_status);
   const canWalk = o && can("orders:fulfil") && o.shipment && o.status !== "delivered";
+  // COD cash is collected on delivery; once collected, payment_status flips to
+  // captured, which is what makes Refund available afterwards.
+  const canCollectCod =
+    o &&
+    can("orders:fulfil") &&
+    o.payment_method === "cod" &&
+    o.status === "delivered" &&
+    o.payment_status === "cod_pending";
 
   return (
     <Drawer
@@ -111,6 +131,11 @@ export function OrderDrawer({
           <button className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
+          {canCollectCod && (
+            <button className="btn btn-primary" onClick={collectCod}>
+              Mark COD collected
+            </button>
+          )}
           {canRefund && (
             <button className="btn btn-danger" onClick={() => setView("refund")}>
               Refund

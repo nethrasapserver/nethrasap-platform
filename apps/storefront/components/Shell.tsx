@@ -97,6 +97,7 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
     <div className="search-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Search products">
       <div className="search-panel" onClick={(e) => e.stopPropagation()}>
         <form
+          className="row"
           onSubmit={(e) => {
             e.preventDefault();
             if (q.trim()) go(q.trim());
@@ -104,12 +105,15 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
         >
           <input
             ref={inputRef}
-            className="input"
+            className="input grow"
             placeholder="Search medicines, devices…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Search"
           />
+          <button type="submit" className="btn btn-primary" disabled={!q.trim()}>
+            Search
+          </button>
         </form>
         <div className="eyebrow" style={{ marginTop: 16 }}>Trending</div>
         <div className="search-chips">
