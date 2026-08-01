@@ -50,6 +50,16 @@ async def list_products_admin(db: DbSession, actor: CatalogueAdmin) -> list[dict
     return await svc.list_products_admin(db)
 
 
+@router.get("/admin/products/{product_id}", response_model=AdminProductOut)
+async def get_product_admin(product_id: UUID, db: DbSession, actor: CatalogueAdmin) -> AdminProductOut:
+    """Single product with variants + prices, draft or live.
+
+    The dashboard price editor needs this: the public /products/{slug} route
+    resolves only published rows, so drafts had no way to be priced.
+    """
+    return _out(await svc.get_product(db, product_id))
+
+
 @router.post("/admin/products", response_model=AdminProductOut, status_code=status.HTTP_201_CREATED)
 async def create_product(payload: ProductCreate, db: DbSession, actor: CatalogueAdmin) -> AdminProductOut:
     return _out(await svc.create_product(db, actor, payload.model_dump()))

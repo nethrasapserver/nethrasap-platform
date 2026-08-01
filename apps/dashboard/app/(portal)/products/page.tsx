@@ -254,6 +254,10 @@ export default function CataloguePage() {
             setPriceFor(null);
             refetch();
           }}
+          onAddVariant={() => {
+            setVariantFor(priceFor);
+            setPriceFor(null);
+          }}
         />
       )}
       {variantFor && (
@@ -720,24 +724,44 @@ interface PriceRowForm {
 }
 type VariantForms = Record<Role, PriceRowForm>;
 
+/* Admin detail shape — variants + per-role prices, draft or live. */
+interface AdminPriceRow {
+  role: string;
+  mrp: number;
+  selling_price: number;
+  range_min: number | null;
+  range_max: number | null;
+}
+interface AdminVariantRow {
+  id: string;
+  pack_size: string;
+  prices: AdminPriceRow[];
+}
+interface AdminDetail {
+  variants: AdminVariantRow[];
+}
+
 function PriceEditor({
   product,
   onClose,
   onDone,
+  onAddVariant,
 }: {
   product: AdminProduct;
   onClose: () => void;
   onDone: () => void;
+  onAddVariant: () => void;
 }) {
   const toast = useToast();
-  const [detail, setDetail] = useState<ProductDetail | null>(null);
+  const [detail, setDetail] = useState<AdminDetail | null>(null);
   const [forms, setForms] = useState<Record<string, VariantForms>>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    // Public detail endpoint — only resolves live products.
+    // Admin detail endpoint — resolves drafts too (the public /products/{slug}
+    // route filters to published rows, which left drafts unpriceable).
     api
-      .get<ProductDetail>(`/products/${product.slug}`)
+      .get<AdminDetail>(`/admin/products/${product.id}`)
       .then((d) => {
         setDetail(d);
         const initial: Record<string, VariantForms> = {};
@@ -756,10 +780,8 @@ function PriceEditor({
         }
         setForms(initial);
       })
-      .catch(() =>
-        toast(product.is_active ? "Could not load prices" : "Publish the product first to edit prices", true),
-      );
-  }, [product.slug, product.is_active, toast]);
+      .catch(() => toast("Could not load prices", true));
+  }, [product.id, toast]);
 
   function setField(vid: string, role: Role, key: keyof PriceRowForm, value: string) {
     setForms((f) => ({ ...f, [vid]: { ...f[vid], [role]: { ...f[vid][role], [key]: value } } }));
@@ -805,7 +827,11 @@ function PriceEditor({
           <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
             Cancel
           </button>
-          <button className="btn btn-primary" disabled={busy || !detail} onClick={save}>
+          <button
+            className="btn btn-primary"
+            disabled={busy || !detail || detail.variants.length === 0}
+            onClick={save}
+          >
             {busy ? "Saving…" : "Save prices"}
           </button>
         </>
@@ -813,6 +839,20 @@ function PriceEditor({
     >
       {!detail ? (
         <div className="muted small">Loading current prices…</div>
+      ) : detail.variants.length === 0 ? (
+        /* Prices hang off variants, so a product with no pack size has
+           nothing to price — send the user to add one first. */
+        <div className="empty" style={{ display: "grid", gap: 10, justifyItems: "start" }}>
+          <h4 style={{ margin: 0 }}>No pack sizes yet</h4>
+          <p className="muted small" style={{ margin: 0, maxWidth: 460 }}>
+            Prices are set per pack size (variant), and this product doesn&apos;t have one
+            yet. Add a pack size — with its customer price — and the per-role tiers will
+            appear here.
+          </p>
+          <button className="btn btn-primary" onClick={onAddVariant}>
+            Add pack size
+          </button>
+        </div>
       ) : (
         <div style={{ display: "grid", gap: 20 }}>
           {detail.variants.map((v) => (

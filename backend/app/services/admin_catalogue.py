@@ -88,6 +88,11 @@ async def _load_product(db: AsyncSession, product_id: uuid.UUID) -> Product:
 # --- Products ----------------------------------------------------------------
 
 
+async def get_product(db: AsyncSession, product_id: uuid.UUID) -> Product:
+    """Load a single product (draft or live) with variants, prices and images."""
+    return await _load_product(db, product_id)
+
+
 async def create_product(db: AsyncSession, actor: User, data: dict) -> Product:
     category = await _category_by_slug(db, data.pop("category_slug"))
     slug = data.pop("slug", None) or _slugify(data["name"])
