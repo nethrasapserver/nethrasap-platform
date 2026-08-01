@@ -54,6 +54,12 @@ class BlockUpdate(BaseModel):
     content: dict[str, Any] | None = None
 
 
+class CmsUploadRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    content_type: str = Field(min_length=3, max_length=100)
+
+
 class SettingsPut(BaseModel):
     values: dict[str, Any] = Field(min_length=1)
 

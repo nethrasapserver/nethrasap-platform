@@ -4,6 +4,30 @@ import { CategoryRail } from "@/components/CategoryRail";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { ProductCard } from "@/components/ProductCard";
 import { serverApi } from "@/lib/api";
+import {
+  DEFAULT_BUYERS,
+  DEFAULT_FAQS,
+  DEFAULT_HOME_CTA,
+  DEFAULT_HOME_FLOW,
+  DEFAULT_HOME_HEADINGS,
+  DEFAULT_HOME_INTROS,
+  DEFAULT_TRUST,
+  blocksOf,
+  bySlot,
+  firstBlock,
+  getPage,
+  str,
+  type BuyerCard,
+  type CmsBlock,
+  type CmsPage,
+  type CtaBand,
+  type FaqItem,
+  type HeroSlideData,
+  type HeroTheme,
+  type IconItem,
+  type SectionHeading,
+  type SectionIntro,
+} from "@/lib/content";
 
 export const dynamic = "force-dynamic"; // always fresh catalogue
 
@@ -25,102 +49,115 @@ async function getData() {
   return { shelf, categories: categories.items, catalogueSize: popular.total };
 }
 
-const BUYERS = [
-  {
-    title: "Retail pharmacies",
-    body: "Drug licence (20B/21B) + GSTIN verified once. Wholesale slabs, credit-friendly COD, batch-level invoices.",
-    href: "/signup",
-    d: "M4 7h16M6 7v12a2 2 0 002 2h8a2 2 0 002-2V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2",
-  },
-  {
-    title: "Clinicians & hospitals",
-    body: "Council registration verified. Clinician pricing, Schedule H/H1 handling, cold-chain biologics.",
-    href: "/signup",
-    d: "M12 3v18M3 12h18",
-  },
-  {
-    title: "Home & self care",
-    body: "OTC essentials, devices and wellness delivered without a prescription, at transparent MRP.",
-    href: "/products?category=otc",
-    d: "M12 21s-7-4.3-9-8.4A5.2 5.2 0 0112 6a5.2 5.2 0 019 6.6c-2 4.1-9 8.4-9 8.4z",
-  },
-];
+/* ---------- CMS block → view-model mappers (all fields optional-chained) ---------- */
 
-const TRUST = [
-  { t: "Pan-India delivery", s: "Across serviceable pincodes", d: "M13 3L4 14h6l-1 7 9-11h-6z" },
-  { t: "Cold-chain assured", s: "GDP-compliant, temperature logged", d: "M12 3v18M5 7l14 10M19 7L5 17" },
-  { t: "CDSCO-verified", s: "Audited sourcing, batch traceable", d: "M9 12l2 2 4-5M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z" },
-  { t: "Role-based pricing", s: "Wholesale rates for verified buyers", d: "M3 17l5-6 4 3 5-7 4 5" },
-];
+function toHeroSlide(b: CmsBlock, i: number): HeroSlideData {
+  const c = b.content;
+  return {
+    key: str(c, "key") ?? `slide-${i}`,
+    eyebrow: str(c, "eyebrow") ?? "",
+    title: str(c, "title") ?? "",
+    body: str(c, "body") ?? "",
+    cta_label: str(c, "cta_label") ?? "",
+    cta_href: str(c, "cta_href") ?? "#",
+    alt_label: str(c, "alt_label"),
+    alt_href: str(c, "alt_href"),
+    theme: (str(c, "theme") ?? "olive") as HeroTheme,
+    image_url: str(c, "image_url"),
+  };
+}
 
-/* The four stages a box passes through. Short labels on purpose — the detail
-   lives on the FAQ and product pages; this is meant to be scanned in seconds. */
-const FLOW = [
-  {
-    title: "From licensed makers",
-    sub: "CDSCO-verified, batch recorded on arrival",
-    d: "M3 21h18M5 21V9l7-5 7 5v12M9 21v-5h6v5M9 12h.01M15 12h.01",
-  },
-  {
-    title: "Stored at 2–8°C",
-    sub: "Cold chain logged at every handover",
-    d: "M12 3v18M5 7l14 10M19 7L5 17M12 7l-3-3M12 7l3-3M12 17l-3 3M12 17l3 3",
-  },
-  {
-    title: "Verified once",
-    sub: "Drug licence or council registration",
-    d: "M9 12l2 2 4-5M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z",
-  },
-  {
-    title: "Tracked delivery",
-    sub: "Followed live to your door",
-    d: "M3 16V7h11v9M14 10h4l3 3v3h-7M6.5 19a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6zm11 0a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6z",
-  },
-];
+function toIconItem(b: CmsBlock): IconItem {
+  return { title: str(b.content, "title") ?? "", subtitle: str(b.content, "subtitle"), icon: str(b.content, "icon") ?? "" };
+}
 
-const FAQS = [
-  {
-    q: "Who can buy on Nethrasap?",
-    a: "Anyone can buy over-the-counter products. Prescription medicines and wholesale pricing require a verified account — retailers upload a drug licence (20B/21B) and GSTIN, clinicians upload their council registration.",
-  },
-  {
-    q: "How does verification work?",
-    a: "Sign up with your phone number, upload your documents from your account page, and our compliance team reviews them. Until then you can browse and order OTC items at standard pricing.",
-  },
-  {
-    q: "How are Schedule H and H1 medicines handled?",
-    a: "They are dispensed only against a valid prescription, which is checked at delivery. Every Schedule drug is labelled on its product page so there are no surprises at the door.",
-  },
-  {
-    q: "What payment methods are available?",
-    a: "Cash or UPI on delivery is available today. Online payment (UPI, card and netbanking) is being enabled and will appear at checkout automatically once live.",
-  },
-  {
-    q: "How is the cold chain maintained?",
-    a: "Cold-chain items move through temperature-controlled storage and transit with logging at each handover, in line with GDP guidelines, so biologics and vaccines arrive within specification.",
-  },
-];
+function toBuyer(b: CmsBlock): BuyerCard {
+  return {
+    title: str(b.content, "title") ?? "",
+    body: str(b.content, "body") ?? "",
+    href: str(b.content, "href") ?? "#",
+    icon: str(b.content, "icon") ?? "",
+  };
+}
+
+function toFaq(b: CmsBlock): FaqItem {
+  return { question: str(b.content, "question") ?? "", answer: str(b.content, "answer") ?? "" };
+}
+
+function resolveHeading(page: CmsPage, slot: string, fallback: SectionHeading, linkLabelFallback?: string): SectionHeading {
+  const c = bySlot(page, "section_heading", slot)?.content;
+  return {
+    heading: str(c, "heading") ?? fallback.heading,
+    link_label: str(c, "link_label") ?? linkLabelFallback ?? fallback.link_label,
+    link_href: str(c, "link_href") ?? fallback.link_href,
+  };
+}
+
+function resolveIntro(page: CmsPage, slot: string, fallback: SectionIntro): SectionIntro {
+  const c = bySlot(page, "section_intro", slot)?.content;
+  return {
+    eyebrow: str(c, "eyebrow") ?? fallback.eyebrow,
+    heading: str(c, "heading") ?? fallback.heading,
+    body: str(c, "body") ?? fallback.body,
+  };
+}
+
+function resolveCta(page: CmsPage, fallback: CtaBand): CtaBand {
+  const c = firstBlock(page, "cta_band")?.content;
+  return {
+    eyebrow: str(c, "eyebrow") ?? fallback.eyebrow,
+    heading: str(c, "heading") ?? fallback.heading,
+    body: str(c, "body") ?? fallback.body,
+    cta_label: str(c, "cta_label") ?? fallback.cta_label,
+    cta_href: str(c, "cta_href") ?? fallback.cta_href,
+    alt_label: str(c, "alt_label") ?? fallback.alt_label,
+    alt_href: str(c, "alt_href") ?? fallback.alt_href,
+  };
+}
 
 export default async function HomePage() {
-  const { shelf, categories, catalogueSize } = await getData();
+  const [{ shelf, categories, catalogueSize }, home] = await Promise.all([getData(), getPage("home")]);
+
+  // Marketing content — CMS with in-code DEFAULTS on any missing page/block.
+  const heroBlocks = blocksOf(home, "hero_slide");
+  const heroSlides = heroBlocks.length > 0 ? heroBlocks.map(toHeroSlide) : undefined; // undefined → carousel uses its own defaults
+
+  const trustBlocks = blocksOf(home, "trust_badge");
+  const trust = trustBlocks.length > 0 ? trustBlocks.map(toIconItem) : DEFAULT_TRUST;
+
+  const buyerBlocks = blocksOf(home, "buyer_card");
+  const buyers = buyerBlocks.length > 0 ? buyerBlocks.map(toBuyer) : DEFAULT_BUYERS;
+
+  const flowBlocks = blocksOf(home, "flow_step");
+  const flow = flowBlocks.length > 0 ? flowBlocks.map(toIconItem) : DEFAULT_HOME_FLOW;
+
+  const faqBlocks = blocksOf(home, "faq_item");
+  const faqs = faqBlocks.length > 0 ? faqBlocks.map(toFaq) : DEFAULT_FAQS;
+
+  const categoryHead = resolveHeading(home, "category", DEFAULT_HOME_HEADINGS.category);
+  const featuredHead = resolveHeading(home, "featured", DEFAULT_HOME_HEADINGS.featured, `View all ${catalogueSize} →`);
+  const buyersHead = resolveHeading(home, "buyers", DEFAULT_HOME_HEADINGS.buyers);
+  const aboutIntro = resolveIntro(home, "about", DEFAULT_HOME_INTROS.about);
+  const faqIntro = resolveIntro(home, "faq", DEFAULT_HOME_INTROS.faq);
+  const cta = resolveCta(home, DEFAULT_HOME_CTA);
 
   return (
     <>
-      <HeroCarousel />
+      <HeroCarousel slides={heroSlides} />
 
       {/* Trust strip — sits directly under the hero so the promise is immediate. */}
       <section className="container" style={{ paddingTop: "var(--sp-6)" }}>
         <div className="card pad trust-strip">
-          {TRUST.map((t) => (
-            <div key={t.t} className="trust-item">
+          {trust.map((t) => (
+            <div key={t.title} className="trust-item">
               <span className="ic">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d={t.d} />
+                  <path d={t.icon} />
                 </svg>
               </span>
               <span>
-                <b style={{ display: "block", color: "var(--ink)" }}>{t.t}</b>
-                {t.s}
+                <b style={{ display: "block", color: "var(--ink)" }}>{t.title}</b>
+                {t.subtitle}
               </span>
             </div>
           ))}
@@ -129,20 +166,24 @@ export default async function HomePage() {
 
       <section className="section container">
         <div className="sec-head">
-          <h2>Shop by category</h2>
-          <Link href="/categories" className="small">
-            All categories →
-          </Link>
+          <h2>{categoryHead.heading}</h2>
+          {categoryHead.link_href && (
+            <Link href={categoryHead.link_href} className="small">
+              {categoryHead.link_label}
+            </Link>
+          )}
         </div>
         <CategoryRail categories={categories} />
       </section>
 
       <section className="section container" style={{ paddingTop: 0 }}>
         <div className="sec-head">
-          <h2>Featured Products</h2>
-          <Link href="/products" className="small">
-            View all {catalogueSize} →
-          </Link>
+          <h2>{featuredHead.heading}</h2>
+          {featuredHead.link_href && (
+            <Link href={featuredHead.link_href} className="small">
+              {featuredHead.link_label}
+            </Link>
+          )}
         </div>
         <div className="grid grid-shelf">
           {shelf.map((p) => (
@@ -154,14 +195,14 @@ export default async function HomePage() {
       {/* Buyer segments — routes each audience to the right entry point. */}
       <section className="section container" style={{ paddingTop: 0 }}>
         <div className="sec-head">
-          <h2>Built for how you buy</h2>
+          <h2>{buyersHead.heading}</h2>
         </div>
         <div className="buyer-grid">
-          {BUYERS.map((b) => (
+          {buyers.map((b) => (
             <Link key={b.title} href={b.href} className="buyer-card">
               <span className="ic">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d={b.d} />
+                  <path d={b.icon} />
                 </svg>
               </span>
               <b>{b.title}</b>
@@ -177,22 +218,18 @@ export default async function HomePage() {
       <section className="about" id="about">
         <div className="container">
           <div className="about-lede">
-            <span className="eyebrow">About Nethrasap</span>
-            <h2>Every box we ship can be traced back to the maker.</h2>
-            <p>
-              We&apos;re a licensed healthcare distributor supplying pharmacies, clinics and
-              hospitals across India. Here&apos;s what actually happens between the manufacturer
-              and your shelf.
-            </p>
+            <span className="eyebrow">{aboutIntro.eyebrow}</span>
+            <h2>{aboutIntro.heading}</h2>
+            <p>{aboutIntro.body}</p>
           </div>
 
           <ol className="flow">
-            {FLOW.map((s, i) => (
+            {flow.map((s, i) => (
               <li key={s.title} className={i % 2 === 0 ? "is-down" : "is-up"}>
                 <span className="flow-dot">
                   <span className="flow-ic">
                     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d={s.d} />
+                      <path d={s.icon} />
                     </svg>
                   </span>
                 </span>
@@ -200,7 +237,7 @@ export default async function HomePage() {
                   <span className="flow-stem" aria-hidden="true" />
                   <span className="flow-label">
                     <b>{s.title}</b>
-                    <span>{s.sub}</span>
+                    <span>{s.subtitle}</span>
                   </span>
                 </div>
               </li>
@@ -237,15 +274,15 @@ export default async function HomePage() {
       {/* FAQ — native details/summary: accessible and JS-free. */}
       <section className="section container">
         <div className="faq-head">
-          <span className="eyebrow">Questions</span>
-          <h2>Frequently asked</h2>
-          <p>Ordering, verification and delivery — the things buyers ask us most.</p>
+          <span className="eyebrow">{faqIntro.eyebrow}</span>
+          <h2>{faqIntro.heading}</h2>
+          <p>{faqIntro.body}</p>
         </div>
         <div className="faq">
-          {FAQS.map((f) => (
-            <details key={f.q}>
-              <summary>{f.q}</summary>
-              <p>{f.a}</p>
+          {faqs.map((f) => (
+            <details key={f.question}>
+              <summary>{f.question}</summary>
+              <p>{f.answer}</p>
             </details>
           ))}
         </div>
@@ -254,19 +291,18 @@ export default async function HomePage() {
       {/* Closing CTA */}
       <section className="container" style={{ paddingBottom: "var(--sp-10)" }}>
         <div className="cta-band">
-          <span className="eyebrow">Get verified</span>
-          <h3>Unlock wholesale pricing on your next order.</h3>
-          <p>
-            One document is all it takes. You can keep ordering at standard pricing while our
-            team reviews it — nothing is blocked while you wait.
-          </p>
+          <span className="eyebrow">{cta.eyebrow}</span>
+          <h3>{cta.heading}</h3>
+          <p>{cta.body}</p>
           <div className="cta-actions">
-            <Link href="/signup" className="btn btn-primary">
-              Create your account
+            <Link href={cta.cta_href} className="btn btn-primary">
+              {cta.cta_label}
             </Link>
-            <Link href="/products" className="btn btn-outline">
-              Browse the catalogue
-            </Link>
+            {cta.alt_label && cta.alt_href && (
+              <Link href={cta.alt_href} className="btn btn-outline">
+                {cta.alt_label}
+              </Link>
+            )}
           </div>
         </div>
       </section>

@@ -242,7 +242,7 @@ _STAFF_PERMS = {
     ],
     "manager": [
         ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
-        ("orders", "fulfil"), ("enquiries", "manage"), ("enquiries", "approve"), ("chat", "manage"),
+        ("orders", "fulfil"), ("enquiries", "manage"), ("enquiries", "approve"), ("chat", "manage"), ("cms", "write"),
         ("catalogue", "write"),
         ("analytics", "read"), ("sales", "read"), ("sales", "manage"), ("audit", "read"),
     ],

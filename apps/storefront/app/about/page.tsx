@@ -1,6 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { serverApi } from "@/lib/api";
+import {
+  DEFAULT_ABOUT_CTA,
+  DEFAULT_ABOUT_FLOW,
+  DEFAULT_CERTS,
+  DEFAULT_FOUNDERS,
+  DEFAULT_LOCATIONS,
+  DEFAULT_PRINCIPLES,
+  DEFAULT_STATS,
+  DEFAULT_STORY_PARAS,
+  STAT_SENTINEL_CATEGORIES,
+  STAT_SENTINEL_PRODUCTS,
+  arr,
+  blocksOf,
+  firstBlock,
+  getPage,
+  str,
+  type CmsBlock,
+  type CtaBand,
+  type Founder,
+  type IconItem,
+  type Location,
+  type Principle,
+  type Stat,
+} from "@/lib/content";
 
 export const metadata: Metadata = {
   title: "About us",
@@ -25,137 +49,149 @@ async function getFigures() {
   }
 }
 
-/* Same journey shown on the home page — one story everywhere. */
-const FLOW = [
-  {
-    title: "Sourced from licensed makers",
-    sub: "CDSCO-verified, batch recorded on arrival",
-    d: "M3 21h18M5 21V9l7-5 7 5v12M9 21v-5h6v5M9 12h.01M15 12h.01",
-  },
-  {
-    title: "QC + batch logging",
-    sub: "Every unit traceable to its manufacturer",
-    d: "M9 12l2 2 4-5M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z",
-  },
-  {
-    title: "Stored at 2–8°C",
-    sub: "GDP cold chain, logged at every handover",
-    d: "M12 3v18M5 7l14 10M19 7L5 17M12 7l-3-3M12 7l3-3M12 17l-3 3M12 17l3 3",
-  },
-  {
-    title: "Delivered to your door",
-    sub: "Pan-India, cash on delivery",
-    d: "M3 16V7h11v9M14 10h4l3 3v3h-7M6.5 19a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6zm11 0a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6z",
-  },
-];
+/* ---------- CMS block → view-model mappers ---------- */
 
-const PRINCIPLES = [
-  {
-    title: "Verified by default",
-    body: "Every manufacturer is CDSCO-audited before a single unit enters our warehouse. Buyers verify once — a drug licence or council registration — and it works everywhere on the platform.",
-    d: "M9 12l2 2 4-5M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z",
-    tone: "olive",
-  },
-  {
-    title: "Priced fairly by role",
-    body: "Retailers, clinicians and households each see pricing that fits how they buy. Bulk needs get a human quote you can negotiate — nothing is charged until you accept.",
-    d: "M3 17l5-6 4 3 5-7 4 5",
-    tone: "olive",
-  },
-  {
-    title: "Cold chain, never broken",
-    body: "Biologics and vaccines travel at 2–8°C from the maker's dock to your door, with the temperature logged at every handover. If the chain breaks, the box never ships.",
-    d: "M12 3v18M5 7l14 10M19 7L5 17",
-    tone: "ice",
-  },
-];
+function toIconItem(b: CmsBlock): IconItem {
+  return { title: str(b.content, "title") ?? "", subtitle: str(b.content, "subtitle"), icon: str(b.content, "icon") ?? "" };
+}
 
-const CERTS = [
-  "CDSCO-verified sourcing",
-  "GDP-compliant cold chain",
-  "Drug licence 20B / 21B",
-  "GST registered",
-  "Batch-level traceability",
-];
+function toPrinciple(b: CmsBlock): Principle {
+  return {
+    title: str(b.content, "title") ?? "",
+    body: str(b.content, "body") ?? "",
+    icon: str(b.content, "icon") ?? "",
+    tone: str(b.content, "tone") ?? "olive",
+  };
+}
 
-/* PLACEHOLDER founders — swap names, roles and bios once confirmed. */
-const FOUNDERS = [
-  {
-    name: "Arvind Rajan",
-    role: "Co-founder · CEO",
-    line: "Fifteen years in pharma distribution before deciding the paperwork should prove itself. Sets the sourcing bar: no audit, no shelf.",
-  },
-  {
-    name: "Meera Krishnan",
-    role: "Co-founder · Operations",
-    line: "Built the cold-chain playbook — every 2–8°C handover logged, every exception escalated before the box moves another metre.",
-  },
-  {
-    name: "Karthik Subramanian",
-    role: "Co-founder · Technology",
-    line: "Wrote the first batch-traceability system on a warehouse floor. Believes software should disappear behind a clean invoice.",
-  },
-];
+function toStat(b: CmsBlock): Stat {
+  return { value: str(b.content, "value") ?? "", label: str(b.content, "label") ?? "" };
+}
 
-/* PLACEHOLDER network — swap cities/roles when the facility list is final. */
-const LOCATIONS = [
-  { city: "Chennai", role: "Headquarters · cold-chain hub", note: "Primary warehouse, QC and batch intake" },
-  { city: "Coimbatore", role: "Fulfilment centre", note: "Western Tamil Nadu, next-day lanes" },
-  { city: "Bengaluru", role: "Cold-chain hub", note: "Biologics and vaccine distribution" },
-  { city: "Hyderabad", role: "Fulfilment centre", note: "Telangana and Andhra coverage" },
-  { city: "Mumbai", role: "Fulfilment centre", note: "Western region wholesale lanes" },
-  { city: "Delhi NCR", role: "Fulfilment centre", note: "Northern region coverage" },
-];
+function toFounder(b: CmsBlock): Founder {
+  return {
+    name: str(b.content, "name") ?? "",
+    role: str(b.content, "role") ?? "",
+    line: str(b.content, "line") ?? "",
+    image_url: str(b.content, "image_url"),
+  };
+}
+
+function toLocation(b: CmsBlock): Location {
+  return { city: str(b.content, "city") ?? "", role: str(b.content, "role") ?? "", note: str(b.content, "note") ?? "" };
+}
+
+function resolveCta(c: Record<string, unknown> | undefined, fallback: CtaBand): CtaBand {
+  return {
+    eyebrow: str(c, "eyebrow") ?? fallback.eyebrow,
+    heading: str(c, "heading") ?? fallback.heading,
+    body: str(c, "body") ?? fallback.body,
+    cta_label: str(c, "cta_label") ?? fallback.cta_label,
+    cta_href: str(c, "cta_href") ?? fallback.cta_href,
+    alt_label: str(c, "alt_label") ?? fallback.alt_label,
+    alt_href: str(c, "alt_href") ?? fallback.alt_href,
+  };
+}
+
+function initials(name: string): string {
+  return name.split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("");
+}
 
 export default async function AboutPage() {
-  const figures = await getFigures();
+  const [figures, about] = await Promise.all([getFigures(), getPage("about")]);
+
+  const resolveStatValue = (value: string): string => {
+    if (value === STAT_SENTINEL_PRODUCTS) return figures.products > 0 ? String(figures.products) : "—";
+    if (value === STAT_SENTINEL_CATEGORIES) return figures.categories > 0 ? String(figures.categories) : "—";
+    return value;
+  };
+
+  const heroBlock = firstBlock(about, "about_hero");
+
+  const statBlocks = blocksOf(about, "stat");
+  const stats = statBlocks.length > 0 ? statBlocks.map(toStat) : DEFAULT_STATS;
+
+  const storyBlocks = blocksOf(about, "story_para");
+  const storyParas = storyBlocks.length > 0 ? storyBlocks.map((b) => str(b.content, "text") ?? "") : DEFAULT_STORY_PARAS;
+
+  const principleBlocks = blocksOf(about, "principle");
+  const principles = principleBlocks.length > 0 ? principleBlocks.map(toPrinciple) : DEFAULT_PRINCIPLES;
+
+  const flowBlocks = blocksOf(about, "flow_step");
+  const flow = flowBlocks.length > 0 ? flowBlocks.map(toIconItem) : DEFAULT_ABOUT_FLOW;
+
+  const founderBlocks = blocksOf(about, "founder");
+  const founders = founderBlocks.length > 0 ? founderBlocks.map(toFounder) : DEFAULT_FOUNDERS;
+
+  const locationBlocks = blocksOf(about, "location");
+  const locations = locationBlocks.length > 0 ? locationBlocks.map(toLocation) : DEFAULT_LOCATIONS;
+
+  const certBlocks = blocksOf(about, "cert");
+  const certs = certBlocks.length > 0 ? certBlocks.map((b) => str(b.content, "label") ?? "").filter(Boolean) : DEFAULT_CERTS;
+
+  const cta = resolveCta(firstBlock(about, "cta_band")?.content, DEFAULT_ABOUT_CTA);
 
   return (
     <div className="ab-page">
       {/* 1 — Who we are: full-bleed photographic hero with a brand scrim. */}
       <section className="ab-hero">
         <div className="container ab-hero-inner">
-          <span className="eyebrow">About Nethrasap</span>
-          <h1>
-            India&apos;s audited healthcare supply chain,
-            <br /> built for the people who run it.
-          </h1>
-          <p>
-            Nethrasap is one licensed source for prescription medicines, OTC, devices and
-            cold-chain biologics — supplying retail pharmacies, clinicians and homes across
-            India. Every box we ship can be traced back to the maker.
-          </p>
-          <div className="row ab-hero-cta">
-            <Link href="/products" className="btn btn-primary">Browse products</Link>
-            <Link href="/signup" className="btn btn-outline">Register your business</Link>
-          </div>
-          <div className="ab-hero-facts">
-            <span>CDSCO-verified sourcing</span>
-            <span>GDP cold chain, 2–8°C</span>
-            <span>Pan-India delivery</span>
-          </div>
+          {heroBlock ? (
+            <>
+              <span className="eyebrow">{str(heroBlock.content, "eyebrow") ?? "About Nethrasap"}</span>
+              <h1>{str(heroBlock.content, "title")}</h1>
+              <p>{str(heroBlock.content, "body")}</p>
+              <div className="row ab-hero-cta">
+                <Link href={str(heroBlock.content, "cta_href") ?? "/products"} className="btn btn-primary">
+                  {str(heroBlock.content, "cta_label") ?? "Browse products"}
+                </Link>
+                {str(heroBlock.content, "alt_href") && (
+                  <Link href={str(heroBlock.content, "alt_href")!} className="btn btn-outline">
+                    {str(heroBlock.content, "alt_label") ?? "Register your business"}
+                  </Link>
+                )}
+              </div>
+              <div className="ab-hero-facts">
+                {arr(heroBlock.content, "facts").map((f, i) => (
+                  <span key={i}>{String(f)}</span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="eyebrow">About Nethrasap</span>
+              <h1>
+                India&apos;s audited healthcare supply chain,
+                <br /> built for the people who run it.
+              </h1>
+              <p>
+                Nethrasap is one licensed source for prescription medicines, OTC, devices and
+                cold-chain biologics — supplying retail pharmacies, clinicians and homes across
+                India. Every box we ship can be traced back to the maker.
+              </p>
+              <div className="row ab-hero-cta">
+                <Link href="/products" className="btn btn-primary">Browse products</Link>
+                <Link href="/signup" className="btn btn-outline">Register your business</Link>
+              </div>
+              <div className="ab-hero-facts">
+                <span>CDSCO-verified sourcing</span>
+                <span>GDP cold chain, 2–8°C</span>
+                <span>Pan-India delivery</span>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
-      {/* 2 — Figures */}
+      {/* 2 — Figures. The products/categories cells stay live via sentinels. */}
       <section className="container">
         <dl className="ab-stats card">
-          <div>
-            <dd>{figures.products > 0 ? figures.products : "—"}</dd>
-            <dt>Products stocked</dt>
-          </div>
-          <div>
-            <dd>{figures.categories > 0 ? figures.categories : "—"}</dd>
-            <dt>Categories</dt>
-          </div>
-          <div>
-            <dd>2–8°C</dd>
-            <dt>Cold chain, logged</dt>
-          </div>
-          <div>
-            <dd>100%</dd>
-            <dt>Batch traceable</dt>
-          </div>
+          {stats.map((s) => (
+            <div key={s.label}>
+              <dd>{resolveStatValue(s.value)}</dd>
+              <dt>{s.label}</dt>
+            </div>
+          ))}
         </dl>
       </section>
 
@@ -166,23 +202,9 @@ export default async function AboutPage() {
           <h2>It started with one question: where did this box come from?</h2>
         </div>
         <div className="ab-story-body">
-          <p>
-            Anyone who has run a pharmacy counter in India knows the feeling — a carton
-            arrives from the third distributor this month, the invoice doesn&apos;t match the
-            batch, and there is no way to know how it was stored on the way. The supply
-            chain worked, but nobody could prove it.
-          </p>
-          <p>
-            We started Nethrasap to make the proof part of the product. One warehouse, one
-            promise: every unit logged to its manufacturer batch on arrival, every cold-chain
-            handover recorded, every invoice matching what&apos;s physically in the box.
-          </p>
-          <p>
-            Today that same discipline runs a full platform — wholesale slabs for verified
-            retailers, clinician pricing for practices and hospitals, transparent MRP for
-            households, and negotiable quotes for bulk buying. Different buyers, one audited
-            chain behind all of them.
-          </p>
+          {storyParas.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
         </div>
       </section>
 
@@ -192,11 +214,11 @@ export default async function AboutPage() {
           <h2>What we stand for</h2>
         </div>
         <div className="ab-principles">
-          {PRINCIPLES.map((p) => (
+          {principles.map((p) => (
             <article key={p.title} className={`ab-principle ${p.tone === "ice" ? "is-ice" : ""}`}>
               <span className="ab-principle-ic">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d={p.d} />
+                  <path d={p.icon} />
                 </svg>
               </span>
               <b>{p.title}</b>
@@ -215,12 +237,12 @@ export default async function AboutPage() {
             <p>The journey every single box takes — whether it&apos;s one strip or one pallet.</p>
           </div>
           <ol className="flow">
-            {FLOW.map((s, i) => (
+            {flow.map((s, i) => (
               <li key={s.title} className={i % 2 === 0 ? "is-down" : "is-up"}>
                 <span className="flow-dot">
                   <span className="flow-ic">
                     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d={s.d} />
+                      <path d={s.icon} />
                     </svg>
                   </span>
                 </span>
@@ -228,7 +250,7 @@ export default async function AboutPage() {
                   <span className="flow-stem" aria-hidden="true" />
                   <span className="flow-label">
                     <b>{s.title}</b>
-                    <span>{s.sub}</span>
+                    <span>{s.subtitle}</span>
                   </span>
                 </div>
               </li>
@@ -244,10 +266,15 @@ export default async function AboutPage() {
           <h2>Three people who got tired of unverifiable boxes.</h2>
         </div>
         <div className="ab-people">
-          {FOUNDERS.map((m) => (
+          {founders.map((m) => (
             <article key={m.name} className="ab-person">
               <span className="ab-person-avatar">
-                {m.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+                {m.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
+                ) : (
+                  initials(m.name)
+                )}
               </span>
               <b>{m.name}</b>
               <span className="ab-person-role">{m.role}</span>
@@ -269,7 +296,7 @@ export default async function AboutPage() {
             </p>
           </div>
           <div className="ab-locations">
-            {LOCATIONS.map((l) => (
+            {locations.map((l) => (
               <article key={l.city} className="ab-location">
                 <span className="ab-location-pin">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -293,7 +320,7 @@ export default async function AboutPage() {
       <section className="container section ab-certs">
         <span className="eyebrow">Compliance</span>
         <div className="ab-cert-chips">
-          {CERTS.map((c) => (
+          {certs.map((c) => (
             <span key={c} className="ab-cert-chip">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M9 12l2 2 4-5" />
@@ -310,15 +337,14 @@ export default async function AboutPage() {
       {/* 9 — Closing CTA */}
       <section className="container" style={{ paddingBottom: "var(--sp-10)" }}>
         <div className="cta-band">
-          <span className="eyebrow">Buy the audited way</span>
-          <h3>One verified account. Every category on one invoice.</h3>
-          <p>
-            Keep ordering at standard pricing while our team verifies your documents —
-            nothing is blocked while you wait.
-          </p>
+          <span className="eyebrow">{cta.eyebrow}</span>
+          <h3>{cta.heading}</h3>
+          <p>{cta.body}</p>
           <div className="cta-actions">
-            <Link href="/signup" className="btn btn-primary">Create your account</Link>
-            <Link href="/products" className="btn btn-outline">Explore the catalogue</Link>
+            <Link href={cta.cta_href} className="btn btn-primary">{cta.cta_label}</Link>
+            {cta.alt_label && cta.alt_href && (
+              <Link href={cta.alt_href} className="btn btn-outline">{cta.alt_label}</Link>
+            )}
           </div>
         </div>
       </section>

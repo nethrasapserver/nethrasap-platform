@@ -13,6 +13,7 @@ from ...schemas.cms import (
     BlockCreate,
     BlockUpdate,
     CmsPageOut,
+    CmsUploadRequest,
     FlagOut,
     FlagPut,
     PageCreate,
@@ -86,6 +87,15 @@ async def update_block(block_id: UUID, payload: BlockUpdate, db: DbSession, acto
 async def delete_block(block_id: UUID, db: DbSession, actor: CmsAdmin) -> CmsPageOut:
     page = await svc.delete_block(db, actor, block_id)
     return CmsPageOut(**svc.serialise_page(page))
+
+
+# --- Admin: image uploads ----------------------------------------------------
+
+
+@router.post("/admin/cms/uploads")
+async def create_upload(payload: CmsUploadRequest, _a: CmsAdmin) -> dict[str, str]:
+    """Presign a direct image upload for CMS content (cms:write gated)."""
+    return svc.create_upload_slot(content_type=payload.content_type)
 
 
 # --- Admin: settings & flags ------------------------------------------------------

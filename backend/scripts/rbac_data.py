@@ -86,6 +86,7 @@ ROLE_PERMISSIONS: dict[str, list[tuple[str, str]]] = {
     "manager": [
         ("products", "read"),
         ("catalogue", "write"),
+        ("cms", "write"),
         ("orders", "read_assigned"),
         ("orders", "read_all"),
         ("orders", "fulfil"),

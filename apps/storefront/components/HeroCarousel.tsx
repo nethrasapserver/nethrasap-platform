@@ -2,91 +2,67 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-interface Slide {
-  key: string;
-  eyebrow: string;
-  title: string;
-  body: string;
-  cta: { label: string; href: string };
-  alt?: { label: string; href: string };
-  theme: "olive" | "cream" | "ice";
-  art: React.ReactNode;
-}
+import { DEFAULT_HERO_SLIDES, type HeroSlideData, type HeroTheme } from "@/lib/content";
 
 const ART_BOX = { width: "100%", height: "100%", viewBox: "0 0 200 160", fill: "none" } as const;
 
-const SLIDES: Slide[] = [
-  {
-    key: "delivery",
-    eyebrow: "Serviceable pincodes",
-    title: "Everything for your pharmacy, delivered to your door.",
-    body: "Prescription medicines, OTC, devices and cold-chain biologics — one audited supply chain.",
-    cta: { label: "Browse products", href: "/products" },
-    alt: { label: "Track an order", href: "/track" },
-    theme: "olive",
-    art: (
-      <svg {...ART_BOX} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M18 108h34l10-40h84l10 40h26" opacity=".35" />
-        <rect x="52" y="52" width="72" height="56" rx="6" />
-        <path d="M124 70h22l16 22v16h-38z" />
-        <circle cx="74" cy="118" r="10" />
-        <circle cx="146" cy="118" r="10" />
-        <path d="M74 66v20M64 76h20" />
-      </svg>
-    ),
-  },
-  {
-    key: "pricing",
-    eyebrow: "Verified buyers",
-    title: "Wholesale pricing for retailers and clinicians.",
-    body: "Complete KYC once — drug licence or council registration — and your tier pricing applies everywhere.",
-    cta: { label: "Register your business", href: "/signup" },
-    alt: { label: "See categories", href: "/categories" },
-    theme: "cream",
-    art: (
-      <svg {...ART_BOX} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M30 120V84M66 120V60M102 120V72M138 120V44M174 120V96" opacity=".45" />
-        <path d="M24 128h156" />
-        <path d="M30 84l36-24 36 12 36-28 36 26" />
-        <circle cx="138" cy="44" r="7" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-  {
-    key: "range",
-    eyebrow: "One supplier",
-    title: "Medicines, devices and daily care in one order.",
-    body: "Prescription and OTC, diagnostics, surgical consumables, baby care and cold-chain biologics — every category on one invoice.",
-    cta: { label: "Browse all categories", href: "/categories" },
-    alt: { label: "Shop cold chain", href: "/products?category=cold-chain" },
-    theme: "ice",
-    art: (
-      <svg {...ART_BOX} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {/* A shelf of category tiles: two tinted, the rest outlined. */}
-        <rect x="82" y="32" width="46" height="46" rx="12" fill="currentColor" opacity=".13" stroke="none" />
-        <rect x="28" y="86" width="46" height="46" rx="12" fill="currentColor" opacity=".13" stroke="none" />
-        <rect x="28" y="32" width="46" height="46" rx="12" />
-        <rect x="82" y="32" width="46" height="46" rx="12" />
-        <rect x="136" y="32" width="46" height="46" rx="12" />
-        <rect x="28" y="86" width="46" height="46" rx="12" />
-        <rect x="82" y="86" width="46" height="46" rx="12" />
-        <rect x="136" y="86" width="46" height="46" rx="12" />
-        {/* One capsule and one vial, so it reads as pharmacy stock. */}
-        <rect x="44" y="49" width="14" height="12" rx="6" />
-        <path d="M159 45v10M154 55h10v14a4 4 0 01-4 4h-2a4 4 0 01-4-4z" />
-      </svg>
-    ),
-  },
-];
+/* Theme-keyed decorative art. Used when a slide has no image_url — each theme
+   keeps its original illustration so a CMS-driven slide that only sets copy
+   still looks exactly like the hand-built defaults. */
+function themeArt(theme: HeroTheme): React.ReactNode {
+  switch (theme) {
+    case "cream":
+      return (
+        <svg {...ART_BOX} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M30 120V84M66 120V60M102 120V72M138 120V44M174 120V96" opacity=".45" />
+          <path d="M24 128h156" />
+          <path d="M30 84l36-24 36 12 36-28 36 26" />
+          <circle cx="138" cy="44" r="7" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "ice":
+      return (
+        <svg {...ART_BOX} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {/* A shelf of category tiles: two tinted, the rest outlined. */}
+          <rect x="82" y="32" width="46" height="46" rx="12" fill="currentColor" opacity=".13" stroke="none" />
+          <rect x="28" y="86" width="46" height="46" rx="12" fill="currentColor" opacity=".13" stroke="none" />
+          <rect x="28" y="32" width="46" height="46" rx="12" />
+          <rect x="82" y="32" width="46" height="46" rx="12" />
+          <rect x="136" y="32" width="46" height="46" rx="12" />
+          <rect x="28" y="86" width="46" height="46" rx="12" />
+          <rect x="82" y="86" width="46" height="46" rx="12" />
+          <rect x="136" y="86" width="46" height="46" rx="12" />
+          {/* One capsule and one vial, so it reads as pharmacy stock. */}
+          <rect x="44" y="49" width="14" height="12" rx="6" />
+          <path d="M159 45v10M154 55h10v14a4 4 0 01-4 4h-2a4 4 0 01-4-4z" />
+        </svg>
+      );
+    case "olive":
+    default:
+      return (
+        <svg {...ART_BOX} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M18 108h34l10-40h84l10 40h26" opacity=".35" />
+          <rect x="52" y="52" width="72" height="56" rx="6" />
+          <path d="M124 70h22l16 22v16h-38z" />
+          <circle cx="74" cy="118" r="10" />
+          <circle cx="146" cy="118" r="10" />
+          <path d="M74 66v20M64 76h20" />
+        </svg>
+      );
+  }
+}
 
 const INTERVAL = 6500;
+const THEMES: ReadonlySet<HeroTheme> = new Set<HeroTheme>(["olive", "cream", "ice"]);
+const normTheme = (t: string): HeroTheme => (THEMES.has(t as HeroTheme) ? (t as HeroTheme) : "olive");
 
-export function HeroCarousel() {
+export function HeroCarousel({ slides }: { slides?: HeroSlideData[] }) {
+  const data = slides && slides.length > 0 ? slides : DEFAULT_HERO_SLIDES;
+
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const touchX = useRef<number | null>(null);
-  const count = SLIDES.length;
+  const count = data.length;
 
   const go = useCallback((next: number) => setIndex(((next % count) + count) % count), [count]);
 
@@ -115,37 +91,49 @@ export function HeroCarousel() {
       }}
     >
       <div className="hero-track" style={{ transform: `translateX(-${index * 100}%)` }}>
-        {SLIDES.map((s, i) => (
-          <div
-            key={s.key}
-            className={`hero-slide is-${s.theme}`}
-            role="group"
-            aria-roledescription="slide"
-            aria-label={`${i + 1} of ${count}`}
-            aria-hidden={i !== index}
-          >
-            <div className="container hero-slide-inner">
-              <div className="hero-copy">
-                <span className="eyebrow">{s.eyebrow}</span>
-                <h1>{s.title}</h1>
-                <p>{s.body}</p>
-                <div className="row" style={{ flexWrap: "wrap", marginTop: 6 }}>
-                  <Link href={s.cta.href} className="btn btn-primary" tabIndex={i === index ? 0 : -1}>
-                    {s.cta.label}
-                  </Link>
-                  {s.alt && (
-                    <Link href={s.alt.href} className="btn btn-outline" tabIndex={i === index ? 0 : -1}>
-                      {s.alt.label}
+        {data.map((s, i) => {
+          const theme = normTheme(s.theme);
+          return (
+            <div
+              key={s.key || `${i}`}
+              className={`hero-slide is-${theme}`}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${i + 1} of ${count}`}
+              aria-hidden={i !== index}
+            >
+              <div className="container hero-slide-inner">
+                <div className="hero-copy">
+                  <span className="eyebrow">{s.eyebrow}</span>
+                  <h1>{s.title}</h1>
+                  <p>{s.body}</p>
+                  <div className="row" style={{ flexWrap: "wrap", marginTop: 6 }}>
+                    <Link href={s.cta_href} className="btn btn-primary" tabIndex={i === index ? 0 : -1}>
+                      {s.cta_label}
                     </Link>
+                    {s.alt_label && s.alt_href && (
+                      <Link href={s.alt_href} className="btn btn-outline" tabIndex={i === index ? 0 : -1}>
+                        {s.alt_label}
+                      </Link>
+                    )}
+                  </div>
+                </div>
+                <div className="hero-art" aria-hidden="true">
+                  {s.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={s.image_url}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                    />
+                  ) : (
+                    themeArt(theme)
                   )}
                 </div>
               </div>
-              <div className="hero-art" aria-hidden="true">
-                {s.art}
-              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button type="button" className="hero-arrow is-prev" onClick={() => go(index - 1)} aria-label="Previous slide">
@@ -156,9 +144,9 @@ export function HeroCarousel() {
       </button>
 
       <div className="hero-dots" role="tablist" aria-label="Choose slide">
-        {SLIDES.map((s, i) => (
+        {data.map((s, i) => (
           <button
-            key={s.key}
+            key={s.key || `${i}`}
             type="button"
             role="tab"
             aria-selected={i === index}

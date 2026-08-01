@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..integrations import storage
 from ..logging import get_logger
 from ..models.audit import AuditLog
 from ..models.cms import AppSetting, CmsBlock, CmsPage, FeatureFlag
@@ -72,6 +73,25 @@ async def get_page_public(db: AsyncSession, slug: str) -> dict[str, Any]:
 async def public_flags(db: AsyncSession) -> dict[str, bool]:
     rows = (await db.execute(select(FeatureFlag))).scalars()
     return {f.key: f.enabled for f in rows}
+
+
+# --- Admin: image uploads --------------------------------------------------------
+
+
+def create_upload_slot(*, content_type: str) -> dict[str, str]:
+    """Presigned direct upload for a CMS image (hero art, block media).
+
+    Mirrors the catalogue presign flow: mint a key under the `cms` namespace,
+    hand back the PUT URL the dashboard uploads to plus the public URL to store
+    in the block content. Presigning is local HMAC math, so no DB/session needed.
+    """
+    if content_type not in storage.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unsupported image type")
+    key = storage.make_key("cms", content_type=content_type)
+    return {
+        "upload_url": storage.presigned_put(key, content_type=content_type),
+        "public_url": storage.public_url(key),
+    }
 
 
 # --- Admin: pages & blocks -------------------------------------------------------
