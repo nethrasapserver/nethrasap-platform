@@ -336,19 +336,25 @@ async def reorder(
 async def track_order_public(
     db: AsyncSession, *, order_number: str, phone_last4: str | None
 ) -> dict[str, Any]:
-    """Public tracking — guarded by last-4-digits-of-phone match."""
+    """Public tracking — guarded by a last-4-digits-of-phone match.
+
+    Fails closed (H-1): without `phone_last4` this raises and NEVER returns the
+    order. Authenticated owners are served by `get_order_for_user` and never
+    reach here; every caller that does is anonymous or a non-owner and must
+    prove knowledge of the order's phone. The phone check runs before the 404
+    lookup so a missing proof cannot even confirm an order number exists.
+    """
+    if not phone_last4:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "phone_last4 is required to track this order",
+        )
     order = await _load_order_or_404(db, order_number=order_number)
     # Phase 3: shipping address holds a `phone` field; compare last 4.
     addr_phone = (order.shipping_address or {}).get("phone") or ""
-    if phone_last4:
-        digits = "".join(ch for ch in addr_phone if ch.isdigit())
-        if digits[-4:] != phone_last4:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "phone digits do not match")
-    else:
-        # Without phone_last4 the caller must be authenticated as the owner.
-        # That check is done at the API layer via OptionalUser; the service
-        # layer here doesn't see the user. Routing handles this.
-        pass
+    digits = "".join(ch for ch in addr_phone if ch.isdigit())
+    if digits[-4:] != phone_last4:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "phone digits do not match")
 
     return {
         "order_number": order.order_number,

@@ -12,6 +12,18 @@
 #   Dashboard  https://nethrasap-dashboard.onrender.com
 # If any name is already taken globally, Render appends a suffix — update the
 # NEXT_PUBLIC_API_BASE / CORS_ORIGINS values below to match.
+#
+# !!! PREREQUISITES — do NOT click "Apply" until all of these exist !!!
+# This blueprint assumes the supporting accounts are already provisioned:
+#   - SMS/DLT: an MSG91 (or equivalent) account with an approved DLT sender ID
+#     and API key. SMS_PROVIDER is set to a real provider below because the
+#     backend config guard hard-fails boot on `console` under production.
+#   - Cloudflare R2: bucket + credentials for the STORAGE_* vars.
+#   - Custom domain: the real registrable domain (e.g. nethrasap.com) with
+#     www./ops./api. subdomains. The *.onrender.com URLs must NOT be used for
+#     the browser-facing values — guest carts break on them (see below).
+# Fill every `sync: false` secret and replace every REPLACE_ME.* placeholder
+# before the first deploy.
 
 envVarGroups:
   - name: nethrasap-shared
@@ -30,11 +42,15 @@ envVarGroups:
         value: "15"
       - key: REFRESH_TOKEN_TTL_DAYS
         value: "30"
-      # SMS: console prints OTPs to logs. Switch to msg91/exotel/twilio + keys later.
+      # SMS: MUST be a real provider under ENVIRONMENT=production — the config
+      # guard hard-fails boot if SMS_PROVIDER=console in production. Set the
+      # MSG91 (or exotel/twilio) API key and a DLT-approved sender ID BEFORE the
+      # first deploy; OTP login is dead until the DLT registration is complete.
       - key: SMS_PROVIDER
-        value: console
+        value: msg91
       - key: SMS_API_KEY
         sync: false
+      # Replace NTHRSP with your actual DLT-approved sender ID before go-live.
       - key: SMS_SENDER_ID
         value: NTHRSP
       # Object storage (Cloudflare R2). Fill when R2 is enabled.
@@ -54,6 +70,10 @@ envVarGroups:
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false
+      # COD-only at launch (locked business decision). Razorpay stays dormant
+      # until gateway payments are explicitly enabled.
+      - key: PAYMENT_METHODS_ENABLED
+        value: cod
       # Payments (Razorpay). Fill with test keys, then live keys at go-live.
       - key: RAZORPAY_KEY_ID
         sync: false
@@ -89,10 +109,13 @@ services:
           type: keyvalue
           name: nethrasap-redis
           property: connectionString
-      # Browser origins allowed to call the API (the two frontend services).
-      # Update if the service names/URLs differ, or add custom domains later.
+      # Browser origins allowed to call the API. MUST be the real custom domains,
+      # NOT the *.onrender.com URLs: the guest-cart cookie is SameSite=Lax and
+      # each *.onrender.com host is a different site (Public Suffix List), so the
+      # cookie is never sent and guest carts silently fail. www./ops./api. under
+      # one registrable domain are same-site and cookies flow. Replace before deploy.
       - key: CORS_ORIGINS
-        value: https://nethrasap-storefront.onrender.com,https://nethrasap-dashboard.onrender.com
+        value: https://www.REPLACE_ME.com,https://ops.REPLACE_ME.com
 
   # --- Background worker (SMS, invoice/payslip PDFs, payroll, webhooks) ---
   - type: worker
@@ -125,8 +148,15 @@ services:
     envVars:
       - key: APP
         value: storefront
+      # Baked into the client bundle at BUILD time — MUST be the custom API
+      # domain, not *.onrender.com (guest carts break on platform URLs via the
+      # SameSite/PSL rule above). Set before the first frontend build.
       - key: NEXT_PUBLIC_API_BASE
-        value: https://nethrasap-api.onrender.com
+        value: https://api.REPLACE_ME.com
+      # Where staff signed in on the storefront are sent to reach the ops portal.
+      # Custom ops domain (e.g. https://ops.nethrasap.com).
+      - key: NEXT_PUBLIC_DASHBOARD_URL
+        value: https://ops.REPLACE_ME.com
 
   # --- Dashboard (ops Next.js app, Docker) ---
   - type: web
@@ -139,5 +169,7 @@ services:
     envVars:
       - key: APP
         value: dashboard
+      # Baked into the client bundle at BUILD time — MUST be the custom API
+      # domain, not *.onrender.com. Set before the first frontend build.
       - key: NEXT_PUBLIC_API_BASE
-        value: https://nethrasap-api.onrender.com
+        value: https://api.REPLACE_ME.com

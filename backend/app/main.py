@@ -22,7 +22,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .api.v1.router import api_router_v1
 from .config import get_settings
 from .logging import configure_logging, get_logger
-from .middleware import REQUEST_ID_HEADER, RequestContextMiddleware
+from .middleware import (
+    REQUEST_ID_HEADER,
+    BodySizeLimitMiddleware,
+    RequestContextMiddleware,
+)
 from .realtime.hub import hub
 from .redis import close_redis
 from .schemas.common import ErrorResponse
@@ -72,6 +76,36 @@ def _error_json(
     )
 
 
+# Caps that keep the validation-error handler from recursing on (or leaking)
+# a deeply-nested request body — see `_safe_validation_errors`.
+_MAX_VALIDATION_ERRORS = 20
+_MAX_ERR_STR_LEN = 300
+_MAX_LOC_PARTS = 16
+
+
+def _safe_validation_errors(exc: RequestValidationError) -> list[dict]:
+    """Flatten pydantic's error list into a shallow, bounded shape.
+
+    pydantic echoes the offending `input` (and `ctx`) back in each error. For a
+    deeply-nested payload that structure is deep enough to blow the recursion
+    limit inside `jsonable_encoder` (H-2: RecursionError -> unauthenticated 500
+    on every validated endpoint) and it leaks the raw request body to the
+    client. We keep only loc/msg/type — truncated and capped in count — so the
+    tree we serialise is always flat and small.
+    """
+    safe: list[dict] = []
+    for err in exc.errors()[:_MAX_VALIDATION_ERRORS]:
+        loc = tuple(err.get("loc", ()))[:_MAX_LOC_PARTS]
+        safe.append(
+            {
+                "loc": [str(p)[:_MAX_ERR_STR_LEN] for p in loc],
+                "msg": str(err.get("msg", "invalid value"))[:_MAX_ERR_STR_LEN],
+                "type": str(err.get("type", ""))[:_MAX_ERR_STR_LEN],
+            }
+        )
+    return safe
+
+
 def _validation_detail(errors: list[dict]) -> str:
     parts: list[str] = []
     for err in errors:
@@ -86,9 +120,11 @@ def create_app() -> FastAPI:
         title="Nethrasap API",
         version="0.1.0",
         description="Backend for the Nethrasap healthcare supply platform.",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        # Interactive docs + the OpenAPI spec expose the full attack surface;
+        # serve them only in dev/test, never in staging/production (M1).
+        docs_url="/docs" if settings.is_dev else None,
+        redoc_url="/redoc" if settings.is_dev else None,
+        openapi_url="/openapi.json" if settings.is_dev else None,
         lifespan=lifespan,
     )
 
@@ -100,11 +136,14 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Added before RequestContextMiddleware so the latter wraps it and the
+    # request_id is already bound when the size guard emits a 413 envelope.
+    app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(RequestContextMiddleware)
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
-        errors = jsonable_encoder(exc.errors())
+        errors = jsonable_encoder(_safe_validation_errors(exc))
         return _error_json(
             422,
             _validation_detail(errors),

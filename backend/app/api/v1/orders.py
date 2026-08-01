@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 
 from ...db import DbSession
 from ...deps import ClientMeta, CurrentUser, OptionalUser, Paged
+from ...redis import rate_limit
 from ...schemas.common import Paginated
 from ...schemas.order import (
     CancelOrderRequest,
@@ -75,12 +76,26 @@ async def track_order(
     order_number: str,
     db: DbSession,
     user: OptionalUser,
+    meta: ClientMeta,
     phone_last4: Annotated[str | None, Query(min_length=4, max_length=4)] = None,
 ) -> TrackOrderPublic:
-    # If the caller is signed in and owns the order, skip the phone check.
+    """Track an order (H-1).
+
+    An authenticated owner (or staff) gets it straight from their own view — no
+    phone check. Everyone else MUST supply the order's `phone_last4`: the public
+    path fails closed without it, and is rate-limited per IP because order
+    numbers are sequential and would otherwise be scrapeable.
+    """
+    # Owner / staff path — no phone check. Fall through to the public path ONLY
+    # on a genuine 403 (this order is not the caller's). A real 404 (order does
+    # not exist) or any unexpected error propagates — never swallowed.
     if user is not None:
         try:
             data = await svc.get_order_for_user(db, order_number=order_number, user=user)
+        except HTTPException as exc:
+            if exc.status_code != status.HTTP_403_FORBIDDEN:
+                raise
+        else:
             return TrackOrderPublic(
                 order_number=data["order_number"],
                 status=data["status"],
@@ -91,9 +106,26 @@ async def track_order(
                 timeline=data["status_history"],
                 shipment=data["shipment"],
             )
-        except Exception:
-            # Fall through to public tracking path
-            pass
+
+    # Public / non-owner path: a correct phone_last4 is mandatory. Never call
+    # track_order_public without it — that omission is the H-1 leak.
+    if not phone_last4:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_403_FORBIDDEN
+                if user is not None
+                else status.HTTP_401_UNAUTHORIZED
+            ),
+            detail="sign in or provide the order's phone_last4 to track it",
+            headers=None if user is not None else {"WWW-Authenticate": "Bearer"},
+        )
+
+    # Throttle enumeration / phone_last4 brute-force (10k combos) per IP.
+    if not await rate_limit(
+        f"track:ip:{meta.get('ip')}", limit=20, window_seconds=15 * 60
+    ):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many requests")
+
     data = await svc.track_order_public(
         db, order_number=order_number, phone_last4=phone_last4
     )

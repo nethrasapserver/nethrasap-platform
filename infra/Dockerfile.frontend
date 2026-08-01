@@ -43,10 +43,15 @@ ENV NODE_ENV=production \
 WORKDIR /app
 # Standalone output contains a pruned node_modules + server.js, laid out
 # from the monorepo root because of outputFileTracingRoot.
-COPY --from=build /repo/apps/${APP}/.next/standalone ./
-COPY --from=build /repo/apps/${APP}/.next/static ./apps/${APP}/.next/static
-COPY --from=build /repo/apps/${APP}/public ./apps/${APP}/public
+# --chown gives the copied app files to the unprivileged `node` user (uid 1000,
+# shipped by node:20-alpine) so the runtime doesn't execute as root.
+COPY --from=build --chown=node:node /repo/apps/${APP}/.next/standalone ./
+COPY --from=build --chown=node:node /repo/apps/${APP}/.next/static ./apps/${APP}/.next/static
+COPY --from=build --chown=node:node /repo/apps/${APP}/public ./apps/${APP}/public
 # ARG values aren't visible to CMD at runtime; bake the entry path.
 RUN ln -s "apps/${APP}/server.js" server.js
 EXPOSE 3000
+# Drop root before running. The standalone server binds $PORT and HOSTNAME
+# (0.0.0.0, set above); nothing here needs privileged ports or root-owned paths.
+USER node
 CMD ["node", "server.js"]
