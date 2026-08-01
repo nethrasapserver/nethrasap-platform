@@ -8,11 +8,15 @@ Strategy:
 from __future__ import annotations
 
 # Ensure config sees the test DB before anything else imports app.config.
+import asyncio
 import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 import pytest_asyncio
+from alembic import command
+from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -42,8 +46,25 @@ from datetime import UTC  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db import _normalise_url, get_session  # noqa: E402
 from app.integrations.sms import ConsoleSmsProvider, get_provider  # noqa: E402
+
+# Work around a forward-ref bug in app.observability (read-only source): the
+# GET /metrics route is annotated `-> Response` while the module uses
+# `from __future__ import annotations`, yet Response is imported only *inside*
+# setup_metrics(). FastAPI resolves the return annotation against the module's
+# globals at route-build time, where the name is absent, so create_app() raises
+# `PydanticUndefinedAnnotation: name 'Response' is not defined` whenever metrics
+# are enabled. Exposing the name at module scope before create_app() runs lets
+# the app boot with metrics on, so the observability suite can hit /metrics.
+# (Proper fix belongs in app/observability.py: hoist the Response import.)
+import app.observability as _observability  # noqa: E402
+from fastapi import Response as _Response  # noqa: E402
+
+_observability.Response = _Response
+
 from app.main import app  # noqa: E402
-from app.models import Base  # noqa: E402
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+ALEMBIC_INI = BACKEND_ROOT / "alembic.ini"
 
 # --- Phone-first auth helpers (shared by every test module) -----------------
 
@@ -118,97 +139,45 @@ def _engine_kwargs() -> tuple[str, dict]:
     return url, connect_args
 
 
+def _alembic_config() -> Config:
+    """Alembic Config that finds the scripts regardless of the process CWD.
+
+    env.py injects the DB URL from settings (already pointed at the test DB by
+    the os.environ setup above), so no URL needs setting here — but we anchor
+    `script_location` to an absolute path so `command.upgrade` works no matter
+    where pytest is invoked from.
+    """
+    cfg = Config(str(ALEMBIC_INI))
+    cfg.set_main_option("script_location", str(BACKEND_ROOT / "migrations"))
+    return cfg
+
+
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def _schema():
-    """Create the schema + triggers once per session.
+    """Build the schema once per session by running the real migration chain.
 
-    The engine used here is created and fully disposed inside this fixture so
-    no connection ever crosses into another test's event loop — each test gets
-    its own engine in `db_session` (NullPool, cheap over TLS to Neon).
+    We upgrade to head with Alembic rather than `Base.metadata.create_all` so the
+    tests exercise the exact DDL production gets — triggers, sequences, the
+    warehouse seed and every server-default/constraint alignment included. This
+    is what keeps model↔migration drift from silently creeping back: if a
+    migration stops matching the models, `alembic check` (run in CI) fails and
+    the suite runs against the true schema.
+
+    env.py drives migrations with `asyncio.run()`, which cannot be nested inside
+    pytest's running event loop, so the upgrade runs in a worker thread.
     """
     url, connect_args = _engine_kwargs()
+    # Start every session from a pristine schema (drops tables, enum types,
+    # triggers, sequences and the pgcrypto extension — migration 0001 recreates
+    # the extension, so nothing else needs pre-seeding here).
     engine = create_async_engine(url, echo=False, connect_args=connect_args)
     async with engine.begin() as conn:
-        # Make sure pgcrypto exists (test DB may be created without docker init)
-        await conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-        # Re-create the products tsvector trigger because run_sync above creates
-        # tables/indexes but not our raw trigger.
-        await conn.exec_driver_sql(
-            """
-            CREATE OR REPLACE FUNCTION products_tsv_trigger()
-            RETURNS trigger AS $$
-            BEGIN
-              NEW.search_tsv :=
-                setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
-                setweight(to_tsvector('english', coalesce(NEW.description, '')), 'C');
-              RETURN NEW;
-            END
-            $$ LANGUAGE plpgsql;
-            """
-        )
-        await conn.exec_driver_sql("DROP TRIGGER IF EXISTS products_tsv_update ON products")
-        await conn.exec_driver_sql(
-            """
-            CREATE TRIGGER products_tsv_update
-              BEFORE INSERT OR UPDATE OF name, description ON products
-              FOR EACH ROW EXECUTE FUNCTION products_tsv_trigger();
-            """
-        )
-        # Reviews denorm trigger (matches migration 0002)
-        await conn.exec_driver_sql(
-            """
-            CREATE OR REPLACE FUNCTION reviews_recompute_product()
-            RETURNS trigger AS $$
-            DECLARE
-              target_product_id uuid := COALESCE(NEW.product_id, OLD.product_id);
-            BEGIN
-              UPDATE products p
-                 SET rating = COALESCE(
-                       (SELECT ROUND(AVG(r.rating)::numeric, 2)
-                        FROM reviews r WHERE r.product_id = target_product_id),
-                       0),
-                     reviews_count = (
-                       SELECT COUNT(*) FROM reviews r WHERE r.product_id = target_product_id),
-                     updated_at = NOW()
-               WHERE p.id = target_product_id;
-              RETURN NULL;
-            END;
-            $$ LANGUAGE plpgsql;
-            """
-        )
-        await conn.exec_driver_sql(
-            "DROP TRIGGER IF EXISTS reviews_recompute_aiud ON reviews"
-        )
-        await conn.exec_driver_sql(
-            """
-            CREATE TRIGGER reviews_recompute_aiud
-              AFTER INSERT OR UPDATE OR DELETE ON reviews
-              FOR EACH ROW EXECUTE FUNCTION reviews_recompute_product();
-            """
-        )
-        # Functional index for case-insensitive sub_category
-        await conn.exec_driver_sql(
-            "CREATE INDEX IF NOT EXISTS ix_products_sub_category_lower "
-            "ON products (LOWER(sub_category))"
-        )
-        # Order-number sequence (raw DDL in migration 0003, invisible to create_all)
-        await conn.exec_driver_sql("CREATE SEQUENCE IF NOT EXISTS order_number_seq")
-        # Partial unique index (migration 0009; create_all can't express it).
-        await conn.exec_driver_sql(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_assignment_active_customer "
-            "ON sales_assignments (customer_id) WHERE ended_at IS NULL"
-        )
-        # Default warehouse (migration 0007 seeds it; create_all doesn't).
-        # id needs gen_random_uuid() here — the model's uuid_pk default is
-        # Python-side and doesn't apply to a raw INSERT.
-        await conn.exec_driver_sql(
-            "INSERT INTO warehouses (id, code, name, city, state) "
-            "VALUES (gen_random_uuid(), 'MAIN', 'Main Warehouse', 'Chennai', 'Tamil Nadu') "
-            "ON CONFLICT (code) DO NOTHING"
-        )
+        await conn.exec_driver_sql("DROP SCHEMA public CASCADE")
+        await conn.exec_driver_sql("CREATE SCHEMA public")
     await engine.dispose()
+
+    # Run the migrations off the event loop (env.py calls asyncio.run()).
+    await asyncio.to_thread(command.upgrade, _alembic_config(), "head")
     yield
 
 
@@ -295,6 +264,7 @@ _STAFF_PERMS = {
         ("sales", "manage"),
         ("audit", "read"),
         ("hr", "manage"),
+        ("platform", "admin"),
     ],
 }
 
@@ -307,7 +277,15 @@ async def staff_tokens(db_session, client) -> dict[str, str]:
     from app.models.user import User, UserProfile, UserRole, UserStatus
     from app.security import hash_password
 
-    perm_rows: dict[tuple[str, str], Permission] = {}
+    from sqlalchemy import select
+
+    # Migrations seed some permissions (e.g. enquiries/approve from 0015), so the
+    # table isn't empty like it was under create_all. Reuse whatever exists and
+    # only insert the gaps — otherwise we trip uq_permissions_resource_action.
+    perm_rows: dict[tuple[str, str], Permission] = {
+        (p.resource, p.action): p
+        for p in (await db_session.execute(select(Permission))).scalars()
+    }
     for pairs in _STAFF_PERMS.values():
         for resource, action in pairs:
             if (resource, action) not in perm_rows:

@@ -24,6 +24,10 @@ dependencies = [
   "arq==0.26.*",
   "boto3==1.35.*",
   "reportlab==4.2.*",
+  # Observability (M2). prometheus-client is a lightweight in-process metrics
+  # library (no account). sentry-sdk stays dormant until SENTRY_DSN is set.
+  "prometheus-client==0.21.*",
+  "sentry-sdk[fastapi]==2.*",
 ]
 
 [dependency-groups]

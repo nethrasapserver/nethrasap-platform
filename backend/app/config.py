@@ -26,9 +26,35 @@ class Settings(BaseSettings):
     environment: Literal["dev", "test", "staging", "production"] = "dev"
     log_level: str = "INFO"
 
+    # --- Build / release identity (surfaced on /health) ---
+    # `app_version` tracks the package version; `git_sha` is injected by CI at
+    # build/deploy time (blank in local dev). Both are informational only.
+    app_version: str = "0.1.0"
+    git_sha: str = ""
+
     database_url: str
     test_database_url: str | None = None
     redis_url: str = "redis://localhost:6379/0"
+
+    # --- DB pool hardening (M10) ---------------------------------------------
+    # Recycle connections before Neon/pgbouncer or a network idle-timeout can
+    # kill them from under us; cap how long a checkout waits for a free slot;
+    # and cap how long any single statement / lock-wait can run so a runaway
+    # query can never pin a pooled connection indefinitely. Set a *_ms value to
+    # 0 to disable that server-side timeout (e.g. if a pooler rejects it).
+    db_pool_recycle_seconds: int = Field(default=1800, ge=0)
+    db_pool_timeout_seconds: int = Field(default=30, ge=1)
+    db_statement_timeout_ms: int = Field(default=30_000, ge=0)
+    db_lock_timeout_ms: int = Field(default=10_000, ge=0)
+
+    # --- Observability (M2) — dormant until provisioned ----------------------
+    # Sentry stays completely inert until a DSN is supplied: no SDK import, no
+    # init, no network. Prometheus /metrics is a cheap in-process counter with
+    # no external dependency; flip metrics_enabled off to drop the route.
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    sentry_environment: str = ""
+    metrics_enabled: bool = True
 
     jwt_secret: str
     jwt_alg: str = "HS256"

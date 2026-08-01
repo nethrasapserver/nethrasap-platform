@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,10 +35,14 @@ class SalesAssignment(Base):
     updated_at: Mapped[updated_at]
 
     __table_args__ = (
-        # At most one ACTIVE assignment per customer is enforced in the service
-        # (a partial unique index would need ended_at IS NULL; kept in code for
-        # clarity alongside the reassign flow).
         UniqueConstraint("customer_id", "rep_id", "started_at", name="uq_sales_assignment_span"),
+        # At most one ACTIVE assignment per customer at a time.
+        Index(
+            "uq_sales_assignment_active_customer",
+            "customer_id",
+            unique=True,
+            postgresql_where=text("ended_at IS NULL"),
+        ),
     )
 
 

@@ -27,6 +27,7 @@ from .middleware import (
     BodySizeLimitMiddleware,
     RequestContextMiddleware,
 )
+from .observability import init_sentry, setup_metrics
 from .realtime.hub import hub
 from .redis import close_redis
 from .schemas.common import ErrorResponse
@@ -116,6 +117,10 @@ def _validation_detail(errors: list[dict]) -> str:
 
 
 def create_app() -> FastAPI:
+    # Error reporting first so anything raised during wiring is captured. This
+    # is a no-op until a Sentry DSN is provisioned (dormant by default).
+    init_sentry()
+
     app = FastAPI(
         title="Nethrasap API",
         version="0.1.0",
@@ -200,6 +205,11 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(api_router_v1, prefix="/api/v1")
+
+    # RED metrics + GET /metrics (in-process counters; no external account).
+    # Added last so its timing middleware wraps the full stack; it never reads
+    # or mutates request.state, so request-id propagation is untouched.
+    setup_metrics(app)
 
     return app
 

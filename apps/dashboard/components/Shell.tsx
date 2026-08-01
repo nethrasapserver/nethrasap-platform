@@ -26,6 +26,7 @@ const IC: Record<string, string> = {
   leave: "M8 2v4M16 2v4M3 9h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z",
   payroll: "M3 17l5-6 4 3 5-7 4 5M3 21h18",
   audit: "M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 13h6M9 17h4",
+  platform: "M4 5h16v5H4zM4 14h16v5H4zM8 7.5h.01M8 16.5h.01",
 };
 
 interface NavItem { href: string; label: string; icon: string; perm?: string; }
@@ -60,6 +61,14 @@ const NAV: NavSection[] = [
     items: [
       { href: "/hr/employees", label: "Employees", icon: "people", perm: "hr:manage" },
       { href: "/hr/leave", label: "Leave", icon: "leave", perm: "hr:manage" },
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      // Super-admin only — gated on platform:admin, the same permission the
+      // backend enforces on /api/v1/platform. Hidden for everyone else.
+      { href: "/platform", label: "Platform Ops", icon: "platform", perm: "platform:admin" },
     ],
   },
 ];

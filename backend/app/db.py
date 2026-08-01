@@ -102,12 +102,40 @@ def _normalise_url(url: str) -> tuple[str, dict]:
 _db_url, _connect_args = _normalise_url(_settings.database_url)
 
 
+def _apply_connection_timeouts(connect_args: dict) -> dict:
+    """Attach per-connection `statement_timeout` / `lock_timeout` (M10).
+
+    asyncpg applies `server_settings` at connection startup, so every pooled
+    connection inherits the caps and a runaway query or lock-wait is force-
+    aborted server-side instead of pinning the connection forever. Values are
+    milliseconds (Postgres accepts an integer as ms). Setting the corresponding
+    config value to 0 omits that guard — an escape hatch if a managed pooler
+    ever refuses the startup parameter. This is merged on top of the existing
+    connect_args (so the Neon pooler's `statement_cache_size=0` stays intact).
+    """
+    server_settings: dict[str, str] = dict(connect_args.get("server_settings", {}))
+    if _settings.db_statement_timeout_ms > 0:
+        server_settings["statement_timeout"] = str(_settings.db_statement_timeout_ms)
+    if _settings.db_lock_timeout_ms > 0:
+        server_settings["lock_timeout"] = str(_settings.db_lock_timeout_ms)
+    if server_settings:
+        connect_args = {**connect_args, "server_settings": server_settings}
+    return connect_args
+
+
+_connect_args = _apply_connection_timeouts(_connect_args)
+
+
 engine = create_async_engine(
     _db_url,
     echo=False,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
+    # M10: recycle before an idle server/pooler drops the socket, and never let
+    # a checkout block forever when the pool is saturated.
+    pool_recycle=_settings.db_pool_recycle_seconds,
+    pool_timeout=_settings.db_pool_timeout_seconds,
     future=True,
     connect_args=_connect_args,
 )

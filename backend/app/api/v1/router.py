@@ -23,6 +23,7 @@ from . import (
     orders,
     payments,
     pincodes,
+    platform,
     products,
     realtime,
     reviews,
@@ -53,3 +54,4 @@ api_router_v1.include_router(checkout.router, prefix="/checkout", tags=["checkou
 api_router_v1.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router_v1.include_router(coupons.router, prefix="/coupons", tags=["coupons"])
 api_router_v1.include_router(pincodes.router, tags=["pincodes"])
+api_router_v1.include_router(platform.router, prefix="/platform", tags=["platform"])

@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Least-privilege default for every job. Individual jobs opt into more only if
+# they need it (none currently do — nothing here writes to the repo or packages).
+permissions:
+  contents: read
+
 jobs:
   no-mocks:
     name: No mock data in app code
@@ -15,7 +20,8 @@ jobs:
         run: |
           ! grep -rnE "NETHRA_DATA|NETHRA_PORTAL|mock-adapter|VITE_MOCK_MODE|Demo123!" \
             apps/storefront/app apps/storefront/lib apps/storefront/components \
-            backend/app packages/api-client/src \
+            apps/dashboard/app apps/dashboard/lib apps/dashboard/components \
+            backend/app backend/scripts packages/api-client/src \
             || (echo "::error::Mock/demo markers found in app code" && exit 1)
 
   backend:
@@ -56,6 +62,40 @@ jobs:
         working-directory: backend
         run: uv run pytest -q
 
+  migrations:
+    name: Migrations apply cleanly and match models
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nethrasap
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: nethrasap_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nethrasap" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://nethrasap:ci_password@localhost:5432/nethrasap_test
+      JWT_SECRET: ci-only-secret-not-production
+      ENVIRONMENT: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Install
+        working-directory: backend
+        run: uv sync --frozen
+      # `upgrade head` proves every migration applies to a clean DB; `check`
+      # then diffs the live models against the migration history and fails on
+      # any un-migrated model drift.
+      - name: alembic upgrade head
+        working-directory: backend
+        run: uv run alembic upgrade head
+      - name: alembic check (no model↔migration drift)
+        working-directory: backend
+        run: uv run alembic check
+
   frontends:
     runs-on: ubuntu-latest
     steps:
@@ -71,6 +111,91 @@ jobs:
         run: npm run lint --workspaces --if-present
       - name: Build
         run: npm run build --workspaces --if-present
+
+  docker-images:
+    name: Build shipped images + backend image tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nethrasap
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: nethrasap_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nethrasap" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Build the test target and run the backend suite inside the very image
+      # layout CI/prod use. --network host lets the container reach the postgres
+      # and redis service containers on localhost.
+      - name: Build backend test image
+        run: docker build -f infra/Dockerfile.backend --target test -t api-test .
+      - name: Run backend tests in the image
+        run: |
+          docker run --rm --network host \
+            -e TEST_DATABASE_URL="postgresql://nethrasap:ci_password@localhost:5432/nethrasap_test" \
+            -e DATABASE_URL="postgresql://nethrasap:ci_password@localhost:5432/nethrasap_test" \
+            -e REDIS_URL="redis://localhost:6379/0" \
+            -e JWT_SECRET="ci-only-secret-not-production" \
+            -e ENVIRONMENT="dev" \
+            api-test uv run pytest -q
+      # Build the actual shipped runtime image so a Dockerfile break is caught
+      # in CI — these are what deploy, but were never built here before.
+      - name: Build backend runtime image
+        run: docker build -f infra/Dockerfile.backend --target runtime -t api-runtime .
+      # Guard the credential-residue fix: seed.py and Demo123! must never ship.
+      - name: Assert no demo credentials in runtime image
+        run: |
+          docker run --rm --entrypoint sh api-runtime -c \
+            "test ! -f /app/scripts/seed.py" \
+            || (echo "::error::scripts/seed.py leaked into the runtime image" && exit 1)
+          if docker run --rm --entrypoint sh api-runtime -c "grep -rIl 'Demo123' / 2>/dev/null | grep -v '^/proc/'"; then
+            echo "::error::Demo123! credential found in the runtime image"
+            exit 1
+          fi
+      - name: Build storefront image
+        run: docker build -f infra/Dockerfile.frontend --build-arg APP=storefront -t storefront-web .
+      - name: Build dashboard image
+        run: docker build -f infra/Dockerfile.frontend --build-arg APP=dashboard -t dashboard-web .
+
+  security:
+    name: Dependency + secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks needs full history to scan every commit on a PR/push.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      # --- Python deps (advisory: audit feeds are noisy / often unpatchable) ---
+      - name: pip-audit (Python, locked prod deps)
+        continue-on-error: true
+        working-directory: backend
+        run: |
+          uv export --frozen --no-dev --no-emit-project -o requirements.txt
+          uvx pip-audit -r requirements.txt
+      # --- npm workspaces (advisory) ---
+      - name: npm audit (workspaces)
+        continue-on-error: true
+        run: |
+          npm ci
+          npm audit --audit-level=high
+      # --- Secret scanning (BLOCKING) ---
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   api-types-drift:
     name: Generated API types match the backend

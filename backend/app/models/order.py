@@ -13,6 +13,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -160,6 +161,7 @@ class Order(Base):
     __table_args__ = (
         CheckConstraint("grand_total >= 0", name="ck_orders_grand_total_non_negative"),
         CheckConstraint("subtotal >= 0", name="ck_orders_subtotal_non_negative"),
+        Index("ix_orders_placed_at", "placed_at"),
     )
 
 

@@ -60,11 +60,12 @@ COPY backend/pyproject.toml ./pyproject.toml
 #   preDeployCommand: alembic upgrade head
 #                     && python -m scripts.seed_rbac
 #                     && python -m scripts.bootstrap_admin
-# seed_rbac imports seed_roles_and_permissions from scripts/seed.py, so seed.py
-# rides along as a transitive dependency. Deliberately EXCLUDED from the image:
-# seed_dev.py, reset_db.py, backfill_product_info.py, and the tests/ tree.
+# seed_rbac imports seed_roles_and_permissions from scripts/rbac_data.py (a
+# credential-free module), so only rbac_data rides along — seed.py (which holds
+# the Demo123! demo fixtures) is deliberately NOT shipped. Also EXCLUDED:
+# seed.py, seed_dev.py, reset_db.py, backfill_product_info.py, and tests/.
 COPY backend/scripts/__init__.py \
-     backend/scripts/seed.py \
+     backend/scripts/rbac_data.py \
      backend/scripts/seed_rbac.py \
      backend/scripts/bootstrap_admin.py \
      ./scripts/

@@ -14,8 +14,10 @@ import asyncio
 from app.db import SessionLocal
 from app.logging import configure_logging, get_logger
 
-# Reuse the single source of truth for role/permission definitions.
-from scripts.seed import seed_roles_and_permissions
+# Reuse the single source of truth for role/permission definitions. Imported
+# from scripts.rbac_data (NOT scripts.seed) so the production RBAC seed pulls in
+# zero demo fixtures/credentials — seed.py is not even shipped in the image.
+from scripts.rbac_data import seed_roles_and_permissions
 
 configure_logging("production")
 log = get_logger("scripts.seed_rbac")

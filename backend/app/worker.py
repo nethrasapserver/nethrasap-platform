@@ -82,6 +82,30 @@ async def generate_payslips(ctx: dict, *, run_id: str) -> None:
         await payroll.generate_payslip_pdfs(db, uuid.UUID(run_id))
 
 
+# Written by the worker so its liveness is externally observable (M11). The API
+# readiness/ops path reads this key; a short TTL means a crashed/hung worker's
+# heartbeat goes stale on its own without any reaper.
+WORKER_HEARTBEAT_KEY = "worker:heartbeat"
+WORKER_HEARTBEAT_TTL = 120  # seconds
+
+
+async def write_heartbeat(ctx: dict) -> None:
+    """Refresh `worker:heartbeat` with a fresh timestamp + short TTL.
+
+    Runs on startup and on a cron so the key is continuously renewed while the
+    worker's event loop is alive. Never raises: a Redis blip must not crash the
+    worker or fail a job — the TTL will simply lapse and surface as 'stale'.
+    """
+    from datetime import UTC, datetime
+
+    ts = datetime.now(UTC).isoformat()
+    try:
+        redis = ctx["redis"]
+        await redis.set(WORKER_HEARTBEAT_KEY, ts, ex=WORKER_HEARTBEAT_TTL)
+    except Exception:
+        log.warning("worker.heartbeat_write_failed")
+
+
 async def dispatch_outbox(ctx: dict) -> None:
     """Cron sweep: re-dispatch job_outbox rows still `pending` (crash recovery
     for the enqueue-after-commit window) and surface the dead-letter depth."""
@@ -110,6 +134,9 @@ _TASKS: dict[str, Callable[..., Awaitable[None]]] = {
 async def startup(ctx: dict) -> None:
     configure_logging(environment=settings.environment, level=settings.log_level)
     log.info("worker.startup", environment=settings.environment)
+    # Publish liveness immediately so ops sees the worker the moment it boots,
+    # not only after the first cron tick.
+    await write_heartbeat(ctx)
 
 
 async def shutdown(ctx: dict) -> None:
@@ -120,7 +147,12 @@ class WorkerSettings:
     functions: ClassVar = [send_sms_task, generate_invoice_pdf, generate_payslips]
     # Every 60s: re-dispatch outbox rows a crashed API process committed but
     # never got onto the queue (arq default `second=0` → once per minute).
-    cron_jobs: ClassVar = [cron(dispatch_outbox)]
+    # Twice a minute: refresh the worker heartbeat (TTL 120s → always fresh
+    # while the loop runs; goes stale within ~2min of a hang/crash).
+    cron_jobs: ClassVar = [
+        cron(dispatch_outbox),
+        cron(write_heartbeat, second={0, 30}),
+    ]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
