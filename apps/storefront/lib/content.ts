@@ -45,8 +45,12 @@ const EMPTY_PAGE = (slug: string): CmsPage => ({ slug, title: "", blocks: [] });
  *  malformed JSON) it returns an empty page so callers fall back to DEFAULTS. */
 export async function getPage(slug: string): Promise<CmsPage> {
   try {
+    // Live read: the marketing pages are force-dynamic (render per request)
+    // anyway, so fetch the CMS uncached — dashboard edits show immediately with
+    // no revalidate webhook. (For production perf, switch to
+    // `next:{revalidate,tags}` + an on-demand purge via a dashboard-side route.)
     const res = await fetch(`${cmsBase()}${API_PREFIX}/cms/pages/${slug}`, {
-      next: { revalidate: 300, tags: [`cms:${slug}`] },
+      cache: "no-store",
     });
     if (!res.ok) return EMPTY_PAGE(slug);
     const data = (await res.json()) as Partial<CmsPage> | null;
