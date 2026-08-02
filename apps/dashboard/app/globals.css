@@ -122,6 +122,23 @@ body { font-size: 14px; }
 }
 .img-setprimary:hover { background: rgba(20,26,12,.8); }
 
+/* Product image gallery (mirrors the storefront PDP: main stage + thumb row) */
+.pf-gallery { display: grid; gap: 10px; }
+.pf-main {
+  position: relative; aspect-ratio: 16 / 11; border-radius: var(--r-md); overflow: hidden;
+  border: 1px solid var(--line); background: var(--paper-3); display: grid; place-items: center;
+}
+.pf-main img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pf-main-empty { display: grid; gap: 6px; justify-items: center; color: var(--ink-3); }
+.img-cell.is-empty {
+  display: grid; place-items: center; cursor: pointer; border-style: dashed; color: var(--ink-3);
+  transition: border-color .12s, color .12s;
+}
+.img-cell.is-empty:hover { border-color: var(--brand-600); color: var(--brand-700); }
+.img-cell.is-empty.is-busy { cursor: default; opacity: .6; }
+.img-add { font-size: 1.5rem; font-weight: 300; line-height: 1; }
+.btn.is-disabled { opacity: .5; pointer-events: none; }
+
 /* Table pagination */
 .pager {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;

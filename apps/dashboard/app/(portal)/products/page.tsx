@@ -24,6 +24,28 @@ interface ProductImg {
   is_primary: boolean;
 }
 
+/* Form-only image: a saved ProductImg, or (in create mode) a file buffered for
+   upload once the product exists. `file` set → `storage_key` is a local blob:
+   preview URL until the real upload replaces it. */
+type FormImg = ProductImg & { file?: File };
+
+/* Presign slot returned by POST /admin/products/{id}/images. */
+type ImageSlot = { image_id: string; storage_key: string; upload_url: string; public_url: string };
+
+/* Mirrors the storefront gallery (ProductGallery.tsx THUMB_SLOTS): the product
+   page shows the primary as the main image plus a row of thumbnail tiles. Keep
+   these in sync so the dashboard never lets staff add images the PDP won't show. */
+const MAX_IMAGES = 3;
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function PlaceholderArt({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+      <path d="M4 7h16M6 7v12a2 2 0 002 2h8a2 2 0 002-2V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" />
+    </svg>
+  );
+}
+
 /* Admin list row — includes unpublished products the public API hides.
    GET /admin/products has no response_model (it returns raw dicts from
    backend/app/services/admin_catalogue.py:list_products_admin), so the
@@ -408,20 +430,62 @@ function ProductForm({
   }
 
   // Image management (immediate, independent of the Save button).
-  const [images, setImages] = useState<ProductImg[]>(product?.images ?? []);
+  const [images, setImages] = useState<FormImg[]>(product?.images ?? []);
   const [imgUrl, setImgUrl] = useState("");
   const [imgBusy, setImgBusy] = useState(false);
+  const atLimit = images.length >= MAX_IMAGES;
 
   // Pending images (new-product mode) get a temp id and are attached on create.
-  const removeLocalPrimary = (xs: ProductImg[], id: string) => {
+  const removeLocalPrimary = (xs: FormImg[], id: string) => {
     const rest = xs.filter((x) => x.id !== id);
     if (!rest.some((x) => x.is_primary) && rest[0]) rest[0] = { ...rest[0], is_primary: true };
     return rest;
   };
 
+  // Direct file upload → object storage (R2 / local MinIO). Edit mode presigns
+  // against the live product (the slot creates the DB row); create mode buffers
+  // the File and uploads it after the product exists.
+  async function uploadFile(file: File | null) {
+    if (!file) return;
+    if (atLimit) return toast(`Up to ${MAX_IMAGES} images per product`, true);
+    if (!IMAGE_TYPES.includes(file.type)) return toast("Use a JPG, PNG or WebP image", true);
+    const makePrimary = images.length === 0;
+    if (editing && product) {
+      setImgBusy(true);
+      try {
+        const slot = await api.post<ImageSlot>(`/admin/products/${product.id}/images`, {
+          content_type: file.type,
+          is_primary: makePrimary,
+        });
+        const put = await fetch(slot.upload_url, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!put.ok) throw new Error("upload failed");
+        setImages((xs) => [
+          ...(makePrimary ? xs.map((x) => ({ ...x, is_primary: false })) : xs),
+          { id: slot.image_id, storage_key: slot.public_url, alt: null, is_primary: makePrimary },
+        ]);
+        toast("Image uploaded");
+      } catch {
+        toast("Upload failed — try again, or paste a hosted URL", true);
+      } finally {
+        setImgBusy(false);
+      }
+    } else {
+      // Buffer with a local preview; uploaded on create() once we have an id.
+      setImages((xs) => [
+        ...xs,
+        { id: `pending-${xs.length}-${file.name}`, storage_key: URL.createObjectURL(file), alt: null, is_primary: makePrimary, file },
+      ]);
+    }
+  }
+
   async function addImage() {
     const url = imgUrl.trim();
     if (!url) return;
+    if (atLimit) return toast(`Up to ${MAX_IMAGES} images per product`, true);
     if (editing && product) {
       setImgBusy(true);
       try {
@@ -512,12 +576,26 @@ function ProductForm({
         toast("Product updated");
       } else {
         const created = await api.post<{ id: string }>("/admin/products", payload);
-        // Attach any images the user buffered while creating.
+        // Attach any images the user buffered while creating: uploaded files go
+        // through a presigned PUT (the slot creates the row); pasted URLs attach
+        // directly. Primary flag is preserved per image.
         for (const im of images) {
-          await api.post(`/admin/products/${created.id}/images/url`, {
-            url: im.storage_key,
-            is_primary: im.is_primary,
-          });
+          if (im.file) {
+            const slot = await api.post<ImageSlot>(`/admin/products/${created.id}/images`, {
+              content_type: im.file.type,
+              is_primary: im.is_primary,
+            });
+            await fetch(slot.upload_url, {
+              method: "PUT",
+              headers: { "Content-Type": im.file.type },
+              body: im.file,
+            });
+          } else {
+            await api.post(`/admin/products/${created.id}/images/url`, {
+              url: im.storage_key,
+              is_primary: im.is_primary,
+            });
+          }
         }
         // Opening pack size + its role tiers, so the product is sellable
         // (or quotable) the moment it is published.
@@ -555,40 +633,88 @@ function ProductForm({
         <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} />
       </div>
 
-      {/* Images */}
+      {/* Images — mirrors the storefront product gallery: one primary "main"
+          image plus a row of thumbnail tiles. Empty tiles double as upload
+          drop-targets; direct file upload with a paste-URL fallback. */}
       <div className="field">
-        <label>Images {images.length > 0 && <span className="muted">· {images.length}</span>}</label>
-        <div className="img-grid">
-          {images.map((im) => (
-            <div key={im.id} className={`img-cell ${im.is_primary ? "is-primary" : ""}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={im.storage_key} alt={im.alt ?? ""} />
-              <button className="img-x" onClick={() => removeImage(im.id)} aria-label="Remove image">✕</button>
-              {im.is_primary ? (
-                <span className="img-badge">Primary</span>
-              ) : (
-                <button className="img-setprimary" onClick={() => makePrimary(im.id)}>Set primary</button>
-              )}
+        <label>Images <span className="muted">· {images.length}/{MAX_IMAGES}</span></label>
+        {(() => {
+          const ordered = [...images].sort((x, y) => Number(y.is_primary) - Number(x.is_primary));
+          const main = ordered[0] ?? null;
+          return (
+            <div className="pf-gallery">
+              <div className="pf-main">
+                {main ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={main.storage_key} alt={main.alt ?? ""} />
+                    <span className="img-badge">Primary</span>
+                  </>
+                ) : (
+                  <span className="pf-main-empty"><PlaceholderArt size={56} /><span className="small">No images yet</span></span>
+                )}
+              </div>
+              <div className="img-grid">
+                {Array.from({ length: MAX_IMAGES }, (_, i) => {
+                  const im = ordered[i];
+                  if (!im) {
+                    return (
+                      <label key={`slot-${i}`} className={`img-cell is-empty ${imgBusy ? "is-busy" : ""}`} title="Upload an image">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          hidden
+                          disabled={imgBusy}
+                          onChange={(e) => { void uploadFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
+                        />
+                        <span className="img-add">{imgBusy ? "…" : "+"}</span>
+                      </label>
+                    );
+                  }
+                  return (
+                    <div key={im.id} className={`img-cell ${im.is_primary ? "is-primary" : ""}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={im.storage_key} alt={im.alt ?? ""} />
+                      <button type="button" className="img-x" onClick={() => removeImage(im.id)} aria-label="Remove image">✕</button>
+                      {im.is_primary ? (
+                        <span className="img-badge">Primary</span>
+                      ) : (
+                        <button type="button" className="img-setprimary" onClick={() => makePrimary(im.id)}>Set primary</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ))}
-          {images.length === 0 && <p className="muted small" style={{ gridColumn: "1/-1", margin: 0 }}>No images yet.</p>}
-        </div>
+          );
+        })()}
         <div className="row" style={{ gap: 8, marginTop: 10 }}>
+          <label className={`btn btn-outline btn-sm ${imgBusy || atLimit ? "is-disabled" : ""}`} style={{ cursor: imgBusy || atLimit ? "default" : "pointer" }}>
+            {imgBusy ? "Uploading…" : "Upload image"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              hidden
+              disabled={imgBusy || atLimit}
+              onChange={(e) => { void uploadFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
+            />
+          </label>
           <input
             className="input grow"
-            placeholder="Paste an image URL (https://…)"
+            placeholder="or paste an image URL (https://…)"
             value={imgUrl}
+            disabled={atLimit}
             onChange={(e) => setImgUrl(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addImage(); } }}
           />
-          <button className="btn btn-outline btn-sm" disabled={imgBusy || !imgUrl.trim()} onClick={addImage}>
-            {imgBusy ? "Adding…" : "Add"}
+          <button className="btn btn-outline btn-sm" disabled={imgBusy || atLimit || !imgUrl.trim()} onClick={addImage}>
+            Add
           </button>
         </div>
         <p className="muted small" style={{ margin: "6px 0 0" }}>
-          {editing
-            ? "Direct file upload needs object storage (R2); paste a hosted image URL for now."
-            : "Paste hosted image URLs — they'll be attached when you create the product."}
+          {atLimit
+            ? `Maximum ${MAX_IMAGES} images — the primary shows as the main image on the product page.`
+            : "The primary shows as the main image on the product page; the rest appear as thumbnails. JPG, PNG or WebP."}
         </p>
       </div>
 
