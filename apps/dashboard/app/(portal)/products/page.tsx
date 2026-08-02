@@ -61,9 +61,12 @@ type AdminProduct = Omit<Schemas["AdminProductOut"], "variants" | "images"> & {
   description: string | null;
   attributes: Record<string, unknown>;
   images: ProductImg[];
+  hsn_code: string | null;
+  badge: string | null;
 };
 
-const DOSE_SLOTS = ["morning", "afternoon", "night"] as const;
+/* One row of the PDP "Composition" table (ProductGallery reads attrs.ingredients). */
+type Ingredient = { name: string; grade: string; strength: string };
 
 const SCHEDULES = ["NONE", "H", "H1", "X"] as const;
 const STOCK = ["in_stock", "low_stock", "out_of_stock"] as const;
@@ -354,26 +357,40 @@ function ProductForm({
     schedule: product?.schedule ?? "NONE",
     stock_status: product?.stock_status ?? "in_stock",
     gst_rate_pct: String(product?.gst_rate_pct ?? 12),
+    hsn_code: product?.hsn_code ?? "",
+    badge: product?.badge ?? "",
     is_featured: product?.is_featured ?? false,
     description: product?.description ?? "",
-    // Product-information fields (stored in attributes).
-    uses: str("uses"),
-    composition: str("composition"),
-    directions: str("directions"),
-    storage: str("storage"),
+    // Product-information fields (stored in attributes) — keyed to match exactly
+    // what the storefront PDP reads (see apps/storefront .../[slug]/page.tsx).
+    // Prefill from the PDP's fallback keys so legacy products still populate.
+    indications: str("indications") || str("uses"),
+    dosage: str("dosage") || str("directions"),
     warnings: str("warnings"),
+    composition: str("composition"),
     manufacturer: str("manufacturer"),
     country_of_origin: str("country_of_origin"),
-    mfg_date: str("mfg_date"),
-    expiry_date: str("expiry_date"),
+    storage: str("storage"),
+    shelf_life_months: typeof a.shelf_life_months === "number" ? String(a.shelf_life_months) : "",
   });
-  const [dosage, setDosage] = useState<string[]>(
-    Array.isArray(a.dosage_timing) ? (a.dosage_timing as string[]) : [],
+  // Tags (PDP "Tags" section) — edited as a comma-separated string.
+  const [tags, setTags] = useState(() =>
+    Array.isArray(a.tags) ? (a.tags as unknown[]).filter((x) => typeof x === "string").join(", ") : "",
   );
+  // Ingredients (PDP "Composition" table).
+  const [ingredients, setIngredients] = useState<Ingredient[]>(() =>
+    Array.isArray(a.ingredients)
+      ? (a.ingredients as Record<string, unknown>[])
+          .filter((x) => x && typeof x === "object")
+          .map((x) => ({ name: String(x.name ?? ""), grade: String(x.grade ?? ""), strength: String(x.strength ?? "") }))
+      : [],
+  );
+  const setIng = (i: number, patch: Partial<Ingredient>) =>
+    setIngredients((xs) => xs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const addIng = () => setIngredients((xs) => [...xs, { name: "", grade: "", strength: "" }]);
+  const removeIng = (i: number) => setIngredients((xs) => xs.filter((_, j) => j !== i));
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
-  const toggleDose = (slot: string) =>
-    setDosage((d) => (d.includes(slot) ? d.filter((x) => x !== slot) : [...d, slot]));
 
   /* Opening pack size + per-role pricing (create mode only — an existing
      product's tiers are edited in the Prices drawer). Creating the variant
@@ -548,22 +565,49 @@ function ProductForm({
       if (v.trim()) attributes[k] = v.trim();
       else delete attributes[k];
     };
-    setAttr("uses", form.uses);
-    setAttr("composition", form.composition);
-    setAttr("directions", form.directions);
-    setAttr("storage", form.storage);
+    // Keys match the PDP's readers exactly. Write the canonical key and drop the
+    // legacy fallback so a cleared field doesn't resurface stale copy.
+    setAttr("indications", form.indications);
+    delete attributes.uses;
+    setAttr("dosage", form.dosage);
+    delete attributes.directions;
     setAttr("warnings", form.warnings);
+    setAttr("composition", form.composition);
     setAttr("manufacturer", form.manufacturer);
     setAttr("country_of_origin", form.country_of_origin);
-    setAttr("mfg_date", form.mfg_date);
-    setAttr("expiry_date", form.expiry_date);
-    attributes.dosage_timing = dosage;
+    setAttr("storage", form.storage);
+
+    // Tags (PDP "Tags" section).
+    const cleanTags = tags.split(",").map((t) => t.trim()).filter(Boolean);
+    if (cleanTags.length) attributes.tags = cleanTags;
+    else delete attributes.tags;
+
+    // Ingredients (PDP "Composition" table) — omit blank optional cells.
+    const cleanIng = ingredients
+      .map((i) => ({ name: i.name.trim(), grade: i.grade.trim(), strength: i.strength.trim() }))
+      .filter((i) => i.name)
+      .map((i) => ({ name: i.name, ...(i.grade ? { grade: i.grade } : {}), ...(i.strength ? { strength: i.strength } : {}) }));
+    if (cleanIng.length) attributes.ingredients = cleanIng;
+    else delete attributes.ingredients;
+
+    // Shelf life (PDP details table) — a positive integer count of months.
+    const shelf = parseInt(form.shelf_life_months, 10);
+    if (Number.isFinite(shelf) && shelf > 0) attributes.shelf_life_months = shelf;
+    else delete attributes.shelf_life_months;
+
+    // Retire the checkbox-era key the PDP no longer renders.
+    delete attributes.dosage_timing;
 
     const payload: Record<string, unknown> = {
       name: form.name,
       category_slug: form.category_slug,
       sub_category: form.sub_category.trim() || null,
       schedule: form.schedule,
+      // Send "" (not null) so clearing the field actually clears it: the update
+      // service ignores null values (treats them as "leave unchanged"), but an
+      // empty string is applied and reads as "no badge / no HSN" on the PDP.
+      hsn_code: form.hsn_code.trim(),
+      badge: form.badge.trim(),
       stock_status: form.stock_status,
       gst_rate_pct: Number(form.gst_rate_pct) || 0,
       is_featured: form.is_featured,
@@ -752,6 +796,16 @@ function ProductForm({
           <input className="input" inputMode="numeric" value={form.gst_rate_pct} onChange={(e) => set("gst_rate_pct", e.target.value.replace(/\D/g, "").slice(0, 2))} />
         </div>
       </div>
+      <div className="row">
+        <div className="field grow">
+          <label>HSN code</label>
+          <input className="input" placeholder="e.g. 3004" value={form.hsn_code} onChange={(e) => set("hsn_code", e.target.value)} />
+        </div>
+        <div className="field grow">
+          <label>Merch badge</label>
+          <input className="input" placeholder="e.g. Bestseller" maxLength={50} value={form.badge} onChange={(e) => set("badge", e.target.value)} />
+        </div>
+      </div>
       <div className="field">
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={form.is_featured} onChange={(e) => set("is_featured", e.target.checked)} />
@@ -892,43 +946,59 @@ function ProductForm({
       <div style={{ borderTop: "1px solid var(--line)", margin: "6px 0 14px" }} />
       <h4 style={{ margin: "0 0 10px" }}>Product information</h4>
       <p className="muted small" style={{ margin: "0 0 14px" }}>
-        Shown under the description on the product page.
+        These map one-to-one to the sections on the storefront product page.
       </p>
 
       <div className="field">
-        <label>Healthcare data / uses</label>
-        <textarea className="input" rows={2} value={form.uses} onChange={(e) => set("uses", e.target.value)} />
+        <label>Tags</label>
+        <input
+          className="input"
+          placeholder="Comma-separated, e.g. Immunity, Ayurvedic, Vegan"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+        />
+        <p className="muted small" style={{ margin: "4px 0 0" }}>Shown as chips in the “Tags” section.</p>
       </div>
+
       <div className="field">
-        <label>Materials &amp; composition</label>
+        <label>Composition summary</label>
         <textarea className="input" rows={2} value={form.composition} onChange={(e) => set("composition", e.target.value)} />
+        <p className="muted small" style={{ margin: "4px 0 0" }}>One-line summary in the Product details table.</p>
       </div>
+
       <div className="field">
-        <label>How to use / directions</label>
-        <textarea className="input" rows={2} value={form.directions} onChange={(e) => set("directions", e.target.value)} />
-      </div>
-      <div className="field">
-        <label>When to take</label>
-        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-          {DOSE_SLOTS.map((slot) => (
-            <label key={slot} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", textTransform: "capitalize" }}>
-              <input type="checkbox" checked={dosage.includes(slot)} onChange={() => toggleDose(slot)} />
-              {slot}
-            </label>
+        <label>Composition table (ingredients)</label>
+        <div style={{ display: "grid", gap: 8 }}>
+          {ingredients.map((ing, i) => (
+            <div className="row" key={i} style={{ gap: 8, alignItems: "center" }}>
+              <input className="input grow" placeholder="Ingredient" value={ing.name} onChange={(e) => setIng(i, { name: e.target.value })} />
+              <input className="input" style={{ width: 110 }} placeholder="Grade" value={ing.grade} onChange={(e) => setIng(i, { grade: e.target.value })} />
+              <input className="input" style={{ width: 110 }} placeholder="Strength" value={ing.strength} onChange={(e) => setIng(i, { strength: e.target.value })} />
+              <button type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => removeIng(i)} aria-label="Remove ingredient">✕</button>
+            </div>
           ))}
+          <div>
+            <button type="button" className="btn btn-outline btn-sm" onClick={addIng}>+ Add ingredient</button>
+          </div>
         </div>
       </div>
+
       <div className="field">
-        <label>Storage</label>
-        <input className="input" value={form.storage} onChange={(e) => set("storage", e.target.value)} />
+        <label>Indications</label>
+        <textarea className="input" rows={2} value={form.indications} onChange={(e) => set("indications", e.target.value)} />
       </div>
       <div className="field">
-        <label>Safety warnings</label>
+        <label>Dosage</label>
+        <textarea className="input" rows={2} value={form.dosage} onChange={(e) => set("dosage", e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Warnings</label>
         <textarea className="input" rows={2} value={form.warnings} onChange={(e) => set("warnings", e.target.value)} />
       </div>
+
       <div className="row">
         <div className="field grow">
-          <label>Manufacturer</label>
+          <label>Manufacturer / marketer</label>
           <input className="input" value={form.manufacturer} onChange={(e) => set("manufacturer", e.target.value)} />
         </div>
         <div className="field grow">
@@ -938,12 +1008,12 @@ function ProductForm({
       </div>
       <div className="row">
         <div className="field grow">
-          <label>Mfg. date</label>
-          <input className="input" placeholder="e.g. Mar 2026" value={form.mfg_date} onChange={(e) => set("mfg_date", e.target.value)} />
+          <label>Storage</label>
+          <input className="input" placeholder="e.g. Store below 25°C, away from light" value={form.storage} onChange={(e) => set("storage", e.target.value)} />
         </div>
-        <div className="field grow">
-          <label>Expiry date</label>
-          <input className="input" placeholder="e.g. Apr 2028" value={form.expiry_date} onChange={(e) => set("expiry_date", e.target.value)} />
+        <div className="field" style={{ width: 160 }}>
+          <label>Shelf life (months)</label>
+          <input className="input" inputMode="numeric" placeholder="e.g. 24" value={form.shelf_life_months} onChange={(e) => set("shelf_life_months", e.target.value.replace(/\D/g, "").slice(0, 3))} />
         </div>
       </div>
     </Drawer>

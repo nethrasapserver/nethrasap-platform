@@ -444,6 +444,8 @@ async def list_products_admin(db: AsyncSession) -> list[dict[str, Any]]:
                 "category_name": p.category.name if p.category else "",
                 "sub_category": p.sub_category,
                 "schedule": p.schedule.value,
+                "hsn_code": p.hsn_code,
+                "badge": p.badge,
                 "stock_status": p.stock_status.value,
                 "is_active": p.is_active,
                 "is_featured": p.is_featured,
