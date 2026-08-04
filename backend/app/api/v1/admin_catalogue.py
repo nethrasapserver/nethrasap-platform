@@ -82,6 +82,13 @@ async def unpublish(product_id: UUID, db: DbSession, actor: CatalogueAdmin) -> A
     return _out(await svc.set_product_active(db, actor, product_id, False))
 
 
+@router.delete("/admin/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_product(product_id: UUID, db: DbSession, actor: CatalogueAdmin) -> Response:
+    """Permanently delete a product (409 if it has orders — unpublish instead)."""
+    await svc.delete_product(db, actor, product_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- Variants & prices ---------------------------------------------------------
 
 

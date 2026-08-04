@@ -32,6 +32,7 @@ from ..models.catalogue import (
     ScheduleClass,
     StockStatus,
 )
+from ..models.order import OrderItem
 from ..models.user import User
 from ..realtime import publish_event
 from ..realtime.channels import topic_channel
@@ -141,6 +142,35 @@ async def set_product_active(db: AsyncSession, actor: User, product_id: uuid.UUI
     await db.commit()
     await _catalogue_event("product.updated", "product", str(product.id))
     return await _load_product(db, product_id)
+
+
+async def delete_product(db: AsyncSession, actor: User, product_id: uuid.UUID) -> None:
+    """Permanently delete a product. Its variants, prices, images and reviews
+    cascade (FK ondelete=CASCADE).
+
+    Blocked when any variant has been ordered: order_items reference
+    product_variants with ondelete=RESTRICT and order history must survive, so
+    those products should be unpublished rather than deleted.
+    """
+    product = await _load_product(db, product_id)
+    ordered = (
+        await db.execute(
+            select(func.count())
+            .select_from(OrderItem)
+            .join(ProductVariant, ProductVariant.id == OrderItem.variant_id)
+            .where(ProductVariant.product_id == product_id)
+        )
+    ).scalar_one()
+    if ordered:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This product has orders and can't be deleted — unpublish it instead.",
+        )
+    name = product.name
+    await db.delete(product)
+    await _audit(db, actor, "product.deleted", "product", str(product_id), {"name": name})
+    await db.commit()
+    await _catalogue_event("product.deleted", "product", str(product_id))
 
 
 # --- Variants + prices ---------------------------------------------------------

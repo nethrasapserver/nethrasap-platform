@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProductDetail, Schemas } from "@nethrasap/api-client";
+import { ApiError, type ProductDetail, type Schemas } from "@nethrasap/api-client";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "@/components/Drawer";
 import { KPI_ICONS, KpiRow } from "@/components/Kpi";
@@ -100,6 +100,22 @@ export default function CataloguePage() {
       refetch();
     } catch {
       toast("Could not update the product", true);
+    }
+  }
+
+  async function deleteProduct(p: AdminProduct) {
+    if (!window.confirm(`Delete “${p.name}”? This permanently removes the product and can’t be undone.`)) return;
+    try {
+      await api.del(`/admin/products/${p.id}`);
+      toast(`${p.name} deleted`);
+      refetch(); // updates the counts (All products / Live / Drafts / Out of stock)
+    } catch (e) {
+      toast(
+        e instanceof ApiError && e.status === 409
+          ? "This product has orders — unpublish it instead of deleting."
+          : "Could not delete the product",
+        true,
+      );
     }
   }
 
@@ -234,6 +250,7 @@ export default function CataloguePage() {
                       isActive={p.is_active}
                       onVariant={() => setVariantFor(p)}
                       onToggle={() => toggleActive(p)}
+                      onDelete={() => deleteProduct(p)}
                     />
                   </div>
                 </td>
@@ -311,7 +328,7 @@ export default function CataloguePage() {
 
 /* ---------- Row overflow menu (secondary actions) ---------- */
 
-function RowMenu({ isActive, onVariant, onToggle }: { isActive: boolean; onVariant: () => void; onToggle: () => void }) {
+function RowMenu({ isActive, onVariant, onToggle, onDelete }: { isActive: boolean; onVariant: () => void; onToggle: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -332,6 +349,9 @@ function RowMenu({ isActive, onVariant, onToggle }: { isActive: boolean; onVaria
           <button role="menuitem" onClick={() => { setOpen(false); onVariant(); }}>+ Add variant</button>
           <button role="menuitem" onClick={() => { setOpen(false); onToggle(); }}>
             {isActive ? "Unpublish" : "Publish"}
+          </button>
+          <button role="menuitem" style={{ color: "var(--danger)" }} onClick={() => { setOpen(false); onDelete(); }}>
+            Delete
           </button>
         </div>
       )}
