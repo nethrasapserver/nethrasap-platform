@@ -26,6 +26,24 @@ interface FormState {
   defaultSortOrder: number;
 }
 
+/* Kinds whose preview is wide/singular render one-per-row; everything else is a
+   compact card and packs into a responsive grid so it fills the width. */
+const WIDE_KINDS = new Set([
+  "hero_slide",
+  "about_hero",
+  "cta_band",
+  "section_heading",
+  "section_intro",
+  "story_para",
+  "announcement",
+  "footer_blurb",
+  "footer_column",
+  "footer_legal",
+  "faq_item",
+  "header_nav",
+  "trending",
+]);
+
 export default function ContentEditorPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
@@ -267,18 +285,20 @@ export default function ContentEditorPage() {
                   <div className="cms-empty">No {(KIND_TITLES[kind] ?? kind).toLowerCase()} yet.</div>
                 )
               ) : (
-                <div className="cms-blocks">
+                <div
+                  className="cms-grid"
+                  style={{ gridTemplateColumns: WIDE_KINDS.has(kind) ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))" }}
+                >
                   {group.map((block, i) => (
-                    <div className={`cms-block ${block.is_active ? "" : "is-hidden"}`} key={block.id}>
-                      <div className="cms-reorder">
-                        <button className="icon-btn" aria-label="Move up" disabled={i === 0 || busyId === block.id} onClick={() => reorder(kind, block.id, "up")}>↑</button>
-                        <button className="icon-btn" aria-label="Move down" disabled={i === group.length - 1 || busyId === block.id} onClick={() => reorder(kind, block.id, "down")}>↓</button>
-                      </div>
-                      <div className="cms-block-body">
+                    <div className={`cms-card ${block.is_active ? "" : "is-hidden"}`} key={block.id}>
+                      <div className="cms-card-body">
                         <SectionPreview kind={kind} content={block.content} framed={false} />
                       </div>
-                      <div className="cms-block-ctrls">
+                      <div className="cms-card-bar">
+                        <button className="icon-btn" aria-label="Move up" disabled={i === 0 || busyId === block.id} onClick={() => reorder(kind, block.id, "up")}>↑</button>
+                        <button className="icon-btn" aria-label="Move down" disabled={i === group.length - 1 || busyId === block.id} onClick={() => reorder(kind, block.id, "down")}>↓</button>
                         {!block.is_active && <span className="pill pill-muted">Hidden</span>}
+                        <span className="cms-bar-gap" />
                         <button className="btn btn-outline btn-sm" onClick={() => setForm({ kind, block, defaultSortOrder: group.length })}>Edit</button>
                         <button className="btn btn-ghost btn-sm" disabled={busyId === block.id} onClick={() => toggleActive(block)}>
                           {block.is_active ? "Hide" : "Publish"}

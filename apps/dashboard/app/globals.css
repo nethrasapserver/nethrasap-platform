@@ -249,20 +249,24 @@ body .auth-page .auth-bg { display: none; }
 }
 .cms-section-help { margin: 4px 0 0; color: var(--ink-3); font-size: .8rem; line-height: 1.45; }
 
-.cms-blocks { display: grid; gap: 10px; }
-.cms-block {
-  display: flex; gap: 12px; align-items: stretch;
-  padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper);
+/* Each block is a card: preview on top, a control bar pinned to the bottom.
+   Compact kinds pack into a responsive grid (set inline per section); wide
+   kinds render one-per-row. No more stranded controls / empty gaps. */
+.cms-grid { display: grid; gap: 12px; }
+.cms-card {
+  display: flex; flex-direction: column; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper); overflow: hidden;
   transition: border-color .12s, box-shadow .12s;
 }
-.cms-block:hover { border-color: var(--line-2); box-shadow: var(--sh-sm); }
-.cms-block.is-hidden { opacity: .62; border-style: dashed; }
-
-.cms-reorder { display: flex; flex-direction: column; gap: 3px; justify-content: center; flex: none; }
-.cms-reorder .icon-btn { width: 26px; height: 22px; }
-
-.cms-block-body { flex: 1; min-width: 0; display: flex; align-items: center; }
-.cms-block-ctrls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; flex: none; }
+.cms-card:hover { border-color: var(--line-2); box-shadow: var(--sh-sm); }
+.cms-card.is-hidden { opacity: .62; border-style: dashed; }
+.cms-card-body { flex: 1; min-width: 0; padding: 16px; display: flex; align-items: center; }
+.cms-card-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 12px; border-top: 1px solid var(--line); background: #ffffff;
+}
+.cms-card-bar .icon-btn { width: 26px; height: 24px; }
+.cms-bar-gap { flex: 1; }
 
 .cms-add-first {
   all: unset; box-sizing: border-box; cursor: pointer; width: 100%; text-align: center;
@@ -305,8 +309,7 @@ body .auth-page .auth-bg { display: none; }
 .cms-chip-btn em { font-style: normal; font-family: var(--font-mono-stack); font-size: .66rem; color: var(--ink-3); }
 
 @media (max-width: 640px) {
-  .cms-block { flex-wrap: wrap; }
-  .cms-block-ctrls { justify-content: flex-start; width: 100%; }
+  .cms-grid { grid-template-columns: 1fr !important; }
 }
 
 /* Faithful hero-slide preview (mirrors the storefront HeroCarousel) — used in
