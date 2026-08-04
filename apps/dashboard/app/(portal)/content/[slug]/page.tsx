@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { BlockForm, KIND_HELP, KIND_LABELS, KIND_TITLES, SURFACE_KINDS } from "@/components/content/BlockForm";
 import { BlockPreview } from "@/components/content/BlockPreview";
+import { HeroSlidePreview } from "@/components/content/HeroSlidePreview";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -246,7 +247,11 @@ export default function ContentEditorPage() {
                         <button className="icon-btn" aria-label="Move down" disabled={i === group.length - 1 || busyId === block.id} onClick={() => reorder(kind, block.id, "down")}>↓</button>
                       </div>
                       <div className="cms-block-body">
-                        <BlockPreview kind={kind} content={block.content} />
+                        {kind === "hero_slide" ? (
+                          <HeroSlidePreview content={block.content} framed={false} />
+                        ) : (
+                          <BlockPreview kind={kind} content={block.content} />
+                        )}
                       </div>
                       <div className="cms-block-ctrls">
                         {!block.is_active && <span className="pill pill-muted">Hidden</span>}

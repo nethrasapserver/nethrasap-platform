@@ -308,3 +308,37 @@ body .auth-page .auth-bg { display: none; }
   .cms-block { flex-wrap: wrap; }
   .cms-block-ctrls { justify-content: flex-start; width: 100%; }
 }
+
+/* Faithful hero-slide preview (mirrors the storefront HeroCarousel) — used in
+   the content list and as the live preview in the hero block editor. */
+.hp-slide {
+  display: grid; grid-template-columns: 1.25fr .75fr; gap: 20px; align-items: center;
+  width: 100%; background: #ffffff; border-radius: var(--r-md);
+}
+.hp-slide.hp-framed { border: 1px solid var(--line); padding: 22px 24px; }
+.hp-copy { display: grid; gap: 10px; min-width: 0; }
+.hp-eyebrow { font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+.hp-title {
+  font-size: clamp(1.15rem, 2.3vw, 1.7rem); font-weight: 800; line-height: 1.15; color: var(--ink);
+  letter-spacing: -.01em;
+}
+.hp-body { margin: 0; color: var(--ink-2); font-size: .9rem; line-height: 1.5; max-width: 52ch; }
+.hp-cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.hp-btn { padding: 8px 16px; border-radius: 999px; font-size: .82rem; font-weight: 650; white-space: nowrap; }
+.hp-btn-primary { background: var(--brand-700); color: var(--cream); }
+.hp-btn-outline { border: 1px solid var(--line-2); color: var(--ink); background: #ffffff; }
+.hp-art { height: 150px; display: grid; place-items: center; opacity: .9; }
+.hp-art svg { width: 82%; height: 100%; }
+.hp-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Live-preview wrapper at the top of the block editor drawer. */
+.cms-live-preview { margin-bottom: 18px; }
+.cms-live-preview > .cms-live-label {
+  display: block; font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--ink-3); margin-bottom: 8px;
+}
+
+@media (max-width: 720px) {
+  .hp-slide { grid-template-columns: 1fr; }
+  .hp-art { display: none; }
+}
