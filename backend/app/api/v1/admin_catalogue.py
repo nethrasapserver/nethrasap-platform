@@ -210,6 +210,15 @@ async def category_image_url(
     return await svc.set_category_image_url(db, actor, category_id, url=payload.url)
 
 
+@router.post("/admin/categories/{category_id}/image/upload", status_code=status.HTTP_201_CREATED)
+async def category_image_upload(
+    category_id: UUID, file: Annotated[UploadFile, File()], db: DbSession, actor: CatalogueAdmin
+) -> dict:
+    """Upload the category tile image THROUGH the api (browser → api → storage)."""
+    data = await file.read()
+    return await svc.upload_category_image(db, actor, category_id, content_type=file.content_type or "", data=data)
+
+
 @router.delete(
     "/admin/categories/{category_id}/image", status_code=status.HTTP_204_NO_CONTENT, response_class=Response
 )

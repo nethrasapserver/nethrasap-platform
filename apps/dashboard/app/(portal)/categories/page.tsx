@@ -9,6 +9,9 @@ import { api } from "@/lib/api";
 import { useToast } from "@/lib/toast";
 import { useApi } from "@/lib/useApi";
 
+const CATEGORY_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+const CATEGORY_IMAGE_ACCEPT = CATEGORY_IMAGE_TYPES.join(",");
+
 interface AdminCategory {
   id: string;
   slug: string;
@@ -271,22 +274,26 @@ function CategoryForm({
 
   async function uploadImage(file: File | null) {
     if (!category || !file) return;
+    if (!CATEGORY_IMAGE_TYPES.includes(file.type)) {
+      const t = file.type.toLowerCase();
+      toast(
+        t.includes("heic") || t.includes("heif") || (!file.type && /\.hei[cf]$/i.test(file.name))
+          ? "HEIC photos can’t be shown by browsers — export the photo as JPG or PNG first."
+          : "That image format isn’t supported. Use JPG, PNG, WebP, GIF or AVIF.",
+        true,
+      );
+      return;
+    }
     setImgBusy(true);
     try {
-      const slot = await api.post<{ upload_url: string; public_url: string }>(
-        `/admin/categories/${category.id}/image`,
-        { content_type: file.type },
-      );
-      const put = await fetch(slot.upload_url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!put.ok) throw new Error("upload failed");
-      setImage(slot.public_url);
+      // Upload THROUGH the api (browser → api → storage). FormData → multipart.
+      const form = new FormData();
+      form.append("file", file);
+      const r = await api.post<{ image_key: string }>(`/admin/categories/${category.id}/image/upload`, form);
+      setImage(r.image_key);
       toast("Image uploaded");
     } catch {
-      toast("Upload failed — storage may not be configured; paste an image URL instead", true);
+      toast("Upload failed — try again, or paste a hosted image URL instead", true);
     } finally {
       setImgBusy(false);
     }
@@ -406,7 +413,7 @@ function CategoryForm({
             <input
               className="input"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept={CATEGORY_IMAGE_ACCEPT}
               disabled={imgBusy}
               onChange={(e) => uploadImage(e.target.files?.[0] ?? null)}
             />

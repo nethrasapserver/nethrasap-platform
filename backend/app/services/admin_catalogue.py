@@ -414,6 +414,26 @@ async def set_category_image_url(db: AsyncSession, actor: User, category_id: uui
     return {"image_key": url}
 
 
+async def upload_category_image(
+    db: AsyncSession, actor: User, category_id: uuid.UUID, *, content_type: str, data: bytes
+) -> dict:
+    """Store a category tile image uploaded through the api and set image_key."""
+    category = await _load_category(db, category_id)
+    if content_type not in storage.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unsupported image type")
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty file")
+    if len(data) > storage.MAX_UPLOAD_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "image too large (max 10 MB)")
+    key = storage.make_key("categories", content_type=content_type, prefix=category.slug)
+    await storage.put_bytes_async(key, data, content_type=content_type)
+    category.image_key = key
+    await _audit(db, actor, "category.image_set", "category", str(category.id), {"key": key, "via": "upload"})
+    await db.commit()
+    await _catalogue_event("category.updated", "category", str(category.id))
+    return {"image_key": storage.image_url(key)}
+
+
 async def clear_category_image(db: AsyncSession, actor: User, category_id: uuid.UUID) -> None:
     category = await _load_category(db, category_id)
     category.image_key = None
