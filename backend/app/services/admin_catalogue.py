@@ -234,7 +234,13 @@ async def update_variant(db: AsyncSession, actor: User, variant_id: uuid.UUID, d
     if variant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "variant not found")
     prices = data.pop("prices", None)
-    for k, v in {k: v for k, v in data.items() if v is not None}.items():
+    # The endpoint sends exclude_unset, so a key present as None was set
+    # deliberately. Allow clearing the nullable columns (barcode, weight_g); for
+    # the non-nullable ones a stray None just means "leave unchanged".
+    nullable = {"barcode", "weight_g"}
+    for k, v in data.items():
+        if v is None and k not in nullable:
+            continue
         setattr(variant, k, v)
     if prices:
         _apply_prices(variant, prices)

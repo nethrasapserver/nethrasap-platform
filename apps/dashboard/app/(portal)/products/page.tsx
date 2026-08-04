@@ -245,7 +245,7 @@ export default function CataloguePage() {
                 <td className="num" onClick={(e) => e.stopPropagation()}>
                   <div className="prod-actions">
                     <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setEdit(p); }}>Edit</button>
-                    <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setPriceFor(p); }}>Prices</button>
+                    <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); setPriceFor(p); }}>Packs & prices</button>
                     <RowMenu
                       isActive={p.is_active}
                       onVariant={() => setVariantFor(p)}
@@ -421,7 +421,7 @@ function ProductForm({
   /* Opening pack size + per-role pricing (create mode only — an existing
      product's tiers are edited in the Prices drawer). Creating the variant
      here is what stops new products landing unpriceable. */
-  const [pack, setPack] = useState({ pack_size: "", unit_label: "" });
+  const [pack, setPack] = useState({ pack_size: "", unit_label: "", barcode: "" });
   const [quoteMode, setQuoteMode] = useState(false);
   const [tiers, setTiers] = useState<Record<Role, PriceRowForm>>({
     customer: { mrp: "", selling: "", rmin: "", rmax: "" },
@@ -672,6 +672,7 @@ function ProductForm({
         await api.post(`/admin/products/${created.id}/variants`, {
           pack_size: pack.pack_size.trim(),
           unit_label: pack.unit_label.trim(),
+          barcode: pack.barcode.trim() || null,
           is_default: true,
           prices: tierPrices(),
         });
@@ -881,6 +882,16 @@ function ProductForm({
           </div>
 
           <div className="field">
+            <label>SKU / barcode <span className="muted">· optional, shows on the product page</span></label>
+            <input
+              className="input"
+              placeholder="e.g. 8901234567890"
+              value={pack.barcode}
+              onChange={(e) => setPack((p) => ({ ...p, barcode: e.target.value }))}
+            />
+          </div>
+
+          <div className="field">
             <label style={{ display: "flex", gap: 9, alignItems: "center", cursor: "pointer" }}>
               <input
                 type="checkbox"
@@ -1068,6 +1079,7 @@ function VariantForm({
   const toast = useToast();
   const [packSize, setPackSize] = useState("");
   const [unitLabel, setUnitLabel] = useState("");
+  const [barcode, setBarcode] = useState("");
   const [isDefault, setIsDefault] = useState(product.variant_count === 0);
   const [mrp, setMrp] = useState("");
   const [selling, setSelling] = useState("");
@@ -1081,6 +1093,7 @@ function VariantForm({
       await api.post(`/admin/products/${product.id}/variants`, {
         pack_size: packSize,
         unit_label: unitLabel,
+        barcode: barcode.trim() || null,
         is_default: isDefault,
         prices: [price],
       });
@@ -1119,6 +1132,10 @@ function VariantForm({
           <label>Unit label</label>
           <input className="input" placeholder="e.g. 10 tablets" value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} />
         </div>
+      </div>
+      <div className="field">
+        <label>SKU / barcode <span className="muted">· optional</span></label>
+        <input className="input" placeholder="e.g. 8901234567890" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
       </div>
       <div className="row">
         <div className="field grow">
@@ -1166,7 +1183,18 @@ interface AdminPriceRow {
 interface AdminVariantRow {
   id: string;
   pack_size: string;
+  unit_label: string;
+  barcode: string | null;
+  is_default: boolean;
   prices: AdminPriceRow[];
+}
+
+/* Editable pack details per variant (edited alongside prices). */
+interface PackForm {
+  pack_size: string;
+  unit_label: string;
+  barcode: string;
+  is_default: boolean;
 }
 interface AdminDetail {
   variants: AdminVariantRow[];
@@ -1186,6 +1214,7 @@ function PriceEditor({
   const toast = useToast();
   const [detail, setDetail] = useState<AdminDetail | null>(null);
   const [forms, setForms] = useState<Record<string, VariantForms>>({});
+  const [packs, setPacks] = useState<Record<string, PackForm>>({});
   const [busy, setBusy] = useState(false);
   // Same fixed/range switch as the create form — set from the saved rows so
   // an existing quote-only product opens in range mode.
@@ -1199,6 +1228,7 @@ function PriceEditor({
       .then((d) => {
         setDetail(d);
         const initial: Record<string, VariantForms> = {};
+        const initPacks: Record<string, PackForm> = {};
         for (const v of d.variants) {
           const form = {} as VariantForms;
           for (const role of ROLES) {
@@ -1211,8 +1241,15 @@ function PriceEditor({
             };
           }
           initial[v.id] = form;
+          initPacks[v.id] = {
+            pack_size: v.pack_size ?? "",
+            unit_label: v.unit_label ?? "",
+            barcode: v.barcode ?? "",
+            is_default: !!v.is_default,
+          };
         }
         setForms(initial);
+        setPacks(initPacks);
         setQuoteMode(
           d.variants.some((v) =>
             (v.prices ?? []).some((p) => p.range_min !== null && p.range_max !== null),
@@ -1225,6 +1262,25 @@ function PriceEditor({
   function setField(vid: string, role: Role, key: keyof PriceRowForm, value: string) {
     setForms((f) => ({ ...f, [vid]: { ...f[vid], [role]: { ...f[vid][role], [key]: value } } }));
   }
+
+  function setPack(vid: string, key: keyof PackForm, value: string | boolean) {
+    setPacks((p) => {
+      // Only one variant can be the default — flip the others off.
+      if (key === "is_default" && value === true) {
+        const next: Record<string, PackForm> = {};
+        for (const [id, pf] of Object.entries(p)) next[id] = { ...pf, is_default: id === vid };
+        return next;
+      }
+      return { ...p, [vid]: { ...p[vid], [key]: value } };
+    });
+  }
+
+  // Every variant needs a pack size and unit label — block save if one is blank.
+  const packGaps: string[] = detail
+    ? detail.variants
+        .filter((v) => !(packs[v.id]?.pack_size.trim() && packs[v.id]?.unit_label.trim()))
+        .map((v) => v.pack_size || "a pack")
+    : [];
 
   /* Tiers with a selling/range price entered but no MRP — filled() would drop
      them silently on save, so flag them and block instead (H-22). */
@@ -1245,6 +1301,10 @@ function PriceEditor({
 
   async function save() {
     if (!detail) return;
+    if (packGaps.length > 0) {
+      toast(`Every pack needs a pack size and unit label — fix ${packGaps.join(", ")}.`, true);
+      return;
+    }
     if (priceGaps.length > 0) {
       toast(`Add an MRP for ${priceGaps.join(", ")} — a price without an MRP isn't saved.`, true);
       return;
@@ -1253,6 +1313,7 @@ function PriceEditor({
     try {
       for (const v of detail.variants) {
         const form = forms[v.id];
+        const pf = packs[v.id];
         // A row counts once it has an MRP plus whatever the chosen mode needs.
         const filled = (r: Role) =>
           toPaise(form[r].mrp) > 0 &&
@@ -1273,9 +1334,15 @@ function PriceEditor({
             range_max: quoteMode ? toPaise(form[r].rmax) : null,
           };
         });
-        await api.patch(`/admin/variants/${v.id}`, { prices });
+        await api.patch(`/admin/variants/${v.id}`, {
+          pack_size: pf.pack_size.trim(),
+          unit_label: pf.unit_label.trim(),
+          barcode: pf.barcode.trim() || null,
+          is_default: pf.is_default,
+          prices,
+        });
       }
-      toast("Prices updated");
+      toast("Pack details & prices updated");
       onDone();
     } catch (e) {
       toast(e instanceof Error && e.message ? e.message : "Could not save prices", true);
@@ -1286,8 +1353,8 @@ function PriceEditor({
   return (
     <Drawer
       wide
-      title="Prices"
-      subtitle={`${product.name} — pricing per pack size, per buyer role.`}
+      title="Packs & prices"
+      subtitle={`${product.name} — pack sizes, SKU, and pricing per buyer role.`}
       onClose={onClose}
       footer={
         <>
@@ -1296,10 +1363,10 @@ function PriceEditor({
           </button>
           <button
             className="btn btn-primary"
-            disabled={busy || !detail || detail.variants.length === 0 || priceGaps.length > 0}
+            disabled={busy || !detail || detail.variants.length === 0 || priceGaps.length > 0 || packGaps.length > 0}
             onClick={save}
           >
-            {busy ? "Saving…" : "Save prices"}
+            {busy ? "Saving…" : "Save changes"}
           </button>
         </>
       }
@@ -1347,8 +1414,46 @@ function PriceEditor({
           )}
 
           {detail.variants.map((v) => (
-            <section key={v.id}>
-              <h4 style={{ margin: "0 0 10px" }}>{v.pack_size}</h4>
+            <section key={v.id} style={{ border: "1px solid var(--line)", borderRadius: "var(--r-md)", padding: 16 }}>
+              <div className="row" style={{ gap: 12 }}>
+                <div className="field grow" style={{ margin: 0 }}>
+                  <label>Pack size</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. Strip of 10"
+                    value={packs[v.id]?.pack_size ?? ""}
+                    onChange={(e) => setPack(v.id, "pack_size", e.target.value)}
+                  />
+                </div>
+                <div className="field grow" style={{ margin: 0 }}>
+                  <label>Unit label</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. 10 tablets"
+                    value={packs[v.id]?.unit_label ?? ""}
+                    onChange={(e) => setPack(v.id, "unit_label", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="row" style={{ gap: 12, margin: "10px 0 4px", alignItems: "center" }}>
+                <div className="field grow" style={{ margin: 0 }}>
+                  <label>SKU / barcode <span className="muted">· optional</span></label>
+                  <input
+                    className="input"
+                    placeholder="e.g. 8901234567890"
+                    value={packs[v.id]?.barcode ?? ""}
+                    onChange={(e) => setPack(v.id, "barcode", e.target.value)}
+                  />
+                </div>
+                <label className="field" style={{ margin: 0, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", alignSelf: "flex-end", paddingBottom: 10, whiteSpace: "nowrap" }}>
+                  <input
+                    type="checkbox"
+                    checked={packs[v.id]?.is_default ?? false}
+                    onChange={(e) => setPack(v.id, "is_default", e.target.checked)}
+                  />
+                  Default pack
+                </label>
+              </div>
               <table className="tbl">
                 <thead>
                   <tr>
@@ -1428,7 +1533,7 @@ function ProductViewDrawer({
           <button className="btn btn-outline" onClick={onToggle}>
             {product.is_active ? "Unpublish" : "Publish"}
           </button>
-          <button className="btn btn-outline" onClick={onPrices}>Prices</button>
+          <button className="btn btn-outline" onClick={onPrices}>Packs & prices</button>
           <button className="btn btn-primary" onClick={onEdit}>Edit</button>
         </>
       }
