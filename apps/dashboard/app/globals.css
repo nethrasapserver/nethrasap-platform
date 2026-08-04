@@ -226,3 +226,85 @@ body { font-size: 14px; }
 body .auth-page { background: #ffffff; }
 body .auth-page::before { background-image: none; }
 body .auth-page .auth-bg { display: none; }
+
+/* ============================================================================
+   Storefront Content editor — visual page outline (/content/[slug])
+   ============================================================================ */
+.cms-outline { display: grid; gap: 16px; }
+.cms-section {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 16px 18px;
+}
+.cms-section-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line);
+}
+.cms-section-title {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 700; color: var(--ink);
+}
+.cms-count {
+  display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--brand-50); color: var(--brand-700);
+  font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.cms-section-help { margin: 4px 0 0; color: var(--ink-3); font-size: .8rem; line-height: 1.45; }
+
+.cms-blocks { display: grid; gap: 10px; }
+.cms-block {
+  display: flex; gap: 12px; align-items: stretch;
+  padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper);
+  transition: border-color .12s, box-shadow .12s;
+}
+.cms-block:hover { border-color: var(--line-2); box-shadow: var(--sh-sm); }
+.cms-block.is-hidden { opacity: .62; border-style: dashed; }
+
+.cms-reorder { display: flex; flex-direction: column; gap: 3px; justify-content: center; flex: none; }
+.cms-reorder .icon-btn { width: 26px; height: 22px; }
+
+.cms-block-body { flex: 1; min-width: 0; display: flex; align-items: center; }
+.cms-block-ctrls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; flex: none; }
+
+.cms-add-first {
+  all: unset; box-sizing: border-box; cursor: pointer; width: 100%; text-align: center;
+  padding: 14px; border: 1px dashed var(--line-2); border-radius: var(--r-md);
+  color: var(--ink-3); font-size: .86rem; font-weight: 600; transition: border-color .12s, color .12s, background .12s;
+}
+.cms-add-first:hover { border-color: var(--brand-600); color: var(--brand-700); background: var(--brand-50); }
+.cms-empty { padding: 16px 4px; color: var(--ink-3); font-size: .85rem; }
+
+/* Block preview (mirrors the live content) */
+.cms-prev { display: flex; gap: 12px; align-items: flex-start; min-width: 0; width: 100%; }
+.cms-prev-thumb, .cms-prev-swatch, .cms-prev-glyph {
+  flex: none; width: 52px; height: 52px; border-radius: var(--r-md); border: 1px solid var(--line); overflow: hidden;
+}
+.cms-prev-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cms-prev-glyph {
+  display: grid; place-items: center; background: var(--brand-50); color: var(--brand-700);
+  font-weight: 700; font-size: .95rem;
+}
+.cms-prev-body { min-width: 0; flex: 1; display: grid; gap: 3px; }
+.cms-prev-eyebrow {
+  font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--brand-700);
+}
+.cms-prev-title {
+  font-weight: 650; color: var(--ink); font-size: .92rem; line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cms-prev-sub {
+  margin: 0; color: var(--ink-3); font-size: .8rem; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cms-prev-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+.cms-chip {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 240px;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--paper-3); color: var(--ink-2); font-size: .72rem; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.cms-chip-btn { background: var(--brand-50); border-color: transparent; color: var(--brand-700); font-weight: 600; }
+.cms-chip-btn em { font-style: normal; font-family: var(--font-mono-stack); font-size: .66rem; color: var(--ink-3); }
+
+@media (max-width: 640px) {
+  .cms-block { flex-wrap: wrap; }
+  .cms-block-ctrls { justify-content: flex-start; width: 100%; }
+}

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { BlockForm, KIND_LABELS, KIND_TITLES, SURFACE_KINDS, blockSummary } from "@/components/content/BlockForm";
+import { BlockForm, KIND_HELP, KIND_LABELS, KIND_TITLES, SURFACE_KINDS } from "@/components/content/BlockForm";
+import { BlockPreview } from "@/components/content/BlockPreview";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -201,94 +202,70 @@ export default function ContentEditorPage() {
         <span className="muted small">{page.blocks.length} blocks</span>
       </div>
 
-      <div style={{ display: "grid", gap: 20 }}>
+      <p className="muted small" style={{ marginTop: -6, marginBottom: 18 }}>
+        Each section below is a part of the live {surface?.title ?? "page"}. Add, edit, reorder, hide or delete
+        its blocks — previews show roughly how they read on the site.
+      </p>
+
+      <div className="cms-outline">
         {kinds.map((kind) => {
           const group = blocksOfKind(page, kind);
           const known = knownKinds.includes(kind);
+          const label = (KIND_LABELS[kind] ?? kind).toLowerCase();
           return (
-            <section className="card" key={kind}>
-              <div className="row spread" style={{ alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
-                <div>
-                  <strong>{KIND_TITLES[kind] ?? kind}</strong>{" "}
-                  <span className="muted small">· {group.length}</span>
+            <section className="cms-section" key={kind}>
+              <div className="cms-section-head">
+                <div style={{ minWidth: 0 }}>
+                  <div className="cms-section-title">
+                    {KIND_TITLES[kind] ?? kind}
+                    <span className="cms-count">{group.length}</span>
+                  </div>
+                  {KIND_HELP[kind] && <p className="cms-section-help">{KIND_HELP[kind]}</p>}
                 </div>
                 {known && (
-                  <button
-                    className="btn btn-outline btn-sm"
-                    onClick={() => setForm({ kind, defaultSortOrder: group.length })}
-                  >
-                    + Add {(KIND_LABELS[kind] ?? kind).toLowerCase()}
+                  <button className="btn btn-primary btn-sm" onClick={() => setForm({ kind, defaultSortOrder: group.length })}>
+                    + Add {label}
                   </button>
                 )}
               </div>
 
               {group.length === 0 ? (
-                <div className="empty" style={{ padding: "20px 16px", color: "var(--muted)" }}>
-                  No {(KIND_TITLES[kind] ?? kind).toLowerCase()} yet.
-                </div>
+                known ? (
+                  <button className="cms-add-first" onClick={() => setForm({ kind, defaultSortOrder: 0 })}>
+                    + Add the first {label}
+                  </button>
+                ) : (
+                  <div className="cms-empty">No {(KIND_TITLES[kind] ?? kind).toLowerCase()} yet.</div>
+                )
               ) : (
-                <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                <div className="cms-blocks">
                   {group.map((block, i) => (
-                    <li
-                      key={block.id}
-                      className="row spread"
-                      style={{
-                        gap: 8,
-                        alignItems: "center",
-                        padding: "10px 16px",
-                        borderTop: i === 0 ? undefined : "1px solid var(--line)",
-                        opacity: block.is_active ? undefined : 0.55,
-                      }}
-                    >
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {blockSummary(kind, block.content)}
-                        </div>
-                        <span className={`pill ${block.is_active ? "pill-ok" : "pill-muted"}`}>
-                          {block.is_active ? "Live" : "Hidden"}
-                        </span>
+                    <div className={`cms-block ${block.is_active ? "" : "is-hidden"}`} key={block.id}>
+                      <div className="cms-reorder">
+                        <button className="icon-btn" aria-label="Move up" disabled={i === 0 || busyId === block.id} onClick={() => reorder(kind, block.id, "up")}>↑</button>
+                        <button className="icon-btn" aria-label="Move down" disabled={i === group.length - 1 || busyId === block.id} onClick={() => reorder(kind, block.id, "down")}>↓</button>
                       </div>
-                      <div className="row" style={{ gap: 4, whiteSpace: "nowrap", alignItems: "center" }}>
-                        <button
-                          className="icon-btn"
-                          aria-label="Move up"
-                          disabled={i === 0 || busyId === block.id}
-                          onClick={() => reorder(kind, block.id, "up")}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          className="icon-btn"
-                          aria-label="Move down"
-                          disabled={i === group.length - 1 || busyId === block.id}
-                          onClick={() => reorder(kind, block.id, "down")}
-                        >
-                          ↓
-                        </button>
-                        <button className="btn btn-outline btn-sm" onClick={() => setForm({ kind, block, defaultSortOrder: group.length })}>
-                          Edit
-                        </button>
+                      <div className="cms-block-body">
+                        <BlockPreview kind={kind} content={block.content} />
+                      </div>
+                      <div className="cms-block-ctrls">
+                        {!block.is_active && <span className="pill pill-muted">Hidden</span>}
+                        <button className="btn btn-outline btn-sm" onClick={() => setForm({ kind, block, defaultSortOrder: group.length })}>Edit</button>
                         <button className="btn btn-ghost btn-sm" disabled={busyId === block.id} onClick={() => toggleActive(block)}>
                           {block.is_active ? "Hide" : "Publish"}
                         </button>
                         {confirmDelete === block.id ? (
                           <>
-                            <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} disabled={busyId === block.id} onClick={() => removeBlock(block)}>
-                              Confirm
-                            </button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(null)}>
-                              Cancel
-                            </button>
+                            <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} disabled={busyId === block.id} onClick={() => removeBlock(block)}>Confirm</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(null)}>Cancel</button>
                           </>
                         ) : (
-                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => setConfirmDelete(block.id)}>
-                            Delete
-                          </button>
+                          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => setConfirmDelete(block.id)}>Delete</button>
                         )}
                       </div>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </section>
           );

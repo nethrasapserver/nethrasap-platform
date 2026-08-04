@@ -207,6 +207,33 @@ export const KIND_TITLES: Record<string, string> = {
   pdp_trust_badge: "PDP trust badges",
 };
 
+/** Plain-language description of what each section controls on the live site.
+    Shown under the section title so editors know what they're changing. */
+export const KIND_HELP: Record<string, string> = {
+  hero_slide: "The big rotating banners at the top of the home page.",
+  section_heading: "A title that sits above a section, with an optional link.",
+  section_intro: "Intro copy that introduces a section of the home page.",
+  trust_badge: "The reassurance strip under the hero — icon plus a short line.",
+  buyer_card: "The “who buys on Nethrasap” cards.",
+  flow_step: "Numbered steps in the “how it works” flow.",
+  faq_item: "Questions and answers in the FAQ.",
+  cta_band: "The call-to-action band near the bottom of the page.",
+  about_hero: "The header at the top of the About page.",
+  stat: "Headline numbers, e.g. “12k+ orders”.",
+  story_para: "Paragraphs of the company story.",
+  principle: "The values / principles cards.",
+  founder: "Team and founder profiles.",
+  location: "The cities you operate in.",
+  cert: "Certifications and compliance chips.",
+  announcement: "The thin bar at the very top of every page.",
+  header_nav: "Links in the main navigation bar.",
+  trending: "“Trending” search suggestions.",
+  footer_blurb: "The short paragraph in the footer.",
+  footer_column: "A column of links in the footer.",
+  footer_legal: "The legal line at the bottom of the footer.",
+  pdp_trust_badge: "Trust badges shown on every product page.",
+};
+
 export type LinkRow = { label: string; href: string };
 
 /** A fresh, empty content object for a new block of this kind. */
