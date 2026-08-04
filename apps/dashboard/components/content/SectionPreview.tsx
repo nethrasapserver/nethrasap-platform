@@ -11,6 +11,31 @@ import { HeroSlidePreview } from "./HeroSlidePreview";
 const st = (c: Record<string, unknown>, k: string) => (typeof c[k] === "string" ? (c[k] as string).trim() : "");
 const list = (c: Record<string, unknown>, k: string) => (Array.isArray(c[k]) ? (c[k] as unknown[]) : []);
 
+/* Friendly names for section_heading / section_intro slots, so each block says
+   which part of the live page it controls instead of a generic "Section intro". */
+const SLOT_LABELS: Record<string, string> = {
+  // home
+  category: "Home · Category heading",
+  featured: "Home · Featured heading",
+  buyers: "Home · Buyer-cards heading",
+  about: "Home · About intro",
+  faq: "Home · FAQ intro",
+  // about
+  story: "About · Our story",
+  operate: "About · How we operate",
+  founders: "About · The founders",
+  network: "About · Where we operate",
+  network_foot: "About · Registered-office line",
+  compliance: "About · Compliance note",
+  principles: "About · “What we stand for”",
+};
+
+function SlotBadge({ content }: { content: Record<string, unknown> }) {
+  const slot = st(content, "slot");
+  if (!slot) return null;
+  return <span className="sp-slot">📍 {SLOT_LABELS[slot] ?? slot}</span>;
+}
+
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
   if (!d) return <span className="sp-ic-dot" />;
   return (
@@ -37,18 +62,24 @@ function Body({ kind, content }: { kind: string; content: Record<string, unknown
 
     case "section_heading":
       return (
-        <div className="sp-secheading">
-          <span className="sp-h">{st(c, "heading") || "Section heading"}</span>
-          {st(c, "link_label") && <span className="sp-link">{st(c, "link_label")} →</span>}
+        <div className="sp-slotted">
+          <SlotBadge content={c} />
+          <div className="sp-secheading">
+            <span className="sp-h">{st(c, "heading") || "Section heading"}</span>
+            {st(c, "link_label") && <span className="sp-link">{st(c, "link_label")} →</span>}
+          </div>
         </div>
       );
 
     case "section_intro":
       return (
-        <div className="sp-intro">
-          {st(c, "eyebrow") && <span className="sp-eyebrow">{st(c, "eyebrow")}</span>}
-          <span className="sp-h">{st(c, "heading") || "Section intro"}</span>
-          {st(c, "body") && <p className="sp-body">{st(c, "body")}</p>}
+        <div className="sp-slotted">
+          <SlotBadge content={c} />
+          <div className="sp-intro">
+            {st(c, "eyebrow") && <span className="sp-eyebrow">{st(c, "eyebrow")}</span>}
+            <span className="sp-h">{st(c, "heading") || "Section intro"}</span>
+            {st(c, "body") && <p className="sp-body">{st(c, "body")}</p>}
+          </div>
         </div>
       );
 

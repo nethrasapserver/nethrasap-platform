@@ -486,3 +486,12 @@ body .auth-page .auth-bg { display: none; }
   .cms-toc { position: static; }
   .cms-toc-list { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; max-height: none; }
 }
+
+/* Slot badge — tells the editor which part of the live page a section_heading /
+   section_intro block controls (SectionPreview SlotBadge). */
+.sp-slotted { display: grid; gap: 10px; width: 100%; }
+.sp-slot {
+  justify-self: start; display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 11px; border-radius: 999px; background: var(--brand-700); color: var(--cream);
+  font-size: .72rem; font-weight: 700; letter-spacing: .01em; white-space: nowrap;
+}
