@@ -7,6 +7,7 @@ import {
   blocksOf,
   firstBlock,
   getPage,
+  siteLogo,
   str,
   type FooterColumn,
   type FooterLink,
@@ -51,12 +52,22 @@ export async function DynamicFooter() {
     .filter((c): c is FooterColumn => c !== null);
   const columns = cmsColumns.length > 0 ? cmsColumns : DEFAULT_FOOTER_COLUMNS;
 
+  const logo = siteLogo(page);
+
   return (
     <footer className="footer">
       <div className="container">
         <div style={{ maxWidth: 280 }}>
           <div className="logo" style={{ marginBottom: 8 }}>
-            Nethra<span>sap</span>
+            {logo.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="logo-img" src={logo.image} alt={`${logo.text}${logo.accent}`} />
+            ) : (
+              <>
+                {logo.text}
+                {logo.accent && <span>{logo.accent}</span>}
+              </>
+            )}
           </div>
           <p className="small">{blurb}</p>
         </div>

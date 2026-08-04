@@ -200,8 +200,9 @@ textarea.input { height: auto; padding: 12px 14px; }
   border-bottom: 1px solid var(--line);
 }
 .header .container { display: flex; align-items: center; gap: var(--sp-4); height: 68px; }
-.logo { font-weight: 800; font-size: 1.3rem; color: var(--brand-800); letter-spacing: -.03em; flex: none; }
+.logo { font-weight: 800; font-size: 1.3rem; color: var(--brand-800); letter-spacing: -.03em; flex: none; display: inline-flex; align-items: center; }
 .logo span { color: var(--brand-500); }
+.logo-img { display: block; height: 34px; width: auto; max-width: 190px; object-fit: contain; }
 
 /* Browse destinations — text. Account/cart actions — icons (see .header-actions). */
 .nav-links { display: flex; gap: var(--sp-5); flex: none; margin-left: auto; }

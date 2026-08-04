@@ -236,10 +236,12 @@ export function Header({
   nav,
   trending,
   searchPlaceholder = "Search medicines, devices…",
+  logo,
 }: {
   nav?: NavLink[];
   trending?: string[];
   searchPlaceholder?: string;
+  logo?: { image?: string; text?: string; accent?: string };
 }) {
   const headerNav = nav && nav.length ? nav : DEFAULT_HEADER_NAV;
   const { user } = useAuth();
@@ -263,8 +265,16 @@ export function Header({
   return (
     <header className="header">
       <div className="container">
-        <Link href="/" className="logo">
-          Nethra<span>sap</span>
+        <Link href="/" className="logo" aria-label={`${logo?.text ?? "Nethra"}${logo?.accent ?? "sap"}`}>
+          {logo?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="logo-img" src={logo.image} alt={`${logo?.text ?? "Nethra"}${logo?.accent ?? "sap"}`} />
+          ) : (
+            <>
+              {logo?.text ?? "Nethra"}
+              {(logo?.accent ?? "sap") && <span>{logo?.accent ?? "sap"}</span>}
+            </>
+          )}
         </Link>
 
         <button type="button" className="search-pill hide-sm" onClick={() => setSearchOpen(true)} aria-label="Search products">

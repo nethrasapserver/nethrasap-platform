@@ -299,6 +299,22 @@ function Body({ kind, content }: { kind: string; content: Record<string, unknown
         </div>
       );
 
+    case "site_logo":
+      return (
+        <div className="sp-logobar">
+          {st(c, "image") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="sp-logo-img" src={st(c, "image")} alt="Logo" />
+          ) : (
+            <span className="sp-logo-word">
+              {st(c, "text") || "Nethra"}
+              <span className="sp-logo-accent">{st(c, "accent") || "sap"}</span>
+            </span>
+          )}
+          <span className="sp-logo-hint">Site header logo</span>
+        </div>
+      );
+
     case "pdp_trust_badge":
       return (
         <div className="sp-pdpbadge">

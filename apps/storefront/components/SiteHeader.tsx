@@ -1,4 +1,4 @@
-import { arr, blocksOf, getPage, siteText, str } from "@/lib/content";
+import { arr, blocksOf, getPage, siteLogo, siteText, str } from "@/lib/content";
 import { Header } from "./Shell";
 
 /* Server wrapper: reads the global CMS page and feeds the (client) Header its
@@ -36,6 +36,7 @@ export async function SiteHeader() {
       nav={nav.length ? nav : undefined}
       trending={trending.length ? trending : undefined}
       searchPlaceholder={siteText(page, "search_placeholder")}
+      logo={siteLogo(page)}
     />
   );
 }

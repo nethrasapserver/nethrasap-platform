@@ -121,6 +121,23 @@ export function siteText(page: CmsPage, slot: string): string {
   return str(bySlot(page, "site_text", slot)?.content, "value") ?? SITE_TEXT[slot] ?? "";
 }
 
+/** Header/footer logo — an uploaded image, or a two-part wordmark (the accent
+    part renders in the brand colour). Editable via the global `site_logo` block. */
+export interface SiteLogo {
+  image?: string;
+  text: string;
+  accent: string;
+}
+
+export function siteLogo(page: CmsPage): SiteLogo {
+  const c = firstBlock(page, "site_logo")?.content;
+  return {
+    image: str(c, "image"),
+    text: str(c, "text") ?? "Nethra",
+    accent: str(c, "accent") ?? "sap",
+  };
+}
+
 /* ==========================================================================
    DEFAULTS — mirror the previously-hardcoded arrays verbatim. Every dynamic
    section degrades to these when the matching CMS page/block is absent, so the

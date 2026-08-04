@@ -160,6 +160,22 @@ export const FIELDS: Record<string, FieldDef[]> = {
     },
     { key: "value", label: "Text", type: "textarea", required: true },
   ],
+  site_logo: [
+    {
+      key: "image",
+      label: "Logo image",
+      type: "image",
+      help: "Upload a logo (PNG/SVG-as-PNG/WebP). When set, it replaces the wordmark text in the header. Leave empty to use the text below.",
+    },
+    { key: "text", label: "Wordmark text", type: "text", placeholder: "Nethra", help: "Shown when no logo image is set." },
+    {
+      key: "accent",
+      label: "Accent part",
+      type: "text",
+      placeholder: "sap",
+      help: "The trailing part of the wordmark, shown in the brand colour (e.g. the “sap” of “Nethrasap”). Leave empty for a single-colour wordmark.",
+    },
+  ],
 };
 
 /** Kinds that belong to each surface, in the order they should be grouped. */
@@ -176,7 +192,7 @@ export const SURFACE_KINDS: Record<string, string[]> = {
     "site_text",
   ],
   about: ["about_hero", "section_intro", "section_heading", "stat", "story_para", "principle", "flow_step", "founder", "location", "cert", "cta_band"],
-  global: ["announcement", "header_nav", "trending", "footer_blurb", "footer_column", "footer_legal", "pdp_trust_badge", "site_text"],
+  global: ["site_logo", "announcement", "header_nav", "trending", "footer_blurb", "footer_column", "footer_legal", "pdp_trust_badge", "site_text"],
 };
 
 /** Singular label — used on Add/Edit buttons and drawer titles. */
@@ -204,6 +220,7 @@ export const KIND_LABELS: Record<string, string> = {
   footer_legal: "Footer legal",
   pdp_trust_badge: "PDP trust badge",
   site_text: "Site text",
+  site_logo: "Logo",
 };
 
 /** Plural label — used for group headings. */
@@ -231,6 +248,7 @@ export const KIND_TITLES: Record<string, string> = {
   footer_legal: "Footer legal",
   pdp_trust_badge: "PDP trust badges",
   site_text: "Site text",
+  site_logo: "Logo",
 };
 
 /** Plain-language description of what each section controls on the live site.
@@ -259,6 +277,7 @@ export const KIND_HELP: Record<string, string> = {
   footer_legal: "The legal line at the bottom of the footer.",
   pdp_trust_badge: "Trust badges shown on every product page.",
   site_text: "Reusable text across the site — search box, shipping/tax lines, category page, SEO title, home footer buttons — keyed by slot.",
+  site_logo: "The brand logo in the site header — upload a logo image, or set the wordmark text and its coloured accent part.",
 };
 
 export type LinkRow = { label: string; href: string };

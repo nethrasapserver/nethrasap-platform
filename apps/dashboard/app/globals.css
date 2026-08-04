@@ -435,6 +435,13 @@ body .auth-page .auth-bg { display: none; }
 /* pdp_trust_badge */
 .sp-pdpbadge { display: grid; gap: 8px; justify-items: center; text-align: center; border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; background: #fff; max-width: 160px; }
 
+/* Logo preview — mirrors the storefront header wordmark. */
+.sp-logobar { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 18px; background: #fff; }
+.sp-logo-word { font-weight: 800; font-size: 1.3rem; letter-spacing: -.03em; color: var(--brand-800, #2f3d1f); }
+.sp-logo-accent { color: var(--brand-500, #6f8f3a); }
+.sp-logo-img { height: 34px; width: auto; max-width: 190px; object-fit: contain; display: block; }
+.sp-logo-hint { font-size: .78rem; color: var(--muted); }
+
 /* ============================================================================
    Content editor page chrome — hero header + sticky section navigator
    ============================================================================ */
