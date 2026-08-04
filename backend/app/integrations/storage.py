@@ -40,7 +40,10 @@ _EXT_BY_CONTENT_TYPE = {
 }
 
 ALLOWED_DOCUMENT_TYPES = ("application/pdf", "image/jpeg", "image/png")
-ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp")
+# Browser-renderable image formats (an <img> can display all of these). HEIC is
+# deliberately excluded — Chrome/Firefox can't render it, so it would upload but
+# show broken; the dashboard tells users to export HEIC as JPG/PNG instead.
+ALLOWED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif", "image/avif")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 

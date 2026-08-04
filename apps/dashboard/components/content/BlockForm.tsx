@@ -51,6 +51,11 @@ const CTA_BAND: FieldDef[] = [
   { key: "secondary_href", label: "Secondary button link", type: "text" },
 ];
 
+/** Browser-renderable image formats the uploader accepts (mirrors the backend
+    storage.ALLOWED_IMAGE_TYPES). HEIC is intentionally absent — see uploadImage. */
+const IMAGE_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+const IMAGE_ACCEPT = IMAGE_UPLOAD_TYPES.join(",");
+
 /** Per-kind field shapes. Client-side contract for the free-JSON `content`. */
 export const FIELDS: Record<string, FieldDef[]> = {
   // --- home ---
@@ -334,6 +339,19 @@ export function BlockForm({
 
   async function uploadImage(key: string, file: File | null) {
     if (!file) return;
+    // Validate the format up front so the message is accurate (the backend only
+    // accepts browser-renderable images; HEIC — the default Mac/iPhone photo
+    // format — can't be shown by browsers).
+    if (!IMAGE_UPLOAD_TYPES.includes(file.type)) {
+      const t = file.type.toLowerCase();
+      toast(
+        t.includes("heic") || t.includes("heif") || (!file.type && /\.hei[cf]$/i.test(file.name))
+          ? "HEIC photos can’t be shown by browsers — open the photo and export/save it as JPG or PNG, then upload that."
+          : "That image format isn’t supported. Use JPG, PNG, WebP, GIF or AVIF.",
+        true,
+      );
+      return;
+    }
     setImgBusy(true);
     try {
       const slot = await api.post<{ upload_url: string; public_url: string }>("/admin/cms/uploads", {
@@ -348,7 +366,7 @@ export function BlockForm({
       set(key, slot.public_url);
       toast("Image uploaded");
     } catch {
-      toast("Upload failed — storage may not be configured; paste an image URL instead", true);
+      toast("Upload failed — try again, or paste a hosted image URL instead", true);
     } finally {
       setImgBusy(false);
     }
@@ -521,7 +539,7 @@ function ImageField({
       <input
         className="input"
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={IMAGE_ACCEPT}
         disabled={busy}
         onChange={(e) => onFile(e.target.files?.[0] ?? null)}
       />

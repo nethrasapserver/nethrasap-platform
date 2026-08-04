@@ -36,7 +36,8 @@ type ImageSlot = { image_id: string; storage_key: string; upload_url: string; pu
    page shows the primary as the main image plus a row of thumbnail tiles. Keep
    these in sync so the dashboard never lets staff add images the PDP won't show. */
 const MAX_IMAGES = 3;
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+const IMAGE_ACCEPT = IMAGE_TYPES.join(",");
 
 /* The PDP shows the description as one short paragraph in the buy card. */
 const DESCRIPTION_MAX_WORDS = 100;
@@ -473,7 +474,15 @@ function ProductForm({
   async function uploadFile(file: File | null) {
     if (!file) return;
     if (atLimit) return toast(`Up to ${MAX_IMAGES} images per product`, true);
-    if (!IMAGE_TYPES.includes(file.type)) return toast("Use a JPG, PNG or WebP image", true);
+    if (!IMAGE_TYPES.includes(file.type)) {
+      const t = file.type.toLowerCase();
+      return toast(
+        t.includes("heic") || t.includes("heif") || (!file.type && /\.hei[cf]$/i.test(file.name))
+          ? "HEIC photos can’t be shown by browsers — export the photo as JPG or PNG first."
+          : "That image format isn’t supported. Use JPG, PNG, WebP, GIF or AVIF.",
+        true,
+      );
+    }
     const makePrimary = images.length === 0;
     if (editing && product) {
       setImgBusy(true);
@@ -714,7 +723,7 @@ function ProductForm({
                       <label key={`slot-${i}`} className={`img-cell is-empty ${imgBusy ? "is-busy" : ""}`} title="Upload an image">
                         <input
                           type="file"
-                          accept="image/jpeg,image/png,image/webp"
+                          accept={IMAGE_ACCEPT}
                           hidden
                           disabled={imgBusy}
                           onChange={(e) => { void uploadFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
@@ -745,7 +754,7 @@ function ProductForm({
             {imgBusy ? "Uploading…" : "Upload image"}
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept={IMAGE_ACCEPT}
               hidden
               disabled={imgBusy || atLimit}
               onChange={(e) => { void uploadFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
