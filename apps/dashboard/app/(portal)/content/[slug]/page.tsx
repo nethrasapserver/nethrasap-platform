@@ -38,6 +38,14 @@ export default function ContentEditorPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [activeKind, setActiveKind] = useState<string | null>(null);
+
+  function jumpTo(kind: string) {
+    setActiveKind(kind);
+    if (typeof document !== "undefined") {
+      document.getElementById(`sec-${kind}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
 
   const storefrontBase = process.env.NEXT_PUBLIC_STOREFRONT_URL || "http://localhost:3000";
 
@@ -180,40 +188,61 @@ export default function ContentEditorPage() {
   const kinds = [...knownKinds, ...extraKinds];
 
   return (
-    <div>
-      <Head slug={slug} title={surface?.title ?? page.title}>
-        <a
-          className="btn btn-ghost btn-sm"
-          href={`${storefrontBase}${surface?.storefront ?? "/"}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          View storefront →
-        </a>
-        <button className="btn btn-outline btn-sm" onClick={togglePublished} disabled={busyId === "__page"}>
-          {page.is_published ? "Unpublish surface" : "Publish surface"}
-        </button>
-      </Head>
-
-      <div className="row" style={{ gap: 8, marginBottom: 14 }}>
-        <span className={`pill ${page.is_published ? "pill-ok" : "pill-muted"}`}>
-          {page.is_published ? "Published" : "Draft"}
-        </span>
-        <span className="muted small">{page.blocks.length} blocks</span>
+    <div className="cms-editor-page">
+      <div className="cms-hero">
+        <div className="cms-hero-main">
+          <Link href="/content" className="cms-back">← Storefront Content</Link>
+          <h1 className="cms-hero-title">{surface?.title ?? page.title}</h1>
+          <div className="cms-hero-meta">
+            <span className={`pill ${page.is_published ? "pill-ok" : "pill-muted"}`}>
+              {page.is_published ? "Published" : "Draft"}
+            </span>
+            <span className="cms-dot">·</span>
+            <span className="muted small">{page.blocks.length} blocks</span>
+            <span className="cms-dot">·</span>
+            <span className="muted small mono">/{slug}</span>
+          </div>
+        </div>
+        <div className="cms-hero-actions">
+          <a
+            className="btn btn-ghost btn-sm"
+            href={`${storefrontBase}${surface?.storefront ?? "/"}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View storefront →
+          </a>
+          <button className="btn btn-outline btn-sm" onClick={togglePublished} disabled={busyId === "__page"}>
+            {page.is_published ? "Unpublish surface" : "Publish surface"}
+          </button>
+        </div>
       </div>
 
-      <p className="muted small" style={{ marginTop: -6, marginBottom: 18 }}>
-        Each section below is a part of the live {surface?.title ?? "page"}. Add, edit, reorder, hide or delete
-        its blocks — previews show roughly how they read on the site.
-      </p>
+      <div className="cms-editor">
+        <aside className="cms-toc">
+          <div className="cms-toc-lab">Sections</div>
+          <div className="cms-toc-list">
+            {kinds.map((kind) => (
+              <button
+                key={kind}
+                className={`cms-toc-item ${activeKind === kind ? "on" : ""}`}
+                onClick={() => jumpTo(kind)}
+              >
+                <span className="cms-toc-name">{KIND_TITLES[kind] ?? kind}</span>
+                <span className="cms-toc-count">{blocksOfKind(page, kind).length}</span>
+              </button>
+            ))}
+          </div>
+        </aside>
 
-      <div className="cms-outline">
+        <div className="cms-main">
+          <div className="cms-outline">
         {kinds.map((kind) => {
           const group = blocksOfKind(page, kind);
           const known = knownKinds.includes(kind);
           const label = (KIND_LABELS[kind] ?? kind).toLowerCase();
           return (
-            <section className="cms-section" key={kind}>
+            <section className="cms-section" id={`sec-${kind}`} key={kind}>
               <div className="cms-section-head">
                 <div style={{ minWidth: 0 }}>
                   <div className="cms-section-title">
@@ -270,7 +299,9 @@ export default function ContentEditorPage() {
             </section>
           );
         })}
-        {kinds.length === 0 && <EmptyCard>This surface has no editable block types.</EmptyCard>}
+            {kinds.length === 0 && <EmptyCard>This surface has no editable block types.</EmptyCard>}
+          </div>
+        </div>
       </div>
 
       {form && (
