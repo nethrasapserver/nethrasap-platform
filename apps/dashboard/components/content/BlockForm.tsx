@@ -6,7 +6,7 @@ import { Drawer } from "@/components/Drawer";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { useToast } from "@/lib/toast";
-import { HeroSlidePreview } from "./HeroSlidePreview";
+import { SectionPreview } from "./SectionPreview";
 
 // --- Field registry ----------------------------------------------------------
 
@@ -393,12 +393,10 @@ export function BlockForm({
         </>
       }
     >
-      {kind === "hero_slide" && (
-        <div className="cms-live-preview">
-          <span className="cms-live-label">Live preview — how this slide looks on the site</span>
-          <HeroSlidePreview content={content} />
-        </div>
-      )}
+      <div className="cms-live-preview">
+        <span className="cms-live-label">Live preview — how this looks on the site</span>
+        <SectionPreview kind={kind} content={content} framed />
+      </div>
       {fields.map((f) => {
         const err = showErrors ? errorFor(f) : null;
         return (
