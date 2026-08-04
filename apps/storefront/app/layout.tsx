@@ -7,17 +7,20 @@ import { ChatBot } from "@/components/ChatBot";
 import { DynamicFooter } from "@/components/DynamicFooter";
 import { BottomNav, FloatingCartBar, StaffBanner } from "@/components/Shell";
 import { SiteHeader } from "@/components/SiteHeader";
+import { getPage, siteText } from "@/lib/content";
 import { sans } from "./fonts";
 import Providers from "./providers";
 
-export const metadata: Metadata = {
-  title: {
-    default: "Nethrasap — India's audited healthcare supply platform",
-    template: "%s | Nethrasap",
-  },
-  description:
-    "Wholesale and retail pharmaceutical & healthcare supplies for clinicians, retailers and consumers across India.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const g = await getPage("global");
+  return {
+    title: {
+      default: siteText(g, "seo_title"),
+      template: "%s | Nethrasap",
+    },
+    description: siteText(g, "seo_description"),
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -76,7 +76,7 @@ export function StaffBanner() {
 }
 
 /* ---------- Search overlay ---------- */
-function SearchOverlay({ onClose, trending }: { onClose: () => void; trending?: string[] }) {
+function SearchOverlay({ onClose, trending, placeholder = "Search medicines, devices…" }: { onClose: () => void; trending?: string[]; placeholder?: string }) {
   const terms = trending && trending.length ? trending : TRENDING;
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -107,7 +107,7 @@ function SearchOverlay({ onClose, trending }: { onClose: () => void; trending?: 
           <input
             ref={inputRef}
             className="input grow"
-            placeholder="Search medicines, devices…"
+            placeholder={placeholder}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Search"
@@ -232,7 +232,15 @@ const DEFAULT_HEADER_NAV: NavLink[] = [
 
 /* `nav` / `trending` are fed by <SiteHeader> from the global CMS page; both fall
    back to the built-in defaults so the header renders even with no CMS data. */
-export function Header({ nav, trending }: { nav?: NavLink[]; trending?: string[] }) {
+export function Header({
+  nav,
+  trending,
+  searchPlaceholder = "Search medicines, devices…",
+}: {
+  nav?: NavLink[];
+  trending?: string[];
+  searchPlaceholder?: string;
+}) {
   const headerNav = nav && nav.length ? nav : DEFAULT_HEADER_NAV;
   const { user } = useAuth();
   const { count } = useCart();
@@ -261,7 +269,7 @@ export function Header({ nav, trending }: { nav?: NavLink[]; trending?: string[]
 
         <button type="button" className="search-pill hide-sm" onClick={() => setSearchOpen(true)} aria-label="Search products">
           <I d={IC.search} size={16} />
-          <span className="search-pill-text">Search medicines, devices…</span>
+          <span className="search-pill-text">{searchPlaceholder}</span>
           <kbd>⌘K</kbd>
         </button>
 
@@ -297,7 +305,7 @@ export function Header({ nav, trending }: { nav?: NavLink[]; trending?: string[]
           <UserMenu />
         </div>
       </div>
-      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} trending={trending} />}
+      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} trending={trending} placeholder={searchPlaceholder} />}
     </header>
   );
 }

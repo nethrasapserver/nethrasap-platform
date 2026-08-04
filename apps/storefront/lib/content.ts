@@ -94,6 +94,33 @@ export function arr(content: Record<string, unknown> | undefined, key: string): 
   return Array.isArray(v) ? v : [];
 }
 
+/* ---------- site_text: small reusable strings scattered across the site,
+   editable via site_text{slot,value} blocks on the home/global surfaces. Each
+   degrades to the in-code default below. ---------- */
+export const SITE_TEXT: Record<string, string> = {
+  // global
+  search_placeholder: "Search medicines, devices…",
+  buybox_shipping: "Free shipping on orders above ₹499 · COD available",
+  buybox_tax: "Inclusive of all taxes",
+  categories_heading: "Shop by category",
+  categories_intro: "Browse the full audited range by department.",
+  seo_title: "Nethrasap — India's audited healthcare supply platform",
+  seo_description:
+    "Wholesale and retail pharmaceutical & healthcare supplies for clinicians, retailers and consumers across India.",
+  // home — the "about" section footer (figures + buttons)
+  home_foot_stat_label: "Cold chain",
+  home_foot_stat_value: "2–8°C",
+  home_foot_cta_label: "Register your business",
+  home_foot_cta_href: "/signup",
+  home_foot_alt_label: "Explore the catalogue",
+  home_foot_alt_href: "/products",
+};
+
+/** Resolve a site_text slot from a CMS page, falling back to SITE_TEXT. */
+export function siteText(page: CmsPage, slot: string): string {
+  return str(bySlot(page, "site_text", slot)?.content, "value") ?? SITE_TEXT[slot] ?? "";
+}
+
 /* ==========================================================================
    DEFAULTS — mirror the previously-hardcoded arrays verbatim. Every dynamic
    section degrades to these when the matching CMS page/block is absent, so the

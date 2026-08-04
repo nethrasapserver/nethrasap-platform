@@ -28,6 +28,20 @@ const SLOT_LABELS: Record<string, string> = {
   network_foot: "About · Registered-office line",
   compliance: "About · Compliance note",
   principles: "About · “What we stand for”",
+  // site_text
+  search_placeholder: "Search box placeholder",
+  buybox_shipping: "Product page · shipping line",
+  buybox_tax: "Product page · tax line",
+  categories_heading: "Categories page · heading",
+  categories_intro: "Categories page · intro",
+  seo_title: "SEO · site title",
+  seo_description: "SEO · description",
+  home_foot_stat_label: "Home · footer stat label",
+  home_foot_stat_value: "Home · footer stat value",
+  home_foot_cta_label: "Home · footer primary button",
+  home_foot_cta_href: "Home · footer primary link",
+  home_foot_alt_label: "Home · footer alt button",
+  home_foot_alt_href: "Home · footer alt link",
 };
 
 function SlotBadge({ content }: { content: Record<string, unknown> }) {
@@ -276,6 +290,14 @@ function Body({ kind, content }: { kind: string; content: Record<string, unknown
 
     case "footer_legal":
       return <div className="sp-footer sp-flegal">{st(c, "text") || "© Company · legal line"}</div>;
+
+    case "site_text":
+      return (
+        <div className="sp-slotted">
+          <SlotBadge content={c} />
+          <p className="sp-body" style={{ color: "var(--ink)", fontSize: ".9rem" }}>{st(c, "value") || "—"}</p>
+        </div>
+      );
 
     case "pdp_trust_badge":
       return (

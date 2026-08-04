@@ -10,6 +10,7 @@ import { ProductGallery } from "@/components/ProductGallery";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { TrustBadges } from "@/components/TrustBadges";
 import { serverApi } from "@/lib/api";
+import { blocksOf, getPage, type PdpTrustBadge, siteText, str } from "@/lib/content";
 
 export const dynamic = "force-dynamic";
 
@@ -95,12 +96,18 @@ function Stars({ value }: { value: number }) {
 }
 
 export default async function ProductPage({ params }: { params: { slug: string } }) {
-  const [p, related, reviewPage] = await Promise.all([
+  const [p, related, reviewPage, global] = await Promise.all([
     getProduct(params.slug),
     getRelated(params.slug),
     getReviews(params.slug),
+    getPage("global"),
   ]);
   if (!p) notFound();
+
+  // PDP trust badges + the shipping/tax lines are editable via the CMS.
+  const pdpBadges: PdpTrustBadge[] = blocksOf(global, "pdp_trust_badge")
+    .map((b) => ({ label: str(b.content, "label") ?? "", icon: str(b.content, "icon") ?? "" }))
+    .filter((b) => b.label);
 
   const defaultVariant = p.variants.find((v) => v.is_default) ?? p.variants[0];
   const attrs = (((p as { attributes?: unknown }).attributes ?? {}) as Attrs);
@@ -145,8 +152,12 @@ export default async function ProductPage({ params }: { params: { slug: string }
             </div>
           )}
 
-          <BuyBox product={p} />
-          <TrustBadges />
+          <BuyBox
+            product={p}
+            shippingText={siteText(global, "buybox_shipping")}
+            taxText={siteText(global, "buybox_tax")}
+          />
+          <TrustBadges badges={pdpBadges.length ? pdpBadges : undefined} />
         </div>
       </div>
 

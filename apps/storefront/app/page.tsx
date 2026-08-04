@@ -14,6 +14,7 @@ import {
   DEFAULT_TRUST,
   blocksOf,
   bySlot,
+  siteText,
   firstBlock,
   getPage,
   str,
@@ -267,16 +268,16 @@ export default async function HomePage() {
                 <dd>{categories.length}</dd>
               </div>
               <div>
-                <dt>Cold chain</dt>
-                <dd>2–8°C</dd>
+                <dt>{siteText(home, "home_foot_stat_label")}</dt>
+                <dd>{siteText(home, "home_foot_stat_value")}</dd>
               </div>
             </dl>
             <div className="row" style={{ flexWrap: "wrap" }}>
-              <Link href="/signup" className="btn btn-primary">
-                Register your business
+              <Link href={siteText(home, "home_foot_cta_href")} className="btn btn-primary">
+                {siteText(home, "home_foot_cta_label")}
               </Link>
-              <Link href="/products" className="btn btn-outline">
-                Explore the catalogue
+              <Link href={siteText(home, "home_foot_alt_href")} className="btn btn-outline">
+                {siteText(home, "home_foot_alt_label")}
               </Link>
             </div>
           </div>

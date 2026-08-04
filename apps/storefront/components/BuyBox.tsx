@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { inr } from "@/lib/format";
+import { SITE_TEXT } from "@/lib/content";
 import { useSaved } from "@/lib/saved";
 
 type VariantOut = ProductDetail["variants"][number];
@@ -61,7 +62,15 @@ function StockPill({ units, status }: { units: number | null; status: string }) 
   return <span className="pill pill-ok">● In stock — {units} units</span>;
 }
 
-export function BuyBox({ product }: { product: ProductDetail }) {
+export function BuyBox({
+  product,
+  shippingText = SITE_TEXT.buybox_shipping,
+  taxText = SITE_TEXT.buybox_tax,
+}: {
+  product: ProductDetail;
+  shippingText?: string;
+  taxText?: string;
+}) {
   const { user } = useAuth();
   const { isSaved, isCompared, toggleSaved, toggleCompared } = useSaved();
   const variants = product.variants as Variant[];
@@ -126,7 +135,7 @@ export function BuyBox({ product }: { product: ProductDetail }) {
               {savings > 0 && <span className="mrp">MRP {inr(price?.mrp)}</span>}
               {offPct > 0 && <span className="off-pct">{offPct}% off</span>}
             </div>
-            <p className="buy-tax small muted">Inclusive of all taxes</p>
+            <p className="buy-tax small muted">{taxText}</p>
           </>
         )}
 
@@ -206,9 +215,7 @@ export function BuyBox({ product }: { product: ProductDetail }) {
             <circle cx="6" cy="18" r="1.8" />
             <circle cx="17" cy="18" r="1.8" />
           </svg>
-          <span>
-            <b>Free shipping</b> on orders above ₹499 · COD available
-          </span>
+          <span>{shippingText}</span>
         </div>
 
         {product.schedule && product.schedule !== "NONE" && (

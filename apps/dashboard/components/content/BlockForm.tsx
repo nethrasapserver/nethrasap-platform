@@ -149,6 +149,17 @@ export const FIELDS: Record<string, FieldDef[]> = {
     { key: "label", label: "Label", type: "text", required: true },
     { key: "icon", label: "Icon", type: "icon" },
   ],
+  site_text: [
+    {
+      key: "slot",
+      label: "Slot",
+      type: "text",
+      required: true,
+      placeholder: "e.g. search_placeholder, buybox_tax",
+      help: "Which site string this sets. Global: search_placeholder · buybox_shipping · buybox_tax · categories_heading · categories_intro · seo_title · seo_description. Home: home_foot_stat_label · home_foot_stat_value · home_foot_cta_label · home_foot_cta_href · home_foot_alt_label · home_foot_alt_href.",
+    },
+    { key: "value", label: "Text", type: "textarea", required: true },
+  ],
 };
 
 /** Kinds that belong to each surface, in the order they should be grouped. */
@@ -162,9 +173,10 @@ export const SURFACE_KINDS: Record<string, string[]> = {
     "flow_step",
     "faq_item",
     "cta_band",
+    "site_text",
   ],
   about: ["about_hero", "section_intro", "section_heading", "stat", "story_para", "principle", "flow_step", "founder", "location", "cert", "cta_band"],
-  global: ["announcement", "header_nav", "trending", "footer_blurb", "footer_column", "footer_legal", "pdp_trust_badge"],
+  global: ["announcement", "header_nav", "trending", "footer_blurb", "footer_column", "footer_legal", "pdp_trust_badge", "site_text"],
 };
 
 /** Singular label — used on Add/Edit buttons and drawer titles. */
@@ -191,6 +203,7 @@ export const KIND_LABELS: Record<string, string> = {
   footer_column: "Footer column",
   footer_legal: "Footer legal",
   pdp_trust_badge: "PDP trust badge",
+  site_text: "Site text",
 };
 
 /** Plural label — used for group headings. */
@@ -217,6 +230,7 @@ export const KIND_TITLES: Record<string, string> = {
   footer_column: "Footer columns",
   footer_legal: "Footer legal",
   pdp_trust_badge: "PDP trust badges",
+  site_text: "Site text",
 };
 
 /** Plain-language description of what each section controls on the live site.
@@ -244,6 +258,7 @@ export const KIND_HELP: Record<string, string> = {
   footer_column: "A column of links in the footer.",
   footer_legal: "The legal line at the bottom of the footer.",
   pdp_trust_badge: "Trust badges shown on every product page.",
+  site_text: "Reusable text across the site — search box, shipping/tax lines, category page, SEO title, home footer buttons — keyed by slot.",
 };
 
 export type LinkRow = { label: string; href: string };
