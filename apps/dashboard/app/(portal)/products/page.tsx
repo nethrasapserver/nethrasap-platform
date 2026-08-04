@@ -702,7 +702,7 @@ function ProductForm({
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn btn-primary" disabled={busy || !form.name || !pricingReady || incompleteTiers.length > 0} onClick={save}>
+          <button className="btn btn-primary" disabled={busy || !form.name || images.length === 0 || !pricingReady || incompleteTiers.length > 0} onClick={save}>
             {busy ? "Saving…" : editing ? "Save changes" : "Create product"}
           </button>
         </>
@@ -722,7 +722,12 @@ function ProductForm({
           image plus a row of thumbnail tiles. Empty tiles double as upload
           drop-targets; direct file upload with a paste-URL fallback. */}
       <div className="field">
-        <label>Images <span className="muted">· {images.length}/{MAX_IMAGES}</span></label>
+        <label>Images<Req /> <span className="muted">· {images.length}/{MAX_IMAGES}</span></label>
+        {images.length === 0 && (
+          <p className="small" style={{ color: "var(--danger)", margin: "0 0 8px" }}>
+            Add at least one image — the first is the main product photo.
+          </p>
+        )}
         {(() => {
           const ordered = [...images].sort((x, y) => Number(y.is_primary) - Number(x.is_primary));
           const main = ordered[0] ?? null;
