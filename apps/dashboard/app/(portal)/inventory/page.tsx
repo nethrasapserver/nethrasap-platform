@@ -39,6 +39,7 @@ export default function InventoryPage() {
     refetch();
   }, [refetch]);
   const [receive, setReceive] = useState<Level | null>(null);
+  const [adjust, setAdjust] = useState<Level | null>(null);
   const [view, setView] = useState<Level | null>(null);
   const [query, setQuery] = useState("");
   const [stock, setStock] = useState("");
@@ -186,6 +187,10 @@ export default function InventoryPage() {
             setReceive(view);
             setView(null);
           }}
+          onAdjust={() => {
+            setAdjust(view);
+            setView(null);
+          }}
         />
       )}
 
@@ -195,6 +200,17 @@ export default function InventoryPage() {
           onClose={() => setReceive(null)}
           onDone={() => {
             setReceive(null);
+            refetch();
+          }}
+        />
+      )}
+
+      {adjust && (
+        <AdjustModal
+          level={adjust}
+          onClose={() => setAdjust(null)}
+          onDone={() => {
+            setAdjust(null);
             refetch();
           }}
         />
@@ -258,6 +274,101 @@ function ReceiveModal({ level, onClose, onDone }: { level: Level; onClose: () =>
   );
 }
 
+const ADJUST_REASONS = [
+  { value: "Stock count correction", label: "Stock count correction" },
+  { value: "Damaged / expired write-off", label: "Damaged / expired write-off" },
+  { value: "Returned to supplier", label: "Returned to supplier" },
+  { value: "Manual correction", label: "Manual correction" },
+];
+
+/** Correct on-hand up or down (damage, shrinkage, count fixes) via the signed
+    adjust endpoint. Blocks dropping below reserved (those units are committed). */
+function AdjustModal({ level, onClose, onDone }: { level: Level; onClose: () => void; onDone: () => void }) {
+  const [target, setTarget] = useState(String(level.on_hand));
+  const [reason, setReason] = useState(ADJUST_REASONS[0].value);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const newOnHand = target === "" ? NaN : Number(target);
+  const delta = (Number.isFinite(newOnHand) ? newOnHand : level.on_hand) - level.on_hand;
+  const belowReserved = Number.isFinite(newOnHand) && newOnHand < level.reserved;
+  const invalid = !Number.isFinite(newOnHand) || newOnHand < 0 || delta === 0 || belowReserved || !reason;
+  return (
+    <Drawer
+      title="Adjust stock"
+      subtitle={level.product_name}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={busy || invalid}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await api.post("/admin/inventory/adjust", { variant_id: level.variant_id, delta, reason });
+                toast("Stock adjusted");
+                onDone();
+              } catch (e) {
+                toast(
+                  e instanceof ApiError && e.status === 409
+                    ? "Adjustment would drop below reserved units."
+                    : "Could not adjust stock",
+                  true,
+                );
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Saving…" : "Save adjustment"}
+          </button>
+        </>
+      }
+    >
+      <dl className="drawer-dl" style={{ marginBottom: 18 }}>
+        <dt>Pack size</dt>
+        <dd>{level.pack_size}</dd>
+        <dt>On hand</dt>
+        <dd className="mono">{level.on_hand}</dd>
+        <dt>Reserved (committed to orders)</dt>
+        <dd className="mono">{level.reserved}</dd>
+      </dl>
+      <div className="field">
+        <label>New on-hand count</label>
+        <input
+          className="input"
+          inputMode="numeric"
+          value={target}
+          onChange={(e) => setTarget(e.target.value.replace(/[^\d]/g, ""))}
+        />
+      </div>
+      <div className="field">
+        <label>Reason</label>
+        <Select value={reason} onChange={setReason} options={ADJUST_REASONS} placeholder="Select a reason" ariaLabel="Adjustment reason" width={280} />
+      </div>
+      {belowReserved ? (
+        <p className="small" style={{ margin: 0, color: "var(--danger)" }}>
+          Can&apos;t go below reserved ({level.reserved}) — those units are committed to open orders.
+        </p>
+      ) : (
+        <p className="muted small" style={{ margin: 0 }}>
+          {delta === 0 ? (
+            "Enter a different count to make an adjustment."
+          ) : (
+            <>
+              Change of <strong className="mono">{delta > 0 ? `+${delta}` : delta}</strong> — new available{" "}
+              <strong className="mono">{(Number.isFinite(newOnHand) ? newOnHand : level.on_hand) - level.reserved}</strong>. Posts an
+              adjustment line to the ledger.
+            </>
+          )}
+        </p>
+      )}
+    </Drawer>
+  );
+}
+
 interface LedgerEntry {
   id: string;
   movement: string;
@@ -270,7 +381,17 @@ interface LedgerEntry {
 }
 
 /** Single stock item: level detail + the append-only movement ledger. */
-function LevelDrawer({ level, onClose, onReceive }: { level: Level; onClose: () => void; onReceive: () => void }) {
+function LevelDrawer({
+  level,
+  onClose,
+  onReceive,
+  onAdjust,
+}: {
+  level: Level;
+  onClose: () => void;
+  onReceive: () => void;
+  onAdjust: () => void;
+}) {
   const ledger = useApi<LedgerEntry[]>("/admin/inventory/ledger", { variant_id: level.variant_id, limit: 25 });
 
   return (
@@ -282,6 +403,7 @@ function LevelDrawer({ level, onClose, onReceive }: { level: Level; onClose: () 
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-outline" onClick={onAdjust}>Adjust</button>
           <button className="btn btn-primary" onClick={onReceive}>Receive stock</button>
         </>
       }
