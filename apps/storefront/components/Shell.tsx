@@ -76,7 +76,8 @@ export function StaffBanner() {
 }
 
 /* ---------- Search overlay ---------- */
-function SearchOverlay({ onClose }: { onClose: () => void }) {
+function SearchOverlay({ onClose, trending }: { onClose: () => void; trending?: string[] }) {
+  const terms = trending && trending.length ? trending : TRENDING;
   const router = useRouter();
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -117,7 +118,7 @@ function SearchOverlay({ onClose }: { onClose: () => void }) {
         </form>
         <div className="eyebrow" style={{ marginTop: 16 }}>Trending</div>
         <div className="search-chips">
-          {TRENDING.map((t) => (
+          {terms.map((t) => (
             <button key={t} type="button" className="search-chip" onClick={() => go(t)}>
               {t}
             </button>
@@ -221,14 +222,18 @@ function UserMenu() {
 }
 
 /* ---------- Header ---------- */
-const HEADER_NAV = [
+type NavLink = { href: string; label: string };
+const DEFAULT_HEADER_NAV: NavLink[] = [
   { href: "/products", label: "Products" },
   { href: "/categories", label: "Categories" },
   { href: "/track", label: "Track" },
   { href: "/about", label: "About" },
 ];
 
-export function Header() {
+/* `nav` / `trending` are fed by <SiteHeader> from the global CMS page; both fall
+   back to the built-in defaults so the header renders even with no CMS data. */
+export function Header({ nav, trending }: { nav?: NavLink[]; trending?: string[] }) {
+  const headerNav = nav && nav.length ? nav : DEFAULT_HEADER_NAV;
   const { user } = useAuth();
   const { count } = useCart();
   const { wishlist } = useSaved();
@@ -261,7 +266,7 @@ export function Header() {
         </button>
 
         <nav className="nav-links" aria-label="Browse">
-          {HEADER_NAV.map((l) => (
+          {headerNav.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -292,7 +297,7 @@ export function Header() {
           <UserMenu />
         </div>
       </div>
-      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
+      {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} trending={trending} />}
     </header>
   );
 }

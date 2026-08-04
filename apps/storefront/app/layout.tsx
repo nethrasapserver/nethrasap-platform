@@ -5,7 +5,8 @@ import "@nethrasap/ui/auth.css";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { ChatBot } from "@/components/ChatBot";
 import { DynamicFooter } from "@/components/DynamicFooter";
-import { BottomNav, FloatingCartBar, Header, StaffBanner } from "@/components/Shell";
+import { BottomNav, FloatingCartBar, StaffBanner } from "@/components/Shell";
+import { SiteHeader } from "@/components/SiteHeader";
 import { sans } from "./fonts";
 import Providers from "./providers";
 
@@ -25,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <AnnouncementBar />
           <StaffBanner />
-          <Header />
+          <SiteHeader />
           <main style={{ minHeight: "60vh" }}>{children}</main>
           <DynamicFooter />
           <BottomNav />

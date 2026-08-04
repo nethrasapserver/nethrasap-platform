@@ -4,6 +4,8 @@ import { serverApi } from "@/lib/api";
 import {
   DEFAULT_ABOUT_CTA,
   DEFAULT_ABOUT_FLOW,
+  DEFAULT_ABOUT_HEADINGS,
+  DEFAULT_ABOUT_INTROS,
   DEFAULT_CERTS,
   DEFAULT_FOUNDERS,
   DEFAULT_LOCATIONS,
@@ -14,17 +16,39 @@ import {
   STAT_SENTINEL_PRODUCTS,
   arr,
   blocksOf,
+  bySlot,
   firstBlock,
   getPage,
   str,
   type CmsBlock,
+  type CmsPage,
   type CtaBand,
   type Founder,
   type IconItem,
   type Location,
   type Principle,
+  type SectionHeading,
+  type SectionIntro,
   type Stat,
 } from "@/lib/content";
+
+function resolveHeading(page: CmsPage, slot: string, fallback: SectionHeading): SectionHeading {
+  const c = bySlot(page, "section_heading", slot)?.content;
+  return {
+    heading: str(c, "heading") ?? fallback.heading,
+    link_label: str(c, "link_label") ?? fallback.link_label,
+    link_href: str(c, "link_href") ?? fallback.link_href,
+  };
+}
+
+function resolveIntro(page: CmsPage, slot: string, fallback: SectionIntro): SectionIntro {
+  const c = bySlot(page, "section_intro", slot)?.content;
+  return {
+    eyebrow: str(c, "eyebrow") ?? fallback.eyebrow,
+    heading: str(c, "heading") ?? fallback.heading,
+    body: str(c, "body") ?? fallback.body,
+  };
+}
 
 export const metadata: Metadata = {
   title: "About us",
@@ -131,6 +155,15 @@ export default async function AboutPage() {
 
   const cta = resolveCta(firstBlock(about, "cta_band")?.content, DEFAULT_ABOUT_CTA);
 
+  // Section headings / intros — CMS-editable (global pattern), in-code defaults.
+  const storyHead = resolveIntro(about, "story", DEFAULT_ABOUT_INTROS.story);
+  const principlesHead = resolveHeading(about, "principles", DEFAULT_ABOUT_HEADINGS.principles);
+  const operateHead = resolveIntro(about, "operate", DEFAULT_ABOUT_INTROS.operate);
+  const foundersHead = resolveIntro(about, "founders", DEFAULT_ABOUT_INTROS.founders);
+  const networkHead = resolveIntro(about, "network", DEFAULT_ABOUT_INTROS.network);
+  const networkFoot = resolveIntro(about, "network_foot", DEFAULT_ABOUT_INTROS.network_foot);
+  const complianceHead = resolveIntro(about, "compliance", DEFAULT_ABOUT_INTROS.compliance);
+
   return (
     <div className="ab-page">
       {/* 1 — Who we are: full-bleed photographic hero with a brand scrim. */}
@@ -198,8 +231,8 @@ export default async function AboutPage() {
       {/* 3 — Our story */}
       <section className="container section ab-story">
         <div className="ab-story-head">
-          <span className="eyebrow">Our story</span>
-          <h2>It started with one question: where did this box come from?</h2>
+          <span className="eyebrow">{storyHead.eyebrow}</span>
+          <h2>{storyHead.heading}</h2>
         </div>
         <div className="ab-story-body">
           {storyParas.map((p, i) => (
@@ -211,7 +244,7 @@ export default async function AboutPage() {
       {/* 4 — Principles */}
       <section className="container section" style={{ paddingTop: 0 }}>
         <div className="sec-head">
-          <h2>What we stand for</h2>
+          <h2>{principlesHead.heading}</h2>
         </div>
         <div className="ab-principles">
           {principles.map((p) => (
@@ -232,9 +265,9 @@ export default async function AboutPage() {
       <section className="about">
         <div className="container">
           <div className="about-lede">
-            <span className="eyebrow">How we operate</span>
-            <h2>Four steps, no shortcuts.</h2>
-            <p>The journey every single box takes — whether it&apos;s one strip or one pallet.</p>
+            <span className="eyebrow">{operateHead.eyebrow}</span>
+            <h2>{operateHead.heading}</h2>
+            {operateHead.body && <p>{operateHead.body}</p>}
           </div>
           <ol className="flow">
             {flow.map((s, i) => (
@@ -262,8 +295,8 @@ export default async function AboutPage() {
       {/* 6 — Founders */}
       <section className="container section">
         <div className="ab-sec-head">
-          <span className="eyebrow">The founders</span>
-          <h2>Three people who got tired of unverifiable boxes.</h2>
+          <span className="eyebrow">{foundersHead.eyebrow}</span>
+          <h2>{foundersHead.heading}</h2>
         </div>
         <div className="ab-people">
           {founders.map((m) => (
@@ -288,12 +321,9 @@ export default async function AboutPage() {
       <section className="ab-network">
         <div className="container section">
           <div className="ab-sec-head">
-            <span className="eyebrow">Where we operate</span>
-            <h2>Six facilities. One audited network.</h2>
-            <p>
-              Stock moves between our hubs under the same batch log it arrived with —
-              wherever you are, the paper trail travels with the box.
-            </p>
+            <span className="eyebrow">{networkHead.eyebrow}</span>
+            <h2>{networkHead.heading}</h2>
+            {networkHead.body && <p>{networkHead.body}</p>}
           </div>
           <div className="ab-locations">
             {locations.map((l) => (
@@ -309,16 +339,13 @@ export default async function AboutPage() {
               </article>
             ))}
           </div>
-          <p className="small muted ab-network-foot">
-            Registered office: Nethrasap Healthcare Supply Pvt. Ltd., Chennai, Tamil Nadu ·
-            Support: +91 44 4000 0000 (placeholder)
-          </p>
+          {networkFoot.body && <p className="small muted ab-network-foot">{networkFoot.body}</p>}
         </div>
       </section>
 
       {/* 8 — Compliance strip */}
       <section className="container section ab-certs">
-        <span className="eyebrow">Compliance</span>
+        <span className="eyebrow">{complianceHead.eyebrow}</span>
         <div className="ab-cert-chips">
           {certs.map((c) => (
             <span key={c} className="ab-cert-chip">
@@ -329,9 +356,7 @@ export default async function AboutPage() {
             </span>
           ))}
         </div>
-        <p className="small muted">
-          Licence and certification documents are available on request for verified business buyers.
-        </p>
+        {complianceHead.body && <p className="small muted">{complianceHead.body}</p>}
       </section>
 
       {/* 9 — Closing CTA */}

@@ -265,6 +265,37 @@ export const DEFAULT_HOME_INTROS: Record<string, SectionIntro> = {
   },
 };
 
+/** About-page section headings, keyed by slot (section_heading{slot,…}). */
+export const DEFAULT_ABOUT_HEADINGS: Record<string, SectionHeading> = {
+  principles: { heading: "What we stand for" },
+};
+
+/** About-page section intros, keyed by slot (section_intro{slot,…}). */
+export const DEFAULT_ABOUT_INTROS: Record<string, SectionIntro> = {
+  story: { eyebrow: "Our story", heading: "It started with one question: where did this box come from?", body: "" },
+  operate: {
+    eyebrow: "How we operate",
+    heading: "Four steps, no shortcuts.",
+    body: "The journey every single box takes — whether it's one strip or one pallet.",
+  },
+  founders: { eyebrow: "The founders", heading: "Three people who got tired of unverifiable boxes.", body: "" },
+  network: {
+    eyebrow: "Where we operate",
+    heading: "Six facilities. One audited network.",
+    body: "Stock moves between our hubs under the same batch log it arrived with — wherever you are, the paper trail travels with the box.",
+  },
+  network_foot: {
+    eyebrow: "",
+    heading: "",
+    body: "Registered office: Nethrasap Healthcare Supply Pvt. Ltd., Chennai, Tamil Nadu · Support: +91 44 4000 0000 (placeholder)",
+  },
+  compliance: {
+    eyebrow: "Compliance",
+    heading: "",
+    body: "Licence and certification documents are available on request for verified business buyers.",
+  },
+};
+
 export interface CtaBand {
   eyebrow: string;
   heading: string;

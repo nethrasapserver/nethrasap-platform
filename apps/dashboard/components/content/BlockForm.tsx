@@ -82,13 +82,13 @@ export const FIELDS: Record<string, FieldDef[]> = {
     { key: "answer", label: "Answer", type: "textarea", required: true },
   ],
   section_heading: [
-    { key: "slot", label: "Slot", type: "text", required: true, help: "Where on the page this heading renders." },
+    { key: "slot", label: "Slot", type: "text", required: true, placeholder: "e.g. category, featured, buyers, principles", help: "Which heading on the page this replaces. Home: category · featured · buyers. About: principles." },
     { key: "heading", label: "Heading", type: "text", required: true },
     { key: "link_label", label: "Link label", type: "text" },
     { key: "link_href", label: "Link", type: "text" },
   ],
   section_intro: [
-    { key: "slot", label: "Slot", type: "text", required: true, help: "Where on the page this intro renders." },
+    { key: "slot", label: "Slot", type: "text", required: true, placeholder: "e.g. faq, story, operate, founders", help: "Which intro on the page this replaces. Home: about · faq. About: story · operate · founders · network · network_foot · compliance." },
     { key: "eyebrow", label: "Eyebrow", type: "text" },
     { key: "heading", label: "Heading", type: "text", required: true },
     { key: "body", label: "Body", type: "textarea" },
@@ -152,7 +152,7 @@ export const SURFACE_KINDS: Record<string, string[]> = {
     "faq_item",
     "cta_band",
   ],
-  about: ["about_hero", "stat", "story_para", "principle", "flow_step", "founder", "location", "cert", "cta_band"],
+  about: ["about_hero", "section_intro", "section_heading", "stat", "story_para", "principle", "flow_step", "founder", "location", "cert", "cta_band"],
   global: ["announcement", "header_nav", "trending", "footer_blurb", "footer_column", "footer_legal", "pdp_trust_badge"],
 };
 
