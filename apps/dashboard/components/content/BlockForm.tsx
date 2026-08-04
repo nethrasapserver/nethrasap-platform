@@ -6,11 +6,12 @@ import { Drawer } from "@/components/Drawer";
 import { Select } from "@/components/Select";
 import { api } from "@/lib/api";
 import { useToast } from "@/lib/toast";
+import { ICON_LIBRARY } from "./icons";
 import { SectionPreview } from "./SectionPreview";
 
 // --- Field registry ----------------------------------------------------------
 
-type FieldType = "text" | "textarea" | "select" | "image" | "links" | "terms";
+type FieldType = "text" | "textarea" | "select" | "image" | "links" | "terms" | "icon";
 
 interface FieldDef {
   key: string;
@@ -38,7 +39,7 @@ const TONE_OPTIONS = [
 const FLOW_STEP: FieldDef[] = [
   { key: "title", label: "Title", type: "text", required: true },
   { key: "subtitle", label: "Subtitle", type: "text" },
-  { key: "icon", label: "Icon", type: "text", placeholder: "icon name or glyph" },
+  { key: "icon", label: "Icon", type: "icon" },
 ];
 
 const CTA_BAND: FieldDef[] = [
@@ -73,13 +74,13 @@ export const FIELDS: Record<string, FieldDef[]> = {
   trust_badge: [
     { key: "title", label: "Title", type: "text", required: true },
     { key: "subtitle", label: "Subtitle", type: "text" },
-    { key: "icon", label: "Icon", type: "text", placeholder: "icon name or glyph" },
+    { key: "icon", label: "Icon", type: "icon" },
   ],
   buyer_card: [
     { key: "title", label: "Title", type: "text", required: true },
     { key: "body", label: "Body", type: "textarea" },
     { key: "href", label: "Link", type: "text" },
-    { key: "icon", label: "Icon", type: "text", placeholder: "icon name or glyph" },
+    { key: "icon", label: "Icon", type: "icon" },
   ],
   flow_step: FLOW_STEP,
   faq_item: [
@@ -119,7 +120,7 @@ export const FIELDS: Record<string, FieldDef[]> = {
   principle: [
     { key: "title", label: "Title", type: "text", required: true },
     { key: "body", label: "Body", type: "textarea" },
-    { key: "icon", label: "Icon", type: "text", placeholder: "icon name or glyph" },
+    { key: "icon", label: "Icon", type: "icon" },
     { key: "tone", label: "Tone", type: "select", options: TONE_OPTIONS },
   ],
   founder: [
@@ -146,7 +147,7 @@ export const FIELDS: Record<string, FieldDef[]> = {
   footer_legal: [{ key: "text", label: "Text", type: "textarea", required: true }],
   pdp_trust_badge: [
     { key: "label", label: "Label", type: "text", required: true },
-    { key: "icon", label: "Icon", type: "text", placeholder: "icon name or glyph" },
+    { key: "icon", label: "Icon", type: "icon" },
   ],
 };
 
@@ -472,6 +473,9 @@ export function BlockForm({
                 onChange={(rows) => set(f.key, rows)}
               />
             )}
+            {f.type === "icon" && (
+              <IconField value={String(content[f.key] ?? "")} onChange={(d) => set(f.key, d)} />
+            )}
             {f.help && !err && (
               <p className="muted small" style={{ margin: "4px 0 0" }}>
                 {f.help}
@@ -633,6 +637,38 @@ function TermsField({ rows, onChange }: { rows: string[]; onChange: (rows: strin
           + Add term
         </button>
       </div>
+    </div>
+  );
+}
+
+function IconField({ value, onChange }: { value: string; onChange: (d: string) => void }) {
+  const custom = value.trim() !== "" && !ICON_LIBRARY.some((ic) => ic.d === value);
+  return (
+    <div>
+      <div className="icon-grid">
+        {ICON_LIBRARY.map((ic) => (
+          <button
+            key={ic.name}
+            type="button"
+            title={ic.name}
+            aria-label={ic.name}
+            aria-pressed={value === ic.d}
+            className={`icon-opt ${value === ic.d ? "on" : ""}`}
+            onClick={() => onChange(ic.d)}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={ic.d} />
+            </svg>
+          </button>
+        ))}
+      </div>
+      <p className="muted small" style={{ margin: "6px 0 0" }}>
+        {value
+          ? custom
+            ? "A custom icon is set — pick one above to replace it."
+            : "Click an icon to change it."
+          : "Pick an icon."}
+      </p>
     </div>
   );
 }

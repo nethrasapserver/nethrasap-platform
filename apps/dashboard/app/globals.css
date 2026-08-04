@@ -508,3 +508,14 @@ body .auth-page .auth-bg { display: none; }
 .hp-eyebrow-over { color: rgba(254,250,224,.92); }
 .hp-title-over { color: var(--cream); }
 .hp-body-over { color: rgba(254,250,224,.9); }
+
+/* Icon picker (CMS icon fields — click an icon instead of typing an SVG path) */
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 8px; }
+.icon-opt {
+  all: unset; box-sizing: border-box; cursor: pointer; display: grid; place-items: center; aspect-ratio: 1;
+  border: 1px solid var(--line); border-radius: var(--r-md); color: var(--ink-2); background: #ffffff;
+  transition: border-color .1s, color .1s, background .1s;
+}
+.icon-opt:hover { border-color: var(--line-2); color: var(--ink); }
+.icon-opt.on { border-color: var(--brand-600); color: var(--brand-700); background: var(--brand-50); box-shadow: 0 0 0 1px var(--brand-600); }
+.icon-opt:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 2px; }
