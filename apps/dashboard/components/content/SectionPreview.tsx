@@ -107,7 +107,14 @@ function Body({ kind, content }: { kind: string; content: Record<string, unknown
     case "flow_step":
       return (
         <div className="sp-flow">
-          <span className="sp-flow-dot"><Icon d={st(c, "icon")} size={22} /></span>
+          <span className={`sp-flow-dot ${st(c, "image_url") ? "has-img" : ""}`}>
+            {st(c, "image_url") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="sp-flow-img" src={st(c, "image_url")} alt="" />
+            ) : (
+              <Icon d={st(c, "icon")} size={22} />
+            )}
+          </span>
           <span className="sp-flow-label">
             <b className="sp-strong">{st(c, "title") || "Step"}</b>
             {st(c, "subtitle") && <span className="sp-body">{st(c, "subtitle")}</span>}

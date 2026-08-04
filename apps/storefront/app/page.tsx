@@ -68,7 +68,12 @@ function toHeroSlide(b: CmsBlock, i: number): HeroSlideData {
 }
 
 function toIconItem(b: CmsBlock): IconItem {
-  return { title: str(b.content, "title") ?? "", subtitle: str(b.content, "subtitle"), icon: str(b.content, "icon") ?? "" };
+  return {
+    title: str(b.content, "title") ?? "",
+    subtitle: str(b.content, "subtitle"),
+    icon: str(b.content, "icon") ?? "",
+    image_url: str(b.content, "image_url"),
+  };
 }
 
 function toBuyer(b: CmsBlock): BuyerCard {
@@ -227,11 +232,18 @@ export default async function HomePage() {
             {flow.map((s, i) => (
               <li key={s.title} className={i % 2 === 0 ? "is-down" : "is-up"}>
                 <span className="flow-dot">
-                  <span className="flow-ic">
-                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d={s.icon} />
-                    </svg>
-                  </span>
+                  {s.image_url ? (
+                    <span className="flow-ic flow-ic-img">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={s.image_url} alt="" />
+                    </span>
+                  ) : (
+                    <span className="flow-ic">
+                      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d={s.icon} />
+                      </svg>
+                    </span>
+                  )}
                 </span>
                 <div className="flow-cap">
                   <span className="flow-stem" aria-hidden="true" />

@@ -157,6 +157,8 @@ export interface IconItem {
   title: string;
   subtitle?: string;
   icon: string;
+  /** Flow steps can show an uploaded image in the circle instead of the icon. */
+  image_url?: string;
 }
 
 /** trust_badge{title,subtitle,icon} — icon is an SVG path (the `d` attribute). */

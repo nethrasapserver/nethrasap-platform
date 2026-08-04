@@ -39,7 +39,7 @@ const TONE_OPTIONS = [
 const FLOW_STEP: FieldDef[] = [
   { key: "title", label: "Title", type: "text", required: true },
   { key: "subtitle", label: "Subtitle", type: "text" },
-  { key: "icon", label: "Icon", type: "icon" },
+  { key: "image_url", label: "Image", type: "image", help: "Shown in the step circle. Leave empty to keep the default icon." },
 ];
 
 const CTA_BAND: FieldDef[] = [
