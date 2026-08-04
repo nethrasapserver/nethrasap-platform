@@ -197,6 +197,8 @@ body { font-size: 14px; }
 .btn { border-radius: var(--r-md); height: 38px; }
 .btn-sm { height: 30px; }
 .btn-danger { background: var(--danger-bg); color: var(--danger); }
+/* Required-field asterisk in form labels. */
+.req { color: var(--danger); font-weight: 700; }
 /* Solid red variant — the topbar sign-out. */
 .btn-danger-solid { background: var(--danger); color: #fff; }
 .btn-danger-solid:hover { background: #9e3b1d; color: #fff; }

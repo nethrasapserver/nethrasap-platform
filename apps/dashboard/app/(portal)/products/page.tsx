@@ -361,6 +361,15 @@ function RowMenu({ isActive, onVariant, onToggle, onDelete }: { isActive: boolea
 
 /* ---------- Create / edit product ---------- */
 
+/** Red asterisk marking a field that must be filled before the product saves. */
+function Req() {
+  return (
+    <span className="req" aria-hidden="true" title="Required">
+      {" *"}
+    </span>
+  );
+}
+
 function ProductForm({
   categories,
   product,
@@ -699,8 +708,13 @@ function ProductForm({
         </>
       }
     >
+      <p className="muted small" style={{ margin: "0 0 14px" }}>
+        Fields marked <span className="req" aria-hidden="true">*</span> are required
+        {editing ? "" : " before you can create the product"}.
+      </p>
+
       <div className="field">
-        <label>Name</label>
+        <label>Name<Req /></label>
         <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} />
       </div>
 
@@ -862,7 +876,7 @@ function ProductForm({
 
           <div className="row">
             <div className="field grow">
-              <label>Pack size</label>
+              <label>Pack size<Req /></label>
               <input
                 className="input"
                 placeholder="e.g. Strip of 10"
@@ -871,7 +885,7 @@ function ProductForm({
               />
             </div>
             <div className="field grow">
-              <label>Unit label</label>
+              <label>Unit label<Req /></label>
               <input
                 className="input"
                 placeholder="e.g. 10 tablets"
@@ -928,7 +942,7 @@ function ProductForm({
                 <tr key={role}>
                   <td style={{ textTransform: "capitalize", fontWeight: 600 }}>
                     {role}
-                    {role === "customer" && <span className="muted small"> (required)</span>}
+                    {role === "customer" && <Req />}
                   </td>
                   <td>
                     <input
