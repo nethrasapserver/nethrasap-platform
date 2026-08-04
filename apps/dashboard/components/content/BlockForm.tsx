@@ -90,7 +90,7 @@ export const FIELDS: Record<string, FieldDef[]> = {
   section_intro: [
     { key: "slot", label: "Slot", type: "text", required: true, placeholder: "e.g. faq, story, operate, founders", help: "Which intro on the page this replaces. Home: about · faq. About: story · operate · founders · network · network_foot · compliance." },
     { key: "eyebrow", label: "Eyebrow", type: "text" },
-    { key: "heading", label: "Heading", type: "text", required: true },
+    { key: "heading", label: "Heading", type: "text" },
     { key: "body", label: "Body", type: "textarea" },
   ],
   cta_band: CTA_BAND,
@@ -99,7 +99,12 @@ export const FIELDS: Record<string, FieldDef[]> = {
     { key: "eyebrow", label: "Eyebrow", type: "text" },
     { key: "title", label: "Title", type: "text", required: true },
     { key: "body", label: "Body", type: "textarea" },
-    { key: "image_url", label: "Image", type: "image" },
+    { key: "cta_label", label: "Primary button label", type: "text" },
+    { key: "cta_href", label: "Primary button link", type: "text", placeholder: "/products" },
+    { key: "alt_label", label: "Alt button label", type: "text" },
+    { key: "alt_href", label: "Alt button link", type: "text", placeholder: "/signup" },
+    { key: "facts", label: "Facts strip", type: "terms", help: "Short reassurance points under the buttons." },
+    { key: "image_url", label: "Background image", type: "image" },
   ],
   stat: [
     { key: "value", label: "Value", type: "text", required: true, placeholder: "e.g. 12k+" },
