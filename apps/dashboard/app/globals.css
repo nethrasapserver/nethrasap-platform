@@ -199,6 +199,16 @@ body { font-size: 14px; }
 .btn-danger { background: var(--danger-bg); color: var(--danger); }
 /* Required-field asterisk in form labels. */
 .req { color: var(--danger); font-weight: 700; }
+
+/* Per-role price rows — each role picks Fixed or Range independently. */
+.price-rows { display: grid; gap: 12px; }
+.price-row { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; background: #fff; }
+.price-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.price-role { text-transform: capitalize; font-weight: 700; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface, #f4f5f2); }
+.seg-btn { border: 0; background: transparent; padding: 5px 12px; border-radius: 999px; font-size: .82rem; font-weight: 600; color: var(--muted); cursor: pointer; line-height: 1.2; }
+.seg-btn.on { background: var(--brand-700, #3f5324); color: #fff; }
+.seg-btn:focus-visible { outline: 2px solid var(--brand-500, #6f8f3a); outline-offset: 1px; }
 /* Solid red variant — the topbar sign-out. */
 .btn-danger-solid { background: var(--danger); color: #fff; }
 .btn-danger-solid:hover { background: #9e3b1d; color: #fff; }

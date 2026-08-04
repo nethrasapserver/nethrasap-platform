@@ -634,7 +634,13 @@ def serialise_admin_product(p: Product) -> dict[str, Any]:
                 "is_default": v.is_default,
                 "sort_order": v.sort_order,
                 "prices": [
-                    {"role": pr.role.value, "mrp": pr.mrp, "selling_price": pr.selling_price}
+                    {
+                        "role": pr.role.value,
+                        "mrp": pr.mrp,
+                        "selling_price": pr.selling_price,
+                        "range_min": pr.range_min,
+                        "range_max": pr.range_max,
+                    }
                     for pr in v.prices
                     if pr.valid_to is None
                 ],

@@ -83,14 +83,18 @@ export function BuyBox({
   const discontinued = product.stock_status === "discontinued";
   const units = variant?.available_units ?? null;
   const outOfStock = units != null ? units <= 0 : product.stock_status === "out_of_stock";
-  const quote = product.is_quote_only;
+  // Quote-vs-buy is decided per the VIEWER's own role price on the selected pack:
+  // a role priced as an indicative band is quote-only, while another role on the
+  // same product can stay a fixed Add-to-cart price (e.g. customer fixed,
+  // retailer range). is_quote_only from the API is only the anonymous default.
+  const range = price && price.range_min != null && price.range_max != null && price.range_max > price.range_min
+    ? { min: price.range_min, max: price.range_max }
+    : null;
+  const quote = range != null;
   // For a fixed product with multiple packs, price_min→max is a pack band.
   const hasPackBand = !quote && product.variants.length > 1 && product.price_max > product.price_min;
   const savings = !quote && price && price.mrp > price.selling_price ? price.mrp - price.selling_price : 0;
   const offPct = savings > 0 && price ? Math.round((savings / price.mrp) * 100) : 0;
-  const range = price && price.range_min != null && price.range_max != null
-    ? { min: price.range_min, max: price.range_max }
-    : null;
 
   // Trade-tier hint: anonymous/customer viewers see the wholesale band when a
   // retailer/clinician price row exists on the selected variant.

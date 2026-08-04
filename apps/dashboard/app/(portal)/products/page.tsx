@@ -431,13 +431,12 @@ function ProductForm({
      product's tiers are edited in the Prices drawer). Creating the variant
      here is what stops new products landing unpriceable. */
   const [pack, setPack] = useState({ pack_size: "", unit_label: "", barcode: "" });
-  const [quoteMode, setQuoteMode] = useState(false);
   const [tiers, setTiers] = useState<Record<Role, PriceRowForm>>({
-    customer: { mrp: "", selling: "", rmin: "", rmax: "" },
-    clinician: { mrp: "", selling: "", rmin: "", rmax: "" },
-    retailer: { mrp: "", selling: "", rmin: "", rmax: "" },
+    customer: { mrp: "", selling: "", rmin: "", rmax: "", range: false },
+    clinician: { mrp: "", selling: "", rmin: "", rmax: "", range: false },
+    retailer: { mrp: "", selling: "", rmin: "", rmax: "", range: false },
   });
-  const setTier = (role: Role, key: keyof PriceRowForm, v: string) =>
+  const setTier = (role: Role, key: keyof PriceRowForm, v: string | boolean) =>
     setTiers((t) => ({ ...t, [role]: { ...t[role], [key]: v } }));
 
   /* A tier counts as filled once it has an MRP plus whichever second value the
@@ -446,7 +445,7 @@ function ProductForm({
   const tierFilled = (role: Role) => {
     const t = tiers[role];
     if (toPaise(t.mrp) <= 0) return false;
-    return quoteMode
+    return t.range
       ? toPaise(t.rmin) > 0 && toPaise(t.rmax) > 0
       : toPaise(t.selling) > 0;
   };
@@ -458,7 +457,7 @@ function ProductForm({
      and block the save instead of dropping the price (H-22). */
   const tierPartial = (role: Role) => {
     const t = tiers[role];
-    const hasPrice = quoteMode
+    const hasPrice = t.range
       ? toPaise(t.rmin) > 0 || toPaise(t.rmax) > 0
       : toPaise(t.selling) > 0;
     return hasPrice && toPaise(t.mrp) <= 0;
@@ -468,15 +467,15 @@ function ProductForm({
   function tierPrices() {
     return ROLES.filter(tierFilled).map((role) => {
       const t = tiers[role];
-      // Quote-only rows still carry an anchor selling price; the band is what
-      // flips the storefront into "request a quote".
-      const selling = quoteMode ? toPaise(t.rmin) : toPaise(t.selling);
+      // A range row still carries an anchor selling price (the band minimum);
+      // the band is what flips this role into "request a quote" on the storefront.
+      const selling = t.range ? toPaise(t.rmin) : toPaise(t.selling);
       return {
         role,
         mrp: toPaise(t.mrp),
         selling_price: selling,
-        range_min: quoteMode ? toPaise(t.rmin) : null,
-        range_max: quoteMode ? toPaise(t.rmax) : null,
+        range_min: t.range ? toPaise(t.rmin) : null,
+        range_max: t.range ? toPaise(t.rmax) : null,
       };
     });
   }
@@ -685,7 +684,7 @@ function ProductForm({
           is_default: true,
           prices: tierPrices(),
         });
-        toast(quoteMode ? "Product created — quote-only pricing set" : "Product created with prices");
+        toast("Product created with prices");
       }
       onDone();
     } catch {
@@ -910,90 +909,23 @@ function ProductForm({
             />
           </div>
 
-          <div className="field">
-            <label style={{ display: "flex", gap: 9, alignItems: "center", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={quoteMode}
-                onChange={(e) => setQuoteMode(e.target.checked)}
+          <p className="muted small" style={{ margin: "4px 0 12px" }}>
+            Set each buyer role to a <b>fixed</b> price (Add to cart) or a <b>range</b> (buyers
+            raise a quote enquiry). Each role is independent — e.g. customer fixed, retailer range.
+          </p>
+
+          <div className="price-rows">
+            {ROLES.map((role) => (
+              <RolePriceRow
+                key={role}
+                role={role}
+                value={tiers[role]}
+                required={role === "customer"}
+                onChange={(key, v) => setTier(role, key, v)}
               />
-              <span>
-                Range price (quote-only)
-                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
-                  Buyers see an indicative band and raise an enquiry instead of buying directly.
-                  Leave unticked for a fixed price with Add to cart.
-                </span>
-              </span>
-            </label>
+            ))}
           </div>
 
-          <table className="tbl" style={{ marginTop: 4 }}>
-            <thead>
-              <tr>
-                <th>Role</th>
-                <th>MRP ₹</th>
-                {quoteMode ? (
-                  <>
-                    <th>Range min ₹</th>
-                    <th>Range max ₹</th>
-                  </>
-                ) : (
-                  <th>Selling ₹</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {ROLES.map((role) => (
-                <tr key={role}>
-                  <td style={{ textTransform: "capitalize", fontWeight: 600 }}>
-                    {role}
-                    {role === "customer" && <Req />}
-                  </td>
-                  <td>
-                    <input
-                      className="input"
-                      style={{ minWidth: 84 }}
-                      inputMode="decimal"
-                      value={tiers[role].mrp}
-                      onChange={(e) => setTier(role, "mrp", e.target.value)}
-                    />
-                  </td>
-                  {quoteMode ? (
-                    <>
-                      <td>
-                        <input
-                          className="input"
-                          style={{ minWidth: 84 }}
-                          inputMode="decimal"
-                          value={tiers[role].rmin}
-                          onChange={(e) => setTier(role, "rmin", e.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="input"
-                          style={{ minWidth: 84 }}
-                          inputMode="decimal"
-                          value={tiers[role].rmax}
-                          onChange={(e) => setTier(role, "rmax", e.target.value)}
-                        />
-                      </td>
-                    </>
-                  ) : (
-                    <td>
-                      <input
-                        className="input"
-                        style={{ minWidth: 84 }}
-                        inputMode="decimal"
-                        value={tiers[role].selling}
-                        onChange={(e) => setTier(role, "selling", e.target.value)}
-                      />
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
           <p className="muted small" style={{ margin: "8px 0 0" }}>
             Leave clinician or retailer blank to charge them the customer price.
           </p>
@@ -1188,8 +1120,77 @@ interface PriceRowForm {
   selling: string;
   rmin: string;
   rmax: string;
+  // Per-role pricing mode: a fixed selling price, or an indicative quote band.
+  // Each role is independent — e.g. customer fixed while retailer is a range.
+  range: boolean;
 }
 type VariantForms = Record<Role, PriceRowForm>;
+
+/* One editable price row (role + mode toggle + the right inputs). Shared by the
+   create form and the price editor so both behave identically. */
+function RolePriceRow({
+  role,
+  value,
+  onChange,
+  required,
+}: {
+  role: Role;
+  value: PriceRowForm;
+  onChange: (key: keyof PriceRowForm, v: string | boolean) => void;
+  required?: boolean;
+}) {
+  return (
+    <div className="price-row">
+      <div className="price-row-head">
+        <span className="price-role">
+          {role}
+          {required && <Req />}
+        </span>
+        <div className="seg" role="group" aria-label={`${role} price mode`}>
+          <button
+            type="button"
+            className={`seg-btn ${value.range ? "" : "on"}`}
+            aria-pressed={!value.range}
+            onClick={() => onChange("range", false)}
+          >
+            Fixed
+          </button>
+          <button
+            type="button"
+            className={`seg-btn ${value.range ? "on" : ""}`}
+            aria-pressed={value.range}
+            onClick={() => onChange("range", true)}
+          >
+            Range (quote)
+          </button>
+        </div>
+      </div>
+      <div className="row" style={{ gap: 10 }}>
+        <div className="field grow" style={{ margin: 0 }}>
+          <label className="small muted">MRP ₹</label>
+          <input className="input" inputMode="decimal" value={value.mrp} onChange={(e) => onChange("mrp", e.target.value)} />
+        </div>
+        {value.range ? (
+          <>
+            <div className="field grow" style={{ margin: 0 }}>
+              <label className="small muted">Range min ₹</label>
+              <input className="input" inputMode="decimal" value={value.rmin} onChange={(e) => onChange("rmin", e.target.value)} />
+            </div>
+            <div className="field grow" style={{ margin: 0 }}>
+              <label className="small muted">Range max ₹</label>
+              <input className="input" inputMode="decimal" value={value.rmax} onChange={(e) => onChange("rmax", e.target.value)} />
+            </div>
+          </>
+        ) : (
+          <div className="field grow" style={{ margin: 0 }}>
+            <label className="small muted">Selling ₹</label>
+            <input className="input" inputMode="decimal" value={value.selling} onChange={(e) => onChange("selling", e.target.value)} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* Admin detail shape — variants + per-role prices, draft or live. */
 interface AdminPriceRow {
@@ -1235,9 +1236,6 @@ function PriceEditor({
   const [forms, setForms] = useState<Record<string, VariantForms>>({});
   const [packs, setPacks] = useState<Record<string, PackForm>>({});
   const [busy, setBusy] = useState(false);
-  // Same fixed/range switch as the create form — set from the saved rows so
-  // an existing quote-only product opens in range mode.
-  const [quoteMode, setQuoteMode] = useState(false);
 
   useEffect(() => {
     // Admin detail endpoint — resolves drafts too (the public /products/{slug}
@@ -1252,11 +1250,14 @@ function PriceEditor({
           const form = {} as VariantForms;
           for (const role of ROLES) {
             const p = (v.prices ?? []).find((x) => x.role === role);
+            // Each role opens in the mode it was saved in — a stored band → range.
+            const isRange = p?.range_min != null && p?.range_max != null;
             form[role] = {
               mrp: toRupeeInput(p?.mrp ?? null),
               selling: toRupeeInput(p?.selling_price ?? null),
               rmin: toRupeeInput(p?.range_min ?? null),
               rmax: toRupeeInput(p?.range_max ?? null),
+              range: !!isRange,
             };
           }
           initial[v.id] = form;
@@ -1269,16 +1270,11 @@ function PriceEditor({
         }
         setForms(initial);
         setPacks(initPacks);
-        setQuoteMode(
-          d.variants.some((v) =>
-            (v.prices ?? []).some((p) => p.range_min !== null && p.range_max !== null),
-          ),
-        );
       })
       .catch(() => toast("Could not load prices", true));
   }, [product.id, toast]);
 
-  function setField(vid: string, role: Role, key: keyof PriceRowForm, value: string) {
+  function setField(vid: string, role: Role, key: keyof PriceRowForm, value: string | boolean) {
     setForms((f) => ({ ...f, [vid]: { ...f[vid], [role]: { ...f[vid][role], [key]: value } } }));
   }
 
@@ -1310,7 +1306,7 @@ function PriceEditor({
       if (!form) continue;
       for (const r of ROLES) {
         const t = form[r];
-        const hasPrice = quoteMode
+        const hasPrice = t.range
           ? toPaise(t.rmin) > 0 || toPaise(t.rmax) > 0
           : toPaise(t.selling) > 0;
         if (hasPrice && toPaise(t.mrp) <= 0) priceGaps.push(`${v.pack_size} · ${r}`);
@@ -1333,24 +1329,25 @@ function PriceEditor({
       for (const v of detail.variants) {
         const form = forms[v.id];
         const pf = packs[v.id];
-        // A row counts once it has an MRP plus whatever the chosen mode needs.
+        // A row counts once it has an MRP plus whatever its own mode needs.
         const filled = (r: Role) =>
           toPaise(form[r].mrp) > 0 &&
-          (quoteMode
+          (form[r].range
             ? toPaise(form[r].rmin) > 0 && toPaise(form[r].rmax) > 0
             : toPaise(form[r].selling) > 0);
         const prices = ROLES.filter(filled).map((r) => {
-          if (quoteMode && toPaise(form[r].rmax) < toPaise(form[r].rmin)) {
+          const isRange = form[r].range;
+          if (isRange && toPaise(form[r].rmax) < toPaise(form[r].rmin)) {
             throw new Error(`${v.pack_size} / ${r}: range max is below min`);
           }
           return {
             role: r,
             mrp: toPaise(form[r].mrp),
-            // Quote rows anchor on the band minimum; switching back to fixed
-            // clears the band so the storefront leaves quote-only mode.
-            selling_price: quoteMode ? toPaise(form[r].rmin) : toPaise(form[r].selling),
-            range_min: quoteMode ? toPaise(form[r].rmin) : null,
-            range_max: quoteMode ? toPaise(form[r].rmax) : null,
+            // Range rows anchor on the band minimum; a fixed row clears the band
+            // so the storefront treats that role as a normal Add-to-cart price.
+            selling_price: isRange ? toPaise(form[r].rmin) : toPaise(form[r].selling),
+            range_min: isRange ? toPaise(form[r].rmin) : null,
+            range_max: isRange ? toPaise(form[r].rmax) : null,
           };
         });
         await api.patch(`/admin/variants/${v.id}`, {
@@ -1408,22 +1405,10 @@ function PriceEditor({
         </div>
       ) : (
         <div style={{ display: "grid", gap: 20 }}>
-          <div className="field">
-            <label style={{ display: "flex", gap: 9, alignItems: "center", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={quoteMode}
-                onChange={(e) => setQuoteMode(e.target.checked)}
-              />
-              <span>
-                Range price (quote-only)
-                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
-                  Buyers see an indicative band and raise an enquiry instead of buying
-                  directly. Leave unticked for a fixed price with Add to cart.
-                </span>
-              </span>
-            </label>
-          </div>
+          <p className="muted small" style={{ margin: 0 }}>
+            Each buyer role can be a <b>fixed</b> price or a <b>range</b> (quote enquiry),
+            set independently per pack.
+          </p>
 
           {priceGaps.length > 0 && (
             <p className="small" style={{ color: "var(--danger)", margin: 0 }}>
@@ -1473,46 +1458,19 @@ function PriceEditor({
                   Default pack
                 </label>
               </div>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Role</th>
-                    <th>MRP ₹</th>
-                    {quoteMode ? (
-                      <>
-                        <th>Range min ₹</th>
-                        <th>Range max ₹</th>
-                      </>
-                    ) : (
-                      <th>Selling ₹</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ROLES.map((role) => (
-                    <tr key={role}>
-                      <td style={{ textTransform: "capitalize", fontWeight: 600 }}>
-                        {role}
-                        {role === "customer" && <span className="muted small"> (required)</span>}
-                      </td>
-                      {(quoteMode
-                        ? (["mrp", "rmin", "rmax"] as const)
-                        : (["mrp", "selling"] as const)
-                      ).map((key) => (
-                        <td key={key}>
-                          <input
-                            className="input"
-                            style={{ minWidth: 84 }}
-                            inputMode="decimal"
-                            value={forms[v.id]?.[role]?.[key] ?? ""}
-                            onChange={(e) => setField(v.id, role, key, e.target.value)}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="price-rows" style={{ marginTop: 12 }}>
+                {ROLES.map((role) =>
+                  forms[v.id]?.[role] ? (
+                    <RolePriceRow
+                      key={role}
+                      role={role}
+                      value={forms[v.id][role]}
+                      required={role === "customer"}
+                      onChange={(key, val) => setField(v.id, role, key, val)}
+                    />
+                  ) : null,
+                )}
+              </div>
             </section>
           ))}
         </div>
