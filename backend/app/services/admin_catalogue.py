@@ -274,6 +274,39 @@ async def add_image_url(
     return {"id": image.id, "storage_key": image.storage_key, "alt": image.alt, "is_primary": image.is_primary}
 
 
+async def upload_product_image(
+    db: AsyncSession, actor: User, product_id: uuid.UUID, *, content_type: str, is_primary: bool, data: bytes
+) -> dict:
+    """Store a product image uploaded through the api and create its row.
+
+    Returns a renderable public URL as `storage_key`, matching add_image_url so
+    the dashboard can drop it straight into <img src>.
+    """
+    product = await _load_product(db, product_id)
+    if content_type not in storage.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unsupported image type")
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty file")
+    if len(data) > storage.MAX_UPLOAD_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "image too large (max 10 MB)")
+    key = storage.make_key("products", content_type=content_type, prefix=product.slug)
+    await storage.put_bytes_async(key, data, content_type=content_type)
+    if not product.images:
+        is_primary = True
+    if is_primary:
+        for img in product.images:
+            img.is_primary = False
+    image = ProductImage(
+        product_id=product.id, storage_key=key, alt=None, is_primary=is_primary, sort_order=len(product.images)
+    )
+    db.add(image)
+    await db.flush()
+    await _audit(db, actor, "product_image.created", "product_image", str(image.id), {"via": "upload"})
+    await db.commit()
+    await _catalogue_event("product.updated", "product", str(product.id))
+    return {"id": str(image.id), "storage_key": storage.image_url(key), "alt": None, "is_primary": is_primary}
+
+
 async def set_primary_image(db: AsyncSession, actor: User, image_id: uuid.UUID) -> None:
     image = (
         await db.execute(

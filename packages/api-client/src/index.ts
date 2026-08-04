@@ -106,7 +106,11 @@ export function createApiClient(opts: ApiClientOptions = {}) {
       if (v !== undefined) url.searchParams.set(k, String(v));
     }
     const target = opts.baseUrl ? url.toString() : url.pathname + url.search;
-    const body = init?.body !== undefined ? JSON.stringify(init.body) : undefined;
+    // FormData (file uploads) passes through untouched — the browser sets the
+    // multipart Content-Type with its boundary. Everything else is JSON.
+    const isForm = typeof FormData !== "undefined" && init?.body instanceof FormData;
+    const body =
+      init?.body === undefined ? undefined : isForm ? (init.body as FormData) : JSON.stringify(init.body);
     const doFetch = (token: string | null | undefined) =>
       fetch(target, {
         method,
@@ -116,7 +120,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         cache: "no-store",
         credentials: "include",
         headers: {
-          ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+          ...(body !== undefined && !isForm ? { "Content-Type": "application/json" } : {}),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body,

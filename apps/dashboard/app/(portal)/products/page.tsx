@@ -29,9 +29,6 @@ interface ProductImg {
    preview URL until the real upload replaces it. */
 type FormImg = ProductImg & { file?: File };
 
-/* Presign slot returned by POST /admin/products/{id}/images. */
-type ImageSlot = { image_id: string; storage_key: string; upload_url: string; public_url: string };
-
 /* Mirrors the storefront gallery (ProductGallery.tsx THUMB_SLOTS): the product
    page shows the primary as the main image plus a row of thumbnail tiles. Keep
    these in sync so the dashboard never lets staff add images the PDP won't show. */
@@ -487,19 +484,17 @@ function ProductForm({
     if (editing && product) {
       setImgBusy(true);
       try {
-        const slot = await api.post<ImageSlot>(`/admin/products/${product.id}/images`, {
-          content_type: file.type,
-          is_primary: makePrimary,
-        });
-        const put = await fetch(slot.upload_url, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!put.ok) throw new Error("upload failed");
+        // Upload THROUGH the api (browser → api → storage); no browser→storage
+        // reachability or CORS needed. FormData → multipart.
+        const form = new FormData();
+        form.append("file", file);
+        const img = await api.post<{ id: string; storage_key: string; is_primary: boolean }>(
+          `/admin/products/${product.id}/images/upload?is_primary=${makePrimary}`,
+          form,
+        );
         setImages((xs) => [
           ...(makePrimary ? xs.map((x) => ({ ...x, is_primary: false })) : xs),
-          { id: slot.image_id, storage_key: slot.public_url, alt: null, is_primary: makePrimary },
+          { id: img.id, storage_key: img.storage_key, alt: null, is_primary: img.is_primary },
         ]);
         toast("Image uploaded");
       } catch {
@@ -642,15 +637,9 @@ function ProductForm({
         // directly. Primary flag is preserved per image.
         for (const im of images) {
           if (im.file) {
-            const slot = await api.post<ImageSlot>(`/admin/products/${created.id}/images`, {
-              content_type: im.file.type,
-              is_primary: im.is_primary,
-            });
-            await fetch(slot.upload_url, {
-              method: "PUT",
-              headers: { "Content-Type": im.file.type },
-              body: im.file,
-            });
+            const form = new FormData();
+            form.append("file", im.file);
+            await api.post(`/admin/products/${created.id}/images/upload?is_primary=${im.is_primary}`, form);
           } else {
             await api.post(`/admin/products/${created.id}/images/url`, {
               url: im.storage_key,

@@ -160,6 +160,23 @@ def put_bytes(key: str, data: bytes, *, content_type: str) -> None:
     )
 
 
+def get_bytes(key: str) -> tuple[bytes, str] | None:
+    """Fetch an object's bytes + content-type, or None if missing/unconfigured.
+    Backs the /media proxy used in local dev (browser → api → storage)."""
+    if not is_configured():
+        return None
+    try:
+        obj = _client().get_object(Bucket=get_settings().storage_bucket, Key=key)
+    except Exception:
+        return None
+    return obj["Body"].read(), (obj.get("ContentType") or "application/octet-stream")
+
+
+async def get_bytes_async(key: str) -> tuple[bytes, str] | None:
+    """Async-safe `get_bytes` (boto3 blocks on the network)."""
+    return await asyncio.to_thread(get_bytes, key)
+
+
 async def put_bytes_async(key: str, data: bytes, *, content_type: str) -> None:
     """Async-safe `put_bytes`: boto3 blocks on the network, so hop to a thread.
 

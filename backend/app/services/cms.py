@@ -94,6 +94,19 @@ def create_upload_slot(*, content_type: str) -> dict[str, str]:
     }
 
 
+async def store_upload(*, content_type: str, data: bytes) -> dict[str, str]:
+    """Store a CMS image uploaded through the API and return its public URL."""
+    if content_type not in storage.ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unsupported image type")
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty file")
+    if len(data) > storage.MAX_UPLOAD_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "image too large (max 10 MB)")
+    key = storage.make_key("cms", content_type=content_type)
+    await storage.put_bytes_async(key, data, content_type=content_type)
+    return {"public_url": storage.public_url(key)}
+
+
 # --- Admin: pages & blocks -------------------------------------------------------
 
 

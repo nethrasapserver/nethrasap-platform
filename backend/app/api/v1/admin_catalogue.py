@@ -135,6 +135,22 @@ async def add_image_url(
     )
 
 
+@router.post("/admin/products/{product_id}/images/upload", status_code=status.HTTP_201_CREATED)
+async def upload_image_file(
+    product_id: UUID,
+    file: Annotated[UploadFile, File()],
+    db: DbSession,
+    actor: CatalogueAdmin,
+    is_primary: bool = False,
+) -> dict:
+    """Upload a product image THROUGH the api (browser → api → storage), so the
+    browser never has to reach the storage host directly."""
+    data = await file.read()
+    return await svc.upload_product_image(
+        db, actor, product_id, content_type=file.content_type or "", is_primary=is_primary, data=data
+    )
+
+
 @router.patch("/admin/images/{image_id}/primary", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def set_primary_image(image_id: UUID, db: DbSession, actor: CatalogueAdmin) -> Response:
     await svc.set_primary_image(db, actor, image_id)

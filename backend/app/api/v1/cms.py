@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, File, Response, UploadFile, status
 
 from ...db import DbSession
 from ...deps import require_permission
@@ -96,6 +96,18 @@ async def delete_block(block_id: UUID, db: DbSession, actor: CmsAdmin) -> CmsPag
 async def create_upload(payload: CmsUploadRequest, _a: CmsAdmin) -> dict[str, str]:
     """Presign a direct image upload for CMS content (cms:write gated)."""
     return svc.create_upload_slot(content_type=payload.content_type)
+
+
+@router.post("/admin/cms/upload")
+async def upload_image(file: Annotated[UploadFile, File()], _a: CmsAdmin) -> dict[str, str]:
+    """Upload a CMS image THROUGH the API (browser → api → storage).
+
+    Avoids the browser needing to reach the storage host directly, which is
+    fragile in local dev (localhost:9000) and needs CORS in prod. Returns the
+    public URL to store on the block.
+    """
+    data = await file.read()
+    return await svc.store_upload(content_type=file.content_type or "", data=data)
 
 
 # --- Admin: settings & flags ------------------------------------------------------

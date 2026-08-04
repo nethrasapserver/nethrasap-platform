@@ -354,16 +354,12 @@ export function BlockForm({
     }
     setImgBusy(true);
     try {
-      const slot = await api.post<{ upload_url: string; public_url: string }>("/admin/cms/uploads", {
-        content_type: file.type,
-      });
-      const put = await fetch(slot.upload_url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!put.ok) throw new Error("upload failed");
-      set(key, slot.public_url);
+      // Upload THROUGH the api (browser → api → storage) so the browser never
+      // has to reach the storage host directly. FormData → multipart.
+      const form = new FormData();
+      form.append("file", file);
+      const { public_url } = await api.post<{ public_url: string }>("/admin/cms/upload", form);
+      set(key, public_url);
       toast("Image uploaded");
     } catch {
       toast("Upload failed — try again, or paste a hosted image URL instead", true);

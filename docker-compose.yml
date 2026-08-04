@@ -97,7 +97,7 @@ services:
       STORAGE_BUCKET: nethrasap
       STORAGE_ACCESS_KEY_ID: nethrasap
       STORAGE_SECRET_ACCESS_KEY: dev_only_password
-      STORAGE_PUBLIC_BASE_URL: http://localhost:9000/nethrasap
+      STORAGE_PUBLIC_BASE_URL: /api/v1/media
     ports:
       - "8000:8000"
     depends_on:
@@ -127,7 +127,7 @@ services:
       STORAGE_BUCKET: nethrasap
       STORAGE_ACCESS_KEY_ID: nethrasap
       STORAGE_SECRET_ACCESS_KEY: dev_only_password
-      STORAGE_PUBLIC_BASE_URL: http://localhost:9000/nethrasap
+      STORAGE_PUBLIC_BASE_URL: /api/v1/media
     depends_on:
       redis:
         condition: service_healthy

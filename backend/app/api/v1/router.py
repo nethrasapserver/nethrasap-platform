@@ -19,6 +19,7 @@ from . import (
     hr,
     inventory,
     kyc,
+    media,
     notifications,
     orders,
     payments,
@@ -45,6 +46,7 @@ api_router_v1.include_router(saved_items.router, tags=["saved-items"])
 api_router_v1.include_router(analytics.router, tags=["analytics"])
 api_router_v1.include_router(hr.router, tags=["hr"])
 api_router_v1.include_router(cms.router, tags=["cms"])
+api_router_v1.include_router(media.router, tags=["media"])
 api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router_v1.include_router(products.router, prefix="/products", tags=["products"])
 api_router_v1.include_router(reviews.router, prefix="/products", tags=["reviews"])
