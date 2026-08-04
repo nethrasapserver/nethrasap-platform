@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CmsBlock, CmsPage } from "@/app/(portal)/content/_lib";
 import { Drawer } from "@/components/Drawer";
 import { Select } from "@/components/Select";
@@ -489,17 +489,33 @@ function ImageField({
   onClear: () => void;
 }) {
   const [url, setUrl] = useState("");
+  const [broken, setBroken] = useState(false);
+  // Re-test whenever the stored value changes (remount the <img> to load again).
+  useEffect(() => setBroken(false), [value]);
   return (
     <>
       {value && (
-        <div className="row" style={{ gap: 10, marginBottom: 10, alignItems: "center" }}>
-          <span className="prod-thumb" style={{ width: 64, height: 64 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={value} alt="" />
-          </span>
-          <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={onClear} disabled={busy}>
-            Remove
-          </button>
+        <div style={{ marginBottom: 10 }}>
+          <div className="row" style={{ gap: 10, alignItems: "center" }}>
+            <span className="prod-thumb" style={{ width: 64, height: 64, fontSize: ".62rem", textAlign: "center" }}>
+              {broken ? (
+                <span className="muted">can&apos;t load</span>
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={value} alt="" onError={() => setBroken(true)} onLoad={() => setBroken(false)} />
+              )}
+            </span>
+            <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={onClear} disabled={busy}>
+              Remove
+            </button>
+          </div>
+          {broken && (
+            <p className="small" style={{ margin: "6px 0 0", color: "var(--danger)", lineHeight: 1.45 }}>
+              This link isn&apos;t loading as an image. Use <b>Choose file</b> to upload the image, or paste a{" "}
+              <b>direct image link</b> — right-click the image → “Copy image address” (it should end in .jpg, .png or
+              .webp). A Google / search / share-page link (share.google, a Drive page, etc.) won&apos;t work.
+            </p>
+          )}
         </div>
       )}
       <input
@@ -513,7 +529,7 @@ function ImageField({
         <input
           className="input"
           style={{ flex: 1 }}
-          placeholder="…or paste an image URL"
+          placeholder="…or paste a direct image URL (.jpg / .png / .webp)"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
@@ -528,6 +544,10 @@ function ImageField({
           Set
         </button>
       </div>
+      <p className="muted small" style={{ margin: "4px 0 0" }}>
+        Upload a file (recommended), or paste a <b>direct</b> image link. A webpage / Google / share link shows as a
+        broken image.
+      </p>
     </>
   );
 }
