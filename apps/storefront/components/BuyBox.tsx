@@ -94,14 +94,6 @@ export function BuyBox({ product }: { product: ProductDetail }) {
     : null;
   const showRoleHint = !quote && (!user || user.role === "customer") && tradeMin != null && tradeMax != null;
 
-  // Benefits checklist from the free-form attributes JSONB (hide if absent).
-  // Cast through unknown: the generated type models the bare `dict` as
-  // Record<string, never>, which would collapse every property to never.
-  const attrs = ((product as { attributes?: unknown }).attributes ?? {}) as Record<string, unknown>;
-  const highlights = Array.isArray(attrs.highlights)
-    ? attrs.highlights.filter((h): h is string => typeof h === "string" && h.trim().length > 0)
-    : [];
-
   return (
     <>
       <div className="buybox">
@@ -167,12 +159,8 @@ export function BuyBox({ product }: { product: ProductDetail }) {
           </div>
         )}
 
-        {highlights.length > 0 && (
-          <ul className="buy-perks">
-            {highlights.map((h) => (
-              <li key={h}>{h}</li>
-            ))}
-          </ul>
+        {product.description && (
+          <p className="buy-desc">{product.description}</p>
         )}
 
         {/* Discontinued products keep the page for SEO but lose the buy row. */}

@@ -559,6 +559,11 @@
 }
 .buy-perks li { display: flex; gap: 8px; align-items: flex-start; }
 .buy-perks li::before { content: "✓"; color: var(--ok); font-weight: 700; flex: none; }
+/* Short product description shown in the buy card (replaces the old bullet perks). */
+.buy-desc {
+  margin: var(--sp-4) 0 0; padding: var(--sp-4) 0 0; border-top: 1px solid var(--line);
+  font-size: .88rem; line-height: 1.55; color: var(--ink-2);
+}
 .buy-rx {
   margin: var(--sp-4) 0 0; padding: 10px 12px; border-radius: var(--r-md);
   background: var(--rx-bg); color: var(--rx); font-size: .8rem;

@@ -38,6 +38,14 @@ type ImageSlot = { image_id: string; storage_key: string; upload_url: string; pu
 const MAX_IMAGES = 3;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+/* The PDP shows the description as one short paragraph in the buy card. */
+const DESCRIPTION_MAX_WORDS = 100;
+const wordCount = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
+const capWords = (s: string, max: number) => {
+  const words = s.split(/\s+/).filter(Boolean);
+  return words.length <= max ? s : words.slice(0, max).join(" ");
+};
+
 function PlaceholderArt({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
@@ -814,7 +822,15 @@ function ProductForm({
       </div>
       <div className="field">
         <label>Description</label>
-        <textarea className="input" rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
+        <textarea
+          className="input"
+          rows={3}
+          value={form.description}
+          onChange={(e) => set("description", capWords(e.target.value, DESCRIPTION_MAX_WORDS))}
+        />
+        <p className="muted small" style={{ margin: "4px 0 0" }}>
+          One short paragraph shown on the product page — {wordCount(form.description)}/{DESCRIPTION_MAX_WORDS} words.
+        </p>
       </div>
 
       {!editing && (

@@ -163,13 +163,6 @@ export default async function ProductPage({ params }: { params: { slug: string }
         </section>
       )}
 
-      {p.description && (
-        <section className="pdp-section" id="description">
-          <h2>Description</h2>
-          <p className="pdp-prose">{p.description}</p>
-        </section>
-      )}
-
       {ingredients.length > 0 && (
         <section className="pdp-section" id="composition">
           <h2>Composition</h2>
