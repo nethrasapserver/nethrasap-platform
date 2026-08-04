@@ -93,15 +93,22 @@ export function HeroCarousel({ slides }: { slides?: HeroSlideData[] }) {
       <div className="hero-track" style={{ transform: `translateX(-${index * 100}%)` }}>
         {data.map((s, i) => {
           const theme = normTheme(s.theme);
+          const hasBg = Boolean(s.image_url);
           return (
             <div
               key={s.key || `${i}`}
-              className={`hero-slide is-${theme}`}
+              className={`hero-slide is-${theme}${hasBg ? " is-bg" : ""}`}
               role="group"
               aria-roledescription="slide"
               aria-label={`${i + 1} of ${count}`}
               aria-hidden={i !== index}
             >
+              {hasBg && (
+                <div className="hero-bg" aria-hidden="true">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.image_url} alt="" />
+                </div>
+              )}
               <div className="container hero-slide-inner">
                 <div className="hero-copy">
                   <span className="eyebrow">{s.eyebrow}</span>
@@ -118,18 +125,11 @@ export function HeroCarousel({ slides }: { slides?: HeroSlideData[] }) {
                     )}
                   </div>
                 </div>
-                <div className="hero-art" aria-hidden="true">
-                  {s.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={s.image_url}
-                      alt=""
-                      style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                    />
-                  ) : (
-                    themeArt(theme)
-                  )}
-                </div>
+                {!hasBg && (
+                  <div className="hero-art" aria-hidden="true">
+                    {themeArt(theme)}
+                  </div>
+                )}
               </div>
             </div>
           );

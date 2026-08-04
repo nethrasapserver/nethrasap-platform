@@ -73,6 +73,28 @@ export function HeroSlidePreview({ content, framed = true }: { content: Record<s
   const alt = s("alt_label");
   const image = s("image_url");
 
+  // With an image, the slide renders it as a full-bleed background with the copy
+  // overlaid — mirroring the storefront (.hero-slide.is-bg).
+  if (image) {
+    return (
+      <div className={`hp-slide hp-bg ${framed ? "hp-framed" : ""}`}>
+        <span className="hp-bg-img">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image} alt="" />
+        </span>
+        <div className="hp-copy hp-over">
+          {eyebrow && <span className="hp-eyebrow hp-eyebrow-over">{eyebrow}</span>}
+          <div className="hp-title hp-title-over">{title || "Slide headline"}</div>
+          {body && <p className="hp-body hp-body-over">{body}</p>}
+          <div className="hp-cta">
+            {cta && <span className="hp-btn sp-btn-cream">{cta}</span>}
+            {alt && <span className="hp-btn sp-btn-ghost">{alt}</span>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`hp-slide ${framed ? "hp-framed" : ""}`}>
       <div className="hp-copy">
@@ -89,12 +111,7 @@ export function HeroSlidePreview({ content, framed = true }: { content: Record<s
         </div>
       </div>
       <div className="hp-art" style={{ color: ART_COLOR[theme] }}>
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" />
-        ) : (
-          <ThemeArt theme={theme} />
-        )}
+        <ThemeArt theme={theme} />
       </div>
     </div>
   );
