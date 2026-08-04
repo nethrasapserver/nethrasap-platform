@@ -24,6 +24,14 @@ class UploadSlotResponse(BaseModel):
     expires_in: int
 
 
+class UploadedDocResponse(BaseModel):
+    """Returned after an upload-through-the-api: the metadata to pass to /kyc/submit."""
+
+    storage_key: str
+    content_type: str
+    size_bytes: int
+
+
 class SubmittedDocument(BaseModel):
     doc_type: DocType
     storage_key: str = Field(min_length=8, max_length=512)

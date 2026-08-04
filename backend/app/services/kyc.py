@@ -64,6 +64,50 @@ def create_upload_slot(user: User, *, doc_type: str, content_type: str, size_byt
     }
 
 
+async def upload_document(user: User, *, doc_type: str, content_type: str, data: bytes) -> dict:
+    """Store one KYC document through the api (browser → api → storage), so the
+    browser never has to reach the storage host. Returns the metadata the client
+    then attaches via /kyc/submit. Nothing persists to the DB until submit."""
+    _require_kyc_role(user)
+    try:
+        KycDocType(doc_type)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid doc_type: {doc_type}") from None
+    if content_type not in storage.ALLOWED_DOCUMENT_TYPES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"content_type must be one of {', '.join(storage.ALLOWED_DOCUMENT_TYPES)}",
+        )
+    if len(data) == 0:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "empty file")
+    if len(data) > storage.MAX_UPLOAD_BYTES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "file too large (max 10 MB)")
+
+    key = storage.make_key("kyc", content_type=content_type, prefix=str(user.id))
+    await storage.put_bytes_async(key, data, content_type=content_type)
+    return {"storage_key": key, "content_type": content_type, "size_bytes": len(data)}
+
+
+async def load_document(db: AsyncSession, request_id: uuid.UUID, doc_id: uuid.UUID) -> tuple[bytes, str]:
+    """Fetch one document's bytes for staff review (browser → api → storage), so
+    KYC files stay behind admin auth instead of a public/presigned URL. The caller
+    (router) is already gated by the kyc:review permission."""
+    doc = (
+        await db.execute(
+            select(KycDocument).where(
+                KycDocument.id == doc_id, KycDocument.request_id == request_id
+            )
+        )
+    ).scalar_one_or_none()
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "document not found")
+    got = await storage.get_bytes_async(doc.storage_key)
+    if got is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "document file missing")
+    data, content_type = got
+    return data, content_type or doc.content_type
+
+
 async def submit_request(
     db: AsyncSession,
     user: User,
@@ -262,7 +306,10 @@ def serialise_request(
                 "doc_type": d.doc_type.value,
                 "content_type": d.content_type,
                 "size_bytes": d.size_bytes,
-                **({"download_url": storage.presigned_get(d.storage_key)} if with_urls else {}),
+                # Served through the api behind kyc:review auth (browser → api →
+                # storage) rather than a presigned storage URL the browser may not
+                # be able to reach. The dashboard fetches it with its bearer token.
+                **({"download_url": f"/verifications/{req.id}/documents/{d.id}"} if with_urls else {}),
             }
             for d in req.documents
         ],

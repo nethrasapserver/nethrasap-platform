@@ -1185,3 +1185,32 @@
 @media (max-width: 560px) {
   .trust-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------- Account — welcome hero ---------- */
+.acct-hero { display: flex; gap: var(--sp-8); align-items: stretch; }
+.acct-hero-main { flex: 1 1 auto; min-width: 0; }
+.acct-hello { margin-top: 6px; }
+.acct-hello h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.8rem); }
+.acct-blurb { margin: 10px 0 0; max-width: 58ch; color: var(--ink-2); font-size: .95rem; line-height: 1.65; }
+.acct-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+.acct-search {
+  flex: 0 0 300px; align-self: flex-end;
+  display: grid; gap: 8px; align-content: end;
+}
+.acct-search-row { display: flex; gap: 8px; }
+.acct-search-row .input { flex: 1 1 auto; min-width: 0; margin: 0; }
+
+.acct-trust { margin-top: var(--sp-4); }
+
+/* Orders table scrolls inside its card instead of stretching the page. */
+.acct-orders { overflow-x: auto; }
+.acct-orders .table { min-width: 560px; }
+
+@media (max-width: 860px) {
+  .acct-hero { flex-direction: column; gap: var(--sp-5); }
+  .acct-search { flex-basis: auto; align-self: stretch; }
+}
+@media (max-width: 560px) {
+  .acct-actions .btn { flex: 1 1 auto; justify-content: center; text-align: center; }
+}

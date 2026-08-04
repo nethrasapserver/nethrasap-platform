@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
 
 from ...db import DbSession
 from ...deps import ClientMeta, CurrentUser, Paged, require_permission
@@ -12,6 +12,7 @@ from ...models.user import User
 from ...schemas.kyc import (
     DecisionRequest,
     SubmitRequest,
+    UploadedDocResponse,
     UploadSlotRequest,
     UploadSlotResponse,
     VerificationListOut,
@@ -38,6 +39,21 @@ async def create_upload_slot(payload: UploadSlotRequest, user: CurrentUser) -> U
         size_bytes=payload.size_bytes,
     )
     return UploadSlotResponse(**slot)
+
+
+@router.post("/kyc/uploads/file", response_model=UploadedDocResponse)
+async def upload_document_file(
+    user: CurrentUser,
+    doc_type: Annotated[str, Form()],
+    file: Annotated[UploadFile, File()],
+) -> UploadedDocResponse:
+    """Upload one document through the api (browser → api → storage). Returns the
+    metadata to attach via /kyc/submit — avoids the browser reaching storage."""
+    data = await file.read()
+    res = await svc.upload_document(
+        user, doc_type=doc_type, content_type=file.content_type or "", data=data
+    )
+    return UploadedDocResponse(**res)
 
 
 @router.post("/kyc/submit", response_model=VerificationOut, status_code=status.HTTP_201_CREATED)
@@ -82,6 +98,18 @@ async def queue(
 async def detail(request_id: UUID, db: DbSession, _staff: ReviewUser) -> VerificationOut:
     req, applicant = await svc.get_request(db, request_id)
     return VerificationOut(**svc.serialise_request(req, applicant, with_urls=True))
+
+
+@router.get("/verifications/{request_id}/documents/{doc_id}")
+async def document(request_id: UUID, doc_id: UUID, db: DbSession, _staff: ReviewUser) -> Response:
+    """Stream a KYC document to a reviewer (browser → api → storage). Gated by
+    kyc:review, so private KYC files never need a public/presigned URL."""
+    data, content_type = await svc.load_document(db, request_id, doc_id)
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Content-Disposition": "inline", "Cache-Control": "private, no-store"},
+    )
 
 
 @router.post("/verifications/{request_id}/approve", response_model=VerificationOut)

@@ -138,6 +138,29 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
   }
 
+  // GET raw binary (e.g. an authenticated document behind admin auth) as a Blob,
+  // reusing the same bearer + single-flight refresh as request(). The response
+  // isn't JSON, so it can't go through request()'s res.json().
+  async function requestBlob(path: string): Promise<Blob> {
+    const url = new URL(base + path, typeof window === "undefined" ? "http://localhost" : window.location.origin);
+    const target = opts.baseUrl ? url.toString() : url.pathname + url.search;
+    const doFetch = (token: string | null | undefined) =>
+      fetch(target, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+    let res = await doFetch(await opts.getToken?.());
+    if (res.status === 401 && !AUTH_PATHS.has(path)) {
+      const tokens = await refreshTokens();
+      if (tokens) res = await doFetch(tokens.access_token);
+      if (res.status === 401) opts.onUnauthorized?.();
+    }
+    if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => null));
+    return res.blob();
+  }
+
   return {
     get: <T>(path: string, query?: Record<string, string | number | boolean | undefined>) =>
       request<T>("GET", path, { query }),
@@ -145,6 +168,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }),
     patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }),
     del: <T>(path: string) => request<T>("DELETE", path),
+    getBlob: (path: string) => requestBlob(path),
   };
 }
 

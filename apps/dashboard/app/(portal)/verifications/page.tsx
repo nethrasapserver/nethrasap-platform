@@ -200,6 +200,23 @@ function ReviewDrawer({
   const { data: v, loading } = useApi<Verification>(`/verifications/${requestId}`);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+
+  // KYC docs are private: fetch through the api with the reviewer's token, then
+  // open the bytes as a blob URL (a plain <a href> can't send the auth header).
+  async function openDoc(docId: string, url: string) {
+    setOpening(docId);
+    try {
+      const blob = await api.getBlob(url);
+      const obj = URL.createObjectURL(blob);
+      window.open(obj, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(obj), 60_000);
+    } catch {
+      toast("Could not open the document — try again", true);
+    } finally {
+      setOpening(null);
+    }
+  }
 
   async function decide(action: "approve" | "reject") {
     if (action === "reject" && !notes.trim()) {
@@ -275,9 +292,14 @@ function ReviewDrawer({
                 </div>
               </div>
               {d.download_url ? (
-                <a className="btn btn-outline btn-sm" href={d.download_url} target="_blank" rel="noopener noreferrer">
-                  Open
-                </a>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => openDoc(d.id, d.download_url!)}
+                  disabled={opening === d.id}
+                >
+                  {opening === d.id ? "Opening…" : "Open"}
+                </button>
               ) : (
                 <span className="muted small">no file</span>
               )}

@@ -7,7 +7,9 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/lib/toast";
 
 type Verification = Schemas["VerificationOut"];
-type UploadSlot = Schemas["UploadSlotResponse"];
+// Response of POST /kyc/uploads/file (upload-through-the-api). Typed locally so
+// the panel doesn't depend on regenerating the OpenAPI client for one shape.
+type UploadedDoc = { storage_key: string; content_type: string; size_bytes: number };
 
 type DocType = "council_cert" | "cdsco_20b_21b" | "gstin" | "hospital_license";
 
@@ -139,25 +141,20 @@ export function KycPanel() {
     }
     setSlots((s) => ({ ...s, [slot.type]: { phase: "uploading", name: file.name } }));
     try {
-      const slotResp = await api.post<UploadSlot>("/kyc/uploads", {
-        doc_type: slot.type,
-        content_type: file.type,
-        size_bytes: file.size,
-      });
-      const put = await fetch(slotResp.upload_url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!put.ok) throw new Error(`upload failed (${put.status})`);
+      // Upload through the api (browser → api → storage): the browser never has
+      // to reach the storage host, which isn't reliably reachable across envs.
+      const form = new FormData();
+      form.append("doc_type", slot.type);
+      form.append("file", file);
+      const uploaded = await api.post<UploadedDoc>("/kyc/uploads/file", form);
       setSlots((s) => ({
         ...s,
         [slot.type]: {
           phase: "done",
           name: file.name,
-          storage_key: slotResp.storage_key,
-          content_type: file.type,
-          size_bytes: file.size,
+          storage_key: uploaded.storage_key,
+          content_type: uploaded.content_type,
+          size_bytes: uploaded.size_bytes,
         },
       }));
     } catch {
