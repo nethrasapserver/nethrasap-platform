@@ -74,7 +74,6 @@ type AdminProduct = Omit<Schemas["AdminProductOut"], "variants" | "images"> & {
 /* One row of the PDP "Composition" table (ProductGallery reads attrs.ingredients). */
 type Ingredient = { name: string; grade: string; strength: string };
 
-const SCHEDULES = ["NONE", "H", "H1", "X"] as const;
 const STOCK = ["in_stock", "low_stock", "out_of_stock"] as const;
 
 type StatusFilter = "all" | "live" | "draft" | "oos";
@@ -229,7 +228,6 @@ export default function CataloguePage() {
                   <div className="prod-name">{p.name}</div>
                   <div className="prod-tags">
                     {p.is_featured && <span className="mini-tag t-feat">Featured</span>}
-                    {p.schedule !== "NONE" && <span className="mini-tag t-rx">Rx · {p.schedule}</span>}
                     {p.sub_category && <span className="mini-tag t-sub">{p.sub_category}</span>}
                   </div>
                 </td>
@@ -389,7 +387,6 @@ function ProductForm({
     name: product?.name ?? "",
     category_slug: product?.category_slug || (categories[0]?.slug ?? ""),
     sub_category: product?.sub_category ?? "",
-    schedule: product?.schedule ?? "NONE",
     stock_status: product?.stock_status ?? "in_stock",
     gst_rate_pct: String(product?.gst_rate_pct ?? 12),
     hsn_code: product?.hsn_code ?? "",
@@ -642,7 +639,6 @@ function ProductForm({
       name: form.name,
       category_slug: form.category_slug,
       sub_category: form.sub_category.trim() || null,
-      schedule: form.schedule,
       // Send "" (not null) so clearing the field actually clears it: the update
       // service ignores null values (treats them as "leave unchanged"), but an
       // empty string is applied and reads as "no badge / no HSN" on the PDP.
@@ -834,12 +830,6 @@ function ProductForm({
               </a>
             </p>
           )}
-        </div>
-        <div className="field grow">
-          <label>Schedule</label>
-          <select className="input" value={form.schedule} onChange={(e) => set("schedule", e.target.value)}>
-            {SCHEDULES.map((s) => <option key={s}>{s}</option>)}
-          </select>
         </div>
       </div>
       <div className="row">
@@ -1533,7 +1523,6 @@ function ProductViewDrawer({
       <div className="row" style={{ gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <span className={`pill ${product.is_active ? "pill-ok" : "pill-muted"}`}>{product.is_active ? "Live" : "Draft"}</span>
         <span className={`pill ${statusPill(product.stock_status)}`}>{product.stock_status.replace(/_/g, " ")}</span>
-        {product.schedule !== "NONE" && <span className="pill pill-rx">Rx · Schedule {product.schedule}</span>}
         {product.is_featured && <span className="pill pill-info">Featured</span>}
       </div>
 
