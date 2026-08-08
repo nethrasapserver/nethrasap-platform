@@ -17,8 +17,13 @@ const ROLES = [
   { value: "retailer", label: "Pharmacy", hint: "Wholesale pricing" },
 ];
 
+// OTP UI is hidden until SMS/DLT goes live. Without OTP the signup is a
+// single form (phone + password) and the backend accepts the raw phone
+// (account starts phone-unverified; verified later once OTP is back).
+const OTP_ENABLED = process.env.NEXT_PUBLIC_OTP_ENABLED !== "false";
+
 export default function SignupPage() {
-  const [stage, setStage] = useState<0 | 1 | 2>(0);
+  const [stage, setStage] = useState<0 | 1 | 2>(OTP_ENABLED ? 0 : 2);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [otpToken, setOtpToken] = useState("");
@@ -84,14 +89,21 @@ export default function SignupPage() {
     setBusy(true);
     submitting.current = true;
     try {
-      const t = await api.post<TokenPair>("/auth/signup", { role, otp_token: otpToken, password, name });
+      const body = OTP_ENABLED
+        ? { role, otp_token: otpToken, password, name }
+        : { role, phone, password, name };
+      const t = await api.post<TokenPair>("/auth/signup", body);
       await setSession(t);
       await reload();
       toast("Welcome to Nethrasap");
       router.push(role === "customer" ? "/account" : "/account?kyc=1");
-    } catch {
+    } catch (e) {
       submitting.current = false;
-      setErr({ password: "Could not create the account. Try a different password." });
+      if ((e as { status?: number })?.status === 409) {
+        setErr({ phone: "This number already has an account — sign in instead." });
+      } else {
+        setErr({ password: "Could not create the account. Try a different password." });
+      }
     } finally {
       setBusy(false);
     }
@@ -99,19 +111,22 @@ export default function SignupPage() {
 
   return (
     <div className="auth-card-v2">
-      <h1>{stage === 2 ? "Almost there" : "Create your account"}</h1>
+      <h1>{stage === 2 && OTP_ENABLED ? "Almost there" : "Create your account"}</h1>
       <p className="auth-sub">
-        {stage === 0 && "We verify every buyer by phone — it keeps the supply chain audited."}
-        {stage === 1 && "Enter the code we just sent you."}
-        {stage === 2 && "Tell us who you're buying for."}
+        {!OTP_ENABLED && "Sign up with your mobile number and a password."}
+        {OTP_ENABLED && stage === 0 && "We verify every buyer by phone — it keeps the supply chain audited."}
+        {OTP_ENABLED && stage === 1 && "Enter the code we just sent you."}
+        {OTP_ENABLED && stage === 2 && "Tell us who you're buying for."}
       </p>
 
       {/* A quiet progress rail — three dots, no numbered chrome. */}
-      <div className="auth-rail" aria-label={`Step ${stage + 1} of 3`}>
-        {[0, 1, 2].map((i) => (
-          <span key={i} className={i === stage ? "on" : i < stage ? "done" : ""} />
-        ))}
-      </div>
+      {OTP_ENABLED && (
+        <div className="auth-rail" aria-label={`Step ${stage + 1} of 3`}>
+          {[0, 1, 2].map((i) => (
+            <span key={i} className={i === stage ? "on" : i < stage ? "done" : ""} />
+          ))}
+        </div>
+      )}
 
       {stage === 0 && (
         <form onSubmit={(e) => { e.preventDefault(); sendCode(); }} noValidate>
@@ -142,6 +157,9 @@ export default function SignupPage() {
 
       {stage === 2 && (
         <form onSubmit={finish} noValidate>
+          {!OTP_ENABLED && (
+            <PhoneField value={phone} onChange={setPhone} error={err.phone} autoFocus />
+          )}
           <div className="field">
             <label>Who are you buying for?</label>
             <div className="role-picker">
@@ -175,13 +193,16 @@ export default function SignupPage() {
               to unlock {role === "retailer" ? "wholesale" : "institutional"} pricing. You can order at standard pricing meanwhile.
             </p>
           )}
-          <button className="btn btn-primary btn-block btn-lg" disabled={busy || !name || password.length < 8}>
+          <button
+            className="btn btn-primary btn-block btn-lg"
+            disabled={busy || !name || password.length < 8 || (!OTP_ENABLED && !phoneValid)}
+          >
             {busy ? "Creating…" : "Create account"}
           </button>
         </form>
       )}
 
-      {stage === 0 && (
+      {(stage === 0 || !OTP_ENABLED) && (
         <>
           <div className="auth-or"><span>or</span></div>
           <GoogleButton label="Sign up with Google" />

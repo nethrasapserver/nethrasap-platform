@@ -53,14 +53,18 @@ async def signup_user(
     phone: str,
     password: str,
     name: str,
+    phone_proven: bool = True,
     ip: str | None = None,
     user_agent: str | None = None,
     cart_session_id: str | None = None,
 ) -> tuple[User, str, str, int]:
     """Create a user + profile + initial refresh session.
 
-    `phone` must already be proven (the router exchanges a signup OTP proof
-    for it), so the account is born phone-verified.
+    Normally `phone` is already proven (the router exchanges a signup OTP
+    proof for it) and the account is born phone-verified. While
+    OTP_ENABLED=false the router passes ``phone_proven=False`` and the
+    account starts unverified — `phone_verified_at` stays NULL until the
+    user completes an OTP check once SMS is live.
 
     Returns (user, access_token, refresh_token, access_ttl_seconds).
     """
@@ -88,7 +92,7 @@ async def signup_user(
 
     user = User(
         phone=phone,
-        phone_verified_at=datetime.now(UTC),
+        phone_verified_at=datetime.now(UTC) if phone_proven else None,
         password_hash=hash_password(password),
         role=user_role,
         status=initial_status,

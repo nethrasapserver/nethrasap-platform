@@ -8,6 +8,10 @@ Flow map:
            (login purpose returns the TokenPair directly — no second call)
   reset:   POST /auth/otp/request(purpose=reset) -> POST /auth/otp/verify
            -> POST /auth/password/reset {otp_token, new_password}
+
+While OTP_ENABLED=false (SMS/DLT registration pending): /auth/otp/* and
+/auth/password/reset return 503, and signup instead accepts a raw phone —
+  signup:  POST /auth/signup {phone, ...}  => TokenPair (phone unverified)
 """
 from __future__ import annotations
 
@@ -103,8 +107,18 @@ def _proven_phone(otp_token: str, *, purpose: str) -> str:
         ) from None
 
 
+def _require_otp_enabled() -> None:
+    """503 the whole OTP surface while SMS/DLT registration is pending."""
+    if not get_settings().otp_enabled:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "OTP sign-in is temporarily unavailable",
+        )
+
+
 @router.post("/otp/request", status_code=status.HTTP_202_ACCEPTED)
 async def otp_request(payload: OtpRequestRequest, db: DbSession, meta: ClientMeta) -> dict:
+    _require_otp_enabled()
     if not await rate_limit(f"otp:ip:{meta.get('ip')}", limit=10, window_seconds=15 * 60):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many requests")
     await otp_svc.request_otp(db, phone=payload.phone, purpose=OtpPurpose(payload.purpose))
@@ -121,6 +135,7 @@ async def otp_verify(
 ) -> TokenPair | dict:
     """Verify a code. `login` purpose returns a TokenPair directly; `signup`
     and `reset` return an `otp_token` proof for the follow-up call."""
+    _require_otp_enabled()
     allowed = await rate_limit(
         f"verify:phone:{payload.phone}", limit=10, window_seconds=15 * 60
     ) and await rate_limit(f"verify:ip:{meta.get('ip')}", limit=10, window_seconds=15 * 60)
@@ -152,13 +167,26 @@ async def signup(
 ) -> TokenPair:
     if not await rate_limit(f"signup:ip:{meta.get('ip')}", limit=5, window_seconds=3600):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many requests")
-    phone = _proven_phone(payload.otp_token, purpose="signup")
+    # Proven phone (OTP proof) is the normal path. A raw phone is accepted
+    # only while OTP_ENABLED=false — the account is created unverified and
+    # gets phone-verified once OTP is back (DLT approved).
+    if payload.otp_token:
+        phone = _proven_phone(payload.otp_token, purpose="signup")
+        phone_proven = True
+    elif not get_settings().otp_enabled:
+        if not payload.phone:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "phone is required")
+        phone = payload.phone
+        phone_proven = False
+    else:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "otp_token is required")
     user, access, refresh, ttl = await auth_svc.signup_user(
         db,
         role=payload.role,
         phone=phone,
         password=payload.password,
         name=payload.name,
+        phone_proven=phone_proven,
         ip=meta.get("ip"),
         user_agent=meta.get("user_agent"),
         cart_session_id=cart_session_id,
@@ -193,6 +221,9 @@ async def login(
 
 @router.post("/password/reset", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def password_reset(payload: PasswordResetRequest, db: DbSession, meta: ClientMeta) -> Response:
+    # Reset needs an OTP proof (there is no email channel); while OTP is off
+    # the proof is unobtainable, so fail loudly instead of at the proof check.
+    _require_otp_enabled()
     if not await rate_limit(f"reset:ip:{meta.get('ip')}", limit=5, window_seconds=3600):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many requests")
     phone = _proven_phone(payload.otp_token, purpose="reset")

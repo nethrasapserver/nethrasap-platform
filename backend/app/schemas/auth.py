@@ -48,9 +48,29 @@ class SignupRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     role: Literal["customer", "clinician", "retailer"]  # portal roles are provisioned, not self-signup
-    otp_token: str = Field(min_length=10, description="signup-purpose proof from /auth/otp/verify")
+    # Exactly one identity source, enforced by the route: otp_token (proven
+    # phone) normally; raw phone only while OTP_ENABLED=false (pre-DLT).
+    otp_token: str | None = Field(
+        default=None, min_length=10, description="signup-purpose proof from /auth/otp/verify"
+    )
+    phone: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=20,
+        description="raw phone — accepted only while OTP_ENABLED=false",
+    )
     password: str = Field(min_length=8, max_length=128)
     name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("phone")
+    @classmethod
+    def _normalize_phone(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        try:
+            return normalize_phone(v)
+        except InvalidPhoneError as e:
+            raise ValueError(str(e)) from None
 
 
 class LoginRequest(_PhoneMixin):

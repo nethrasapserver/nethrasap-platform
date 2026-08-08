@@ -228,3 +228,85 @@ async def test_logout_revokes_refresh(client):
     # Refresh now fails.
     resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
     assert resp.status_code == 401
+
+
+# --- OTP_ENABLED=false (pre-DLT password-only mode) --------------------------
+
+
+@pytest.fixture
+def otp_disabled(monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "otp_enabled", False)
+
+
+@pytest.mark.asyncio
+async def test_password_signup_when_otp_disabled(client, otp_disabled):
+    resp = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "role": "customer",
+            "phone": "+919876500020",
+            "password": "Strongp@ss123",
+            "name": "No Otp User",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    token = resp.json()["access_token"]
+
+    # The account exists but the phone is NOT verified (no OTP proof).
+    me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200, me.text
+    assert me.json()["phone"] == "+919876500020"
+    assert me.json()["phone_verified"] is False
+
+    # Password login works for the new account.
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"phone": "+919876500020", "password": "Strongp@ss123"},
+    )
+    assert login.status_code == 200, login.text
+
+
+@pytest.mark.asyncio
+async def test_raw_phone_signup_rejected_when_otp_enabled(client):
+    # Default mode: a raw phone without an OTP proof must not create accounts.
+    resp = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "role": "customer",
+            "phone": "+919876500021",
+            "password": "Strongp@ss123",
+            "name": "Should Fail",
+        },
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_otp_surface_returns_503_when_disabled(client, otp_disabled):
+    req = await client.post(
+        "/api/v1/auth/otp/request", json={"phone": "+919876500022", "purpose": "login"}
+    )
+    assert req.status_code == 503
+
+    ver = await client.post(
+        "/api/v1/auth/otp/verify",
+        json={"phone": "+919876500022", "purpose": "login", "code": "123456"},
+    )
+    assert ver.status_code == 503
+
+    reset = await client.post(
+        "/api/v1/auth/password/reset",
+        json={"otp_token": "irrelevant-token", "new_password": "Strongp@ss456"},
+    )
+    assert reset.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_signup_missing_phone_when_otp_disabled(client, otp_disabled):
+    resp = await client.post(
+        "/api/v1/auth/signup",
+        json={"role": "customer", "password": "Strongp@ss123", "name": "No Phone"},
+    )
+    assert resp.status_code == 400

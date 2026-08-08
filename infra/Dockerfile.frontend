@@ -23,13 +23,17 @@ ARG API_PROXY_TARGET=http://localhost:8000
 ARG NEXT_PUBLIC_API_BASE=""
 # Where staff signed in on the storefront are pointed to reach the ops portal.
 ARG NEXT_PUBLIC_DASHBOARD_URL=""
+# "false" hides the OTP tabs/steps (password-only auth while DLT is pending).
+# Mirror of the backend OTP_ENABLED flag.
+ARG NEXT_PUBLIC_OTP_ENABLED="true"
 WORKDIR /repo
 COPY --from=deps /repo/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 \
     API_PROXY_TARGET=${API_PROXY_TARGET} \
     NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE} \
-    NEXT_PUBLIC_DASHBOARD_URL=${NEXT_PUBLIC_DASHBOARD_URL}
+    NEXT_PUBLIC_DASHBOARD_URL=${NEXT_PUBLIC_DASHBOARD_URL} \
+    NEXT_PUBLIC_OTP_ENABLED=${NEXT_PUBLIC_OTP_ENABLED}
 RUN npm run build --workspace "apps/${APP}"
 
 FROM node:20-alpine AS run

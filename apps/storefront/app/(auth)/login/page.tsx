@@ -13,6 +13,10 @@ import { useToast } from "@/lib/toast";
 
 type Mode = "password" | "otp";
 
+// OTP UI is hidden until SMS/DLT goes live (backend mirrors this via
+// OTP_ENABLED — the /auth/otp/* endpoints 503 while it's off).
+const OTP_ENABLED = process.env.NEXT_PUBLIC_OTP_ENABLED !== "false";
+
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("password");
   const [phone, setPhone] = useState("");
@@ -96,26 +100,28 @@ export default function LoginPage() {
       <h1>Welcome back</h1>
       <p className="auth-sub">Sign in with your registered mobile number.</p>
 
-      <div className="seg" role="tablist" aria-label="Sign-in method">
-        <button
-          role="tab"
-          aria-selected={mode === "password"}
-          className={mode === "password" ? "on" : ""}
-          onClick={() => { setMode("password"); setErr({}); }}
-        >
-          Password
-        </button>
-        <button
-          role="tab"
-          aria-selected={mode === "otp"}
-          className={mode === "otp" ? "on" : ""}
-          onClick={() => { setMode("otp"); setErr({}); }}
-        >
-          One-time code
-        </button>
-      </div>
+      {OTP_ENABLED && (
+        <div className="seg" role="tablist" aria-label="Sign-in method">
+          <button
+            role="tab"
+            aria-selected={mode === "password"}
+            className={mode === "password" ? "on" : ""}
+            onClick={() => { setMode("password"); setErr({}); }}
+          >
+            Password
+          </button>
+          <button
+            role="tab"
+            aria-selected={mode === "otp"}
+            className={mode === "otp" ? "on" : ""}
+            onClick={() => { setMode("otp"); setErr({}); }}
+          >
+            One-time code
+          </button>
+        </div>
+      )}
 
-      {mode === "password" ? (
+      {mode === "password" || !OTP_ENABLED ? (
         <form onSubmit={signInWithPassword} noValidate>
           <PhoneField value={phone} onChange={setPhone} error={err.phone} autoFocus />
           <PasswordField value={password} onChange={setPassword} error={err.password} />

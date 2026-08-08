@@ -42,10 +42,16 @@ envVarGroups:
         value: "15"
       - key: REFRESH_TOKEN_TTL_DAYS
         value: "30"
-      # SMS: MUST be a real provider under ENVIRONMENT=production — the config
-      # guard hard-fails boot if SMS_PROVIDER=console in production. Set the
-      # MSG91 (or exotel/twilio) API key and a DLT-approved sender ID BEFORE the
-      # first deploy; OTP login is dead until the DLT registration is complete.
+      # OTP kill-switch: "false" = password-only auth while DLT registration is
+      # pending (/auth/otp/* return 503; signup takes phone+password directly).
+      # Flip to "true" — plus a real SMS key and NEXT_PUBLIC_OTP_ENABLED=true on
+      # both frontends — once the DLT sender ID is approved.
+      - key: OTP_ENABLED
+        value: "false"
+      # SMS: with OTP_ENABLED=true this MUST be a real provider under
+      # ENVIRONMENT=production — the config guard hard-fails boot on `console`.
+      # Set the MSG91 (or exotel/twilio) API key and a DLT-approved sender ID
+      # before flipping OTP on; OTP login is dead until DLT completes.
       - key: SMS_PROVIDER
         value: msg91
       - key: SMS_API_KEY
@@ -157,6 +163,10 @@ services:
       # Custom ops domain (e.g. https://ops.nethrasap.com).
       - key: NEXT_PUBLIC_DASHBOARD_URL
         value: https://ops.REPLACE_ME.com
+      # Mirrors the backend OTP_ENABLED kill-switch (baked at build time).
+      # Flip to "true" and redeploy once DLT is approved.
+      - key: NEXT_PUBLIC_OTP_ENABLED
+        value: "false"
 
   # --- Dashboard (ops Next.js app, Docker) ---
   - type: web
@@ -173,3 +183,6 @@ services:
       # domain, not *.onrender.com. Set before the first frontend build.
       - key: NEXT_PUBLIC_API_BASE
         value: https://api.REPLACE_ME.com
+      # Mirrors the backend OTP_ENABLED kill-switch (baked at build time).
+      - key: NEXT_PUBLIC_OTP_ENABLED
+        value: "false"

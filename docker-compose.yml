@@ -144,6 +144,8 @@ services:
         API_PROXY_TARGET: "http://api:8000"
         # Browser-facing URL of the ops portal (staff banner link).
         NEXT_PUBLIC_DASHBOARD_URL: "http://localhost:3001"
+        # Interpolated from .env so dev matches the backend OTP_ENABLED flag.
+        NEXT_PUBLIC_OTP_ENABLED: "${NEXT_PUBLIC_OTP_ENABLED:-true}"
     container_name: nethrasap-storefront
     # Build arg covers the baked Next rewrites; SSR server components read
     # API_PROXY_TARGET at RUNTIME (lib/api.ts serverApi), so it must also be
@@ -161,7 +163,10 @@ services:
     build:
       context: .
       dockerfile: infra/Dockerfile.frontend
-      args: { APP: dashboard, API_PROXY_TARGET: "http://api:8000" }
+      args:
+        APP: dashboard
+        API_PROXY_TARGET: "http://api:8000"
+        NEXT_PUBLIC_OTP_ENABLED: "${NEXT_PUBLIC_OTP_ENABLED:-true}"
     container_name: nethrasap-dashboard
     environment:
       API_PROXY_TARGET: "http://api:8000"

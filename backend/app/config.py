@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://localhost:3001"
 
     # --- SMS / OTP (phone-first platform; there is deliberately no email) ---
+    # Kill-switch for the whole OTP surface while DLT/SMS registration is
+    # pending: when False, /auth/otp/* return 503, signup accepts a raw
+    # (unverified) phone + password, and the console-provider production
+    # guard is skipped since no OTPs are ever generated.
+    otp_enabled: bool = True
     sms_provider: Literal["console", "msg91", "exotel", "twilio"] = "console"
     sms_api_key: str = ""
     sms_sender_id: str = "NTHRSP"
@@ -130,11 +135,12 @@ class Settings(BaseSettings):
                 "python3 -c 'import secrets; print(secrets.token_urlsafe(64))'"
             )
         if self.environment == "production":
-            if self.sms_provider == "console":
+            if self.sms_provider == "console" and self.otp_enabled:
                 raise ValueError(
                     "SMS_PROVIDER=console only logs messages (and would leak OTPs into "
                     "production logs) — refusing to start with ENVIRONMENT=production. "
-                    "Configure a real provider (msg91/exotel/twilio)."
+                    "Configure a real provider (msg91/exotel/twilio), or set "
+                    "OTP_ENABLED=false to run password-only until DLT approval."
                 )
             if not (
                 self.storage_endpoint
