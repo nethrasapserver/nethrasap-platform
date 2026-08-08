@@ -327,6 +327,9 @@ export function BlockForm({
   kind,
   block,
   defaultSortOrder,
+  preset,
+  lockedKeys,
+  contextLabel,
   onClose,
   onSaved,
 }: {
@@ -337,14 +340,23 @@ export function BlockForm({
   block?: CmsBlock;
   /** sort_order for a newly created block. */
   defaultSortOrder: number;
+  /** Values forced onto the block (e.g. the `slot` its section owns). */
+  preset?: Record<string, unknown>;
+  /** Fields the section already decides — hidden from the form. */
+  lockedKeys?: string[];
+  /** Shown instead of the raw kind in the drawer subtitle. */
+  contextLabel?: string;
   onClose: () => void;
   onSaved: (page: CmsPage) => void;
 }) {
   const toast = useToast();
   const editing = !!block;
-  const fields = FIELDS[kind] ?? [];
+  const locked = new Set(lockedKeys ?? []);
+  const fields = (FIELDS[kind] ?? []).filter((f) => !locked.has(f.key));
   const [content, setContent] = useState<Record<string, unknown>>(
-    () => ({ ...blankContent(kind), ...(block?.content ?? {}) }),
+    // The preset wins over stored content: a block reached through a section
+    // belongs to that section's slot, even if older data disagrees.
+    () => ({ ...blankContent(kind), ...(block?.content ?? {}), ...(preset ?? {}) }),
   );
   const [busy, setBusy] = useState(false);
   const [imgBusy, setImgBusy] = useState(false);
@@ -434,7 +446,7 @@ export function BlockForm({
   return (
     <Drawer
       title={editing ? `Edit ${label.toLowerCase()}` : `New ${label.toLowerCase()}`}
-      subtitle={`${slug} · ${kind}`}
+      subtitle={contextLabel ? `${slug} · ${contextLabel}` : `${slug} · ${kind}`}
       onClose={onClose}
       footer={
         <>

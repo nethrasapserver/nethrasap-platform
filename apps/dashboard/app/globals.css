@@ -261,6 +261,28 @@ body .auth-page .auth-bg { display: none; }
 }
 .cms-section-help { margin: 4px 0 0; color: var(--ink-3); font-size: .8rem; line-height: 1.45; }
 
+/* The editor mirrors the page: numbered sections, each holding one or more
+   parts (its heading, its intro, its list of cards). */
+.cms-section-idx {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px;
+  background: var(--brand-700); color: var(--cream); font-size: .72rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; flex: none;
+}
+.cms-parts { display: grid; gap: 18px; }
+.cms-part { display: grid; gap: 10px; min-width: 0; }
+.cms-part + .cms-part { padding-top: 16px; border-top: 1px dashed var(--line); }
+.cms-part-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cms-part-lab {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--ink-3);
+}
+.cms-toc-idx {
+  flex: none; min-width: 16px; font-size: .68rem; font-weight: 700; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.cms-toc-item.on .cms-toc-idx { color: var(--brand-700); }
+
 /* Each block is a card: preview on top, a control bar pinned to the bottom.
    Compact kinds pack into a responsive grid (set inline per section); wide
    kinds render one-per-row. No more stranded controls / empty gaps. */
@@ -490,7 +512,7 @@ body .auth-page .auth-bg { display: none; }
 }
 .cms-toc-item:hover { background: var(--paper-3); color: var(--ink); }
 .cms-toc-item.on { background: var(--brand-50); color: var(--brand-700); font-weight: 650; }
-.cms-toc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cms-toc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cms-toc-count {
   flex: none; min-width: 20px; text-align: center; font-size: .72rem; color: var(--ink-3);
   font-variant-numeric: tabular-nums;

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { BlockForm, KIND_HELP, KIND_LABELS, KIND_TITLES, SURFACE_KINDS } from "@/components/content/BlockForm";
+import { BlockForm, KIND_LABELS, KIND_TITLES } from "@/components/content/BlockForm";
 import { SectionPreview } from "@/components/content/SectionPreview";
+import { type PageSection, type SectionPart, SURFACE_SECTIONS, claimedKeys } from "@/components/content/sections";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -24,6 +25,9 @@ interface FormState {
   kind: string;
   block?: CmsBlock;
   defaultSortOrder: number;
+  preset?: Record<string, unknown>;
+  lockedKeys?: string[];
+  contextLabel?: string;
 }
 
 /* Kinds whose preview is wide/singular render one-per-row; everything else is a
@@ -56,12 +60,12 @@ export default function ContentEditorPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [activeKind, setActiveKind] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
-  function jumpTo(kind: string) {
-    setActiveKind(kind);
+  function jumpTo(id: string) {
+    setActiveSection(id);
     if (typeof document !== "undefined") {
-      document.getElementById(`sec-${kind}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
 
@@ -174,10 +178,7 @@ export default function ContentEditorPage() {
     }
   }
 
-  async function reorder(kind: string, blockId: string, dir: "up" | "down") {
-    // Non-null: reorder is only reachable from the rendered UI, which returns
-    // early above when `page` is null.
-    const group = blocksOfKind(page!, kind);
+  async function reorder(group: CmsBlock[], blockId: string, dir: "up" | "down") {
     const idx = group.findIndex((b) => b.id === blockId);
     const swap = dir === "up" ? idx - 1 : idx + 1;
     if (idx < 0 || swap < 0 || swap >= group.length) return;
@@ -201,9 +202,10 @@ export default function ContentEditorPage() {
     }
   }
 
-  const knownKinds = SURFACE_KINDS[slug] ?? [];
-  const extraKinds = Array.from(new Set(page.blocks.map((b) => b.kind))).filter((k) => !knownKinds.includes(k));
-  const kinds = [...knownKinds, ...extraKinds];
+  const sections = SURFACE_SECTIONS[slug] ?? [];
+  const orphans = orphanBlocks(page, slug);
+  const countIn = (section: PageSection) =>
+    section.parts.reduce((n, part) => n + partBlocks(page, part).length, 0);
 
   return (
     <div className="cms-editor-page">
@@ -215,6 +217,8 @@ export default function ContentEditorPage() {
             <span className={`pill ${page.is_published ? "pill-ok" : "pill-muted"}`}>
               {page.is_published ? "Published" : "Draft"}
             </span>
+            <span className="cms-dot">·</span>
+            <span className="muted small">{sections.length} sections</span>
             <span className="cms-dot">·</span>
             <span className="muted small">{page.blocks.length} blocks</span>
             <span className="cms-dot">·</span>
@@ -238,68 +242,104 @@ export default function ContentEditorPage() {
 
       <div className="cms-editor">
         <aside className="cms-toc">
-          <div className="cms-toc-lab">Sections</div>
+          <div className="cms-toc-lab">Page sections</div>
           <div className="cms-toc-list">
-            {kinds.map((kind) => (
+            {sections.map((section, i) => (
               <button
-                key={kind}
-                className={`cms-toc-item ${activeKind === kind ? "on" : ""}`}
-                onClick={() => jumpTo(kind)}
+                key={section.id}
+                className={`cms-toc-item ${activeSection === section.id ? "on" : ""}`}
+                onClick={() => jumpTo(section.id)}
               >
-                <span className="cms-toc-name">{KIND_TITLES[kind] ?? kind}</span>
-                <span className="cms-toc-count">{blocksOfKind(page, kind).length}</span>
+                <span className="cms-toc-idx">{i + 1}</span>
+                <span className="cms-toc-name">{section.title}</span>
+                <span className="cms-toc-count">{countIn(section)}</span>
               </button>
             ))}
+            {orphans.length > 0 && (
+              <button
+                className={`cms-toc-item ${activeSection === "__other" ? "on" : ""}`}
+                onClick={() => jumpTo("__other")}
+              >
+                <span className="cms-toc-idx">·</span>
+                <span className="cms-toc-name">Unassigned</span>
+                <span className="cms-toc-count">{orphans.length}</span>
+              </button>
+            )}
           </div>
         </aside>
 
         <div className="cms-main">
           <div className="cms-outline">
-        {kinds.map((kind) => {
-          const group = blocksOfKind(page, kind);
-          const known = knownKinds.includes(kind);
-          const label = (KIND_LABELS[kind] ?? kind).toLowerCase();
-          return (
-            <section className="cms-section" id={`sec-${kind}`} key={kind}>
-              <div className="cms-section-head">
-                <div style={{ minWidth: 0 }}>
-                  <div className="cms-section-title">
-                    {KIND_TITLES[kind] ?? kind}
-                    <span className="cms-count">{group.length}</span>
+            {sections.map((section, i) => (
+              <section className="cms-section" id={`sec-${section.id}`} key={section.id}>
+                <div className="cms-section-head">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="cms-section-title">
+                      <span className="cms-section-idx">{i + 1}</span>
+                      {section.title}
+                    </div>
+                    <p className="cms-section-help">{section.help}</p>
                   </div>
-                  {KIND_HELP[kind] && <p className="cms-section-help">{KIND_HELP[kind]}</p>}
                 </div>
-                {known && (
-                  <button className="btn btn-primary btn-sm" onClick={() => setForm({ kind, defaultSortOrder: group.length })}>
-                    + Add {label}
-                  </button>
-                )}
-              </div>
 
-              {group.length === 0 ? (
-                known ? (
-                  <button className="cms-add-first" onClick={() => setForm({ kind, defaultSortOrder: 0 })}>
-                    + Add the first {label}
-                  </button>
-                ) : (
-                  <div className="cms-empty">No {(KIND_TITLES[kind] ?? kind).toLowerCase()} yet.</div>
-                )
-              ) : (
-                <div
-                  className="cms-grid"
-                  style={{ gridTemplateColumns: WIDE_KINDS.has(kind) ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))" }}
-                >
-                  {group.map((block, i) => (
+                <div className="cms-parts">
+                  {section.parts.map((part) => (
+                    <PartBlock
+                      key={`${part.kind}:${part.slot ?? ""}`}
+                      page={page}
+                      part={part}
+                      section={section}
+                      busyId={busyId}
+                      confirmDelete={confirmDelete}
+                      onEdit={(block, group) =>
+                        setForm({
+                          kind: part.kind,
+                          block,
+                          defaultSortOrder: group.length,
+                          preset: part.slot ? { slot: part.slot } : undefined,
+                          lockedKeys: part.slot ? ["slot"] : undefined,
+                          contextLabel: `${section.title} · ${partLabel(part)}`,
+                        })
+                      }
+                      onReorder={reorder}
+                      onToggle={toggleActive}
+                      onDelete={removeBlock}
+                      onConfirmDelete={setConfirmDelete}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+
+            {orphans.length > 0 && (
+              <section className="cms-section" id="sec-__other" key="__other">
+                <div className="cms-section-head">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="cms-section-title">Unassigned content</div>
+                    <p className="cms-section-help">
+                      Blocks that don&apos;t belong to any section on this page — usually an old or custom slot. They
+                      still render if the storefront asks for them.
+                    </p>
+                  </div>
+                </div>
+                <div className="cms-grid" style={{ gridTemplateColumns: "1fr" }}>
+                  {orphans.map((block) => (
                     <div className={`cms-card ${block.is_active ? "" : "is-hidden"}`} key={block.id}>
                       <div className="cms-card-body">
-                        <SectionPreview kind={kind} content={block.content} framed={false} />
+                        <SectionPreview kind={block.kind} content={block.content} framed={false} />
                       </div>
                       <div className="cms-card-bar">
-                        <button className="icon-btn" aria-label="Move up" disabled={i === 0 || busyId === block.id} onClick={() => reorder(kind, block.id, "up")}>↑</button>
-                        <button className="icon-btn" aria-label="Move down" disabled={i === group.length - 1 || busyId === block.id} onClick={() => reorder(kind, block.id, "down")}>↓</button>
-                        {!block.is_active && <span className="pill pill-muted">Hidden</span>}
+                        <span className="pill pill-muted">
+                          {KIND_LABELS[block.kind] ?? block.kind}
+                          {typeof block.content?.slot === "string" ? ` · ${block.content.slot}` : ""}
+                        </span>
                         <span className="cms-bar-gap" />
-                        <button className="btn btn-outline btn-sm" onClick={() => setForm({ kind, block, defaultSortOrder: group.length })}>Edit</button>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setForm({ kind: block.kind, block, defaultSortOrder: 0 })}
+                        >
+                          Edit
+                        </button>
                         <button className="btn btn-ghost btn-sm" disabled={busyId === block.id} onClick={() => toggleActive(block)}>
                           {block.is_active ? "Hide" : "Publish"}
                         </button>
@@ -315,11 +355,10 @@ export default function ContentEditorPage() {
                     </div>
                   ))}
                 </div>
-              )}
-            </section>
-          );
-        })}
-            {kinds.length === 0 && <EmptyCard>This surface has no editable block types.</EmptyCard>}
+              </section>
+            )}
+
+            {sections.length === 0 && <EmptyCard>This surface has no editable sections.</EmptyCard>}
           </div>
         </div>
       </div>
@@ -331,6 +370,9 @@ export default function ContentEditorPage() {
           kind={form.kind}
           block={form.block}
           defaultSortOrder={form.defaultSortOrder}
+          preset={form.preset}
+          lockedKeys={form.lockedKeys}
+          contextLabel={form.contextLabel}
           onClose={() => setForm(null)}
           onSaved={(next) => {
             applyPage(next);
@@ -343,11 +385,163 @@ export default function ContentEditorPage() {
   );
 }
 
-function blocksOfKind(page: CmsPage, kind: string): CmsBlock[] {
+/** One part of a section: a single block (heading/intro/hero) or a list. */
+function PartBlock({
+  page,
+  part,
+  section,
+  busyId,
+  confirmDelete,
+  onEdit,
+  onReorder,
+  onToggle,
+  onDelete,
+  onConfirmDelete,
+}: {
+  page: CmsPage;
+  part: SectionPart;
+  section: PageSection;
+  busyId: string | null;
+  confirmDelete: string | null;
+  onEdit: (block: CmsBlock | undefined, group: CmsBlock[]) => void;
+  onReorder: (group: CmsBlock[], blockId: string, dir: "up" | "down") => void;
+  onToggle: (block: CmsBlock) => void;
+  onDelete: (block: CmsBlock) => void;
+  onConfirmDelete: (id: string | null) => void;
+}) {
+  const group = partBlocks(page, part);
+  const label = partLabel(part);
+  const singular = (KIND_LABELS[part.kind] ?? part.kind).toLowerCase();
+  const multi = section.parts.length > 1;
+
+  // --- Single-block part: the section's heading / intro / hero ---
+  if (part.single) {
+    const block = group[0];
+    return (
+      <div className="cms-part">
+        {multi && (
+          <div className="cms-part-head">
+            <span className="cms-part-lab">{label}</span>
+            {part.help && <span className="muted small">{part.help}</span>}
+          </div>
+        )}
+        {block ? (
+          <div className={`cms-card ${block.is_active ? "" : "is-hidden"}`}>
+            <div className="cms-card-body">
+              <SectionPreview kind={part.kind} content={block.content} framed={false} />
+            </div>
+            <div className="cms-card-bar">
+              {!block.is_active && <span className="pill pill-muted">Hidden</span>}
+              <span className="cms-bar-gap" />
+              <button className="btn btn-outline btn-sm" onClick={() => onEdit(block, group)}>Edit</button>
+              <button className="btn btn-ghost btn-sm" disabled={busyId === block.id} onClick={() => onToggle(block)}>
+                {block.is_active ? "Hide" : "Publish"}
+              </button>
+              {confirmDelete === block.id ? (
+                <>
+                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} disabled={busyId === block.id} onClick={() => onDelete(block)}>Confirm</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => onConfirmDelete(null)}>Cancel</button>
+                </>
+              ) : (
+                <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => onConfirmDelete(block.id)}>Delete</button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <button className="cms-add-first" onClick={() => onEdit(undefined, group)}>
+            + Set the {multi ? label.toLowerCase() : singular}
+            <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
+              The site shows its built-in default until you do.
+            </span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // --- List part: cards, steps, questions … ---
+  return (
+    <div className="cms-part">
+      <div className="cms-part-head">
+        <span className="cms-part-lab">
+          {label}
+          <span className="cms-count">{group.length}</span>
+        </span>
+        {part.help && <span className="muted small">{part.help}</span>}
+        <span className="cms-bar-gap" />
+        <button className="btn btn-primary btn-sm" onClick={() => onEdit(undefined, group)}>
+          + Add {singular}
+        </button>
+      </div>
+
+      {group.length === 0 ? (
+        <button className="cms-add-first" onClick={() => onEdit(undefined, group)}>
+          + Add the first {singular}
+        </button>
+      ) : (
+        <div
+          className="cms-grid"
+          style={{ gridTemplateColumns: WIDE_KINDS.has(part.kind) ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))" }}
+        >
+          {group.map((block, i) => (
+            <div className={`cms-card ${block.is_active ? "" : "is-hidden"}`} key={block.id}>
+              <div className="cms-card-body">
+                <SectionPreview kind={part.kind} content={block.content} framed={false} />
+              </div>
+              <div className="cms-card-bar">
+                <button className="icon-btn" aria-label="Move up" disabled={i === 0 || busyId === block.id} onClick={() => onReorder(group, block.id, "up")}>↑</button>
+                <button className="icon-btn" aria-label="Move down" disabled={i === group.length - 1 || busyId === block.id} onClick={() => onReorder(group, block.id, "down")}>↓</button>
+                {!block.is_active && <span className="pill pill-muted">Hidden</span>}
+                <span className="cms-bar-gap" />
+                <button className="btn btn-outline btn-sm" onClick={() => onEdit(block, group)}>Edit</button>
+                <button className="btn btn-ghost btn-sm" disabled={busyId === block.id} onClick={() => onToggle(block)}>
+                  {block.is_active ? "Hide" : "Publish"}
+                </button>
+                {confirmDelete === block.id ? (
+                  <>
+                    <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} disabled={busyId === block.id} onClick={() => onDelete(block)}>Confirm</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => onConfirmDelete(null)}>Cancel</button>
+                  </>
+                ) : (
+                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => onConfirmDelete(block.id)}>Delete</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function partLabel(part: SectionPart): string {
+  return part.label ?? (part.single ? KIND_LABELS[part.kind] : KIND_TITLES[part.kind]) ?? part.kind;
+}
+
+/** Blocks belonging to a part — kind, narrowed by slot when the part owns one. */
+function partBlocks(page: CmsPage, part: SectionPart): CmsBlock[] {
   return page.blocks
-    .filter((b) => b.kind === kind)
+    .filter((b) => b.kind === part.kind && (!part.slot || b.content?.slot === part.slot))
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+/** Blocks no section claims — kept visible so content can never go missing. */
+function orphanBlocks(page: CmsPage, slug: string): CmsBlock[] {
+  const claimed = claimedKeys(slug);
+  const slotted = new Set(
+    (SURFACE_SECTIONS[slug] ?? []).flatMap((s) => s.parts.filter((p) => p.slot).map((p) => p.kind)),
+  );
+  return page.blocks
+    .filter((b) => {
+      if (slotted.has(b.kind)) {
+        const slot = typeof b.content?.slot === "string" ? b.content.slot : "";
+        return !claimed.has(`${b.kind}:${slot}`);
+      }
+      return !claimed.has(b.kind);
+    })
+    .slice()
+    .sort((a, b) => a.kind.localeCompare(b.kind) || a.sort_order - b.sort_order);
 }
 
 function Head({ slug, title, children }: { slug: string; title: string; children?: React.ReactNode }) {
