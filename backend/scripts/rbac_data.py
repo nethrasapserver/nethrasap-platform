@@ -44,6 +44,7 @@ PERMISSION_DEFS: list[dict] = [
     {"resource": "orders", "action": "fulfil"},
     # users
     {"resource": "users", "action": "read"},
+    {"resource": "users", "action": "create", "description": "Provision staff accounts"},
     {"resource": "users", "action": "update_role"},
     {"resource": "users", "action": "suspend"},
     # kyc

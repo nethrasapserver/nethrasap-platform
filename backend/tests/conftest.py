@@ -43,10 +43,6 @@ os.environ["PAYMENT_METHODS_ENABLED"] = "cod,upi,card,netbanking,wallet"
 
 from datetime import UTC  # noqa: E402
 
-from app.config import get_settings  # noqa: E402
-from app.db import _normalise_url, get_session  # noqa: E402
-from app.integrations.sms import ConsoleSmsProvider, get_provider  # noqa: E402
-
 # Work around a forward-ref bug in app.observability (read-only source): the
 # GET /metrics route is annotated `-> Response` while the module uses
 # `from __future__ import annotations`, yet Response is imported only *inside*
@@ -57,6 +53,9 @@ from app.integrations.sms import ConsoleSmsProvider, get_provider  # noqa: E402
 # the app boot with metrics on, so the observability suite can hit /metrics.
 # (Proper fix belongs in app/observability.py: hoist the Response import.)
 import app.observability as _observability  # noqa: E402
+from app.config import get_settings  # noqa: E402
+from app.db import _normalise_url, get_session  # noqa: E402
+from app.integrations.sms import ConsoleSmsProvider, get_provider  # noqa: E402
 from fastapi import Response as _Response  # noqa: E402
 
 _observability.Response = _Response
@@ -231,41 +230,19 @@ async def client(_session_factory) -> AsyncIterator[AsyncClient]:
     app.dependency_overrides.pop(get_session, None)
 
 
+from scripts.rbac_data import ROLE_PERMISSIONS  # noqa: E402
+
 STAFF_PASSWORD = "Staff@Pass123"
 STAFF_PHONES = {"sales": "+919700000001", "manager": "+919700000002", "admin": "+919700000003"}
 
-_STAFF_PERMS = {
-    "sales": [
-        ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
-        ("orders", "fulfil"), ("enquiries", "manage"), ("chat", "manage"),
-        ("analytics", "read"), ("sales", "read"),
-    ],
-    "manager": [
-        ("kyc", "review"), ("kyc", "approve"), ("kyc", "reject"),
-        ("orders", "fulfil"), ("enquiries", "manage"), ("enquiries", "approve"), ("chat", "manage"), ("cms", "write"),
-        ("catalogue", "write"),
-        ("analytics", "read"), ("sales", "read"), ("sales", "manage"), ("audit", "read"),
-    ],
-    "admin": [
-        ("kyc", "review"),
-        ("kyc", "approve"),
-        ("kyc", "reject"),
-        ("catalogue", "write"),
-        ("inventory", "write"),
-        ("cms", "write"),
-        ("settings", "write"),
-        ("orders", "fulfil"),
-        ("orders", "refund"),
-        ("enquiries", "manage"),
-        ("enquiries", "approve"),
-        ("chat", "manage"),
-        ("analytics", "read"),
-        ("sales", "read"),
-        ("sales", "manage"),
-        ("audit", "read"),
-        ("hr", "manage"),
-        ("platform", "admin"),
-    ],
+# Derived from the production RBAC definitions rather than hand-listed: a
+# hardcoded copy silently drifts every time a permission is added (a new
+# `users:create` grant is exactly how this was found), and the tests then
+# assert against a role the platform doesn't actually ship.
+_STAFF_PERMS: dict[str, list[tuple[str, str]]] = {
+    role: list(perms)
+    for role, perms in ROLE_PERMISSIONS.items()
+    if role in ("sales", "manager", "admin")
 }
 
 
@@ -276,7 +253,6 @@ async def staff_tokens(db_session, client) -> dict[str, str]:
     from app.models.rbac import Permission, Role, RolePermission
     from app.models.user import User, UserProfile, UserRole, UserStatus
     from app.security import hash_password
-
     from sqlalchemy import select
 
     # Migrations seed some permissions (e.g. enquiries/approve from 0015), so the

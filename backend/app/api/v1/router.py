@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from . import (
     admin_catalogue,
     admin_orders,
+    admin_users,
     analytics,
     auth,
     cart,
@@ -39,6 +40,7 @@ api_router_v1.include_router(admin_catalogue.router, tags=["admin-catalogue"])
 api_router_v1.include_router(inventory.router, tags=["inventory"])
 api_router_v1.include_router(payments.router, tags=["payments"])
 api_router_v1.include_router(admin_orders.router, tags=["admin-orders"])
+api_router_v1.include_router(admin_users.router, tags=["admin-users"])
 api_router_v1.include_router(enquiries.router, tags=["enquiries"])
 api_router_v1.include_router(chat.router, tags=["chat"])
 api_router_v1.include_router(notifications.router, tags=["notifications"])
