@@ -1,170 +1,254 @@
-# Production Deployment Plan — Render + Cloudflare + Supabase
+# Production Deployment Plan — Cloudflare + Render + Supabase
 
-*Prepared 2026-07-26; revised same day after the owner chose the managed path:
-**Render (compute) + Cloudflare (edge/storage) + Supabase (Postgres)**.
-The earlier VPS-in-Mumbai option is archived in §10 as the future exit path.
-MongoDB was considered and rejected — the backend is deeply relational
-(39 SQLAlchemy models, 17 Alembic migrations, row-locked inventory, triggers)
-and PostgreSQL 16 is a locked owner decision; Supabase IS managed Postgres,
-so it needs zero code changes.*
+*Rewritten 2026-08-08 for the owner's chosen stack: **Cloudflare** (frontend
+edge, R2 storage, DNS/WAF), **Render** (API + worker + Redis), **Supabase**
+(PostgreSQL). Supersedes the 2026-07-26 plan, which predates httpOnly-cookie
+auth, MinIO/R2 uploads-through-the-API, the CMS, and the production boot guards.*
 
 ---
 
-## 1. Architecture
+## 0. The constraint that shapes everything
+
+`apps/*/next.config.mjs` carries this, and it is not decoration:
+
+> **LOAD-BEARING in every environment**: all browser REST calls go through the
+> same-origin rewrite so the httpOnly auth cookies are first-party.
+
+The browser **never** calls the API directly. It calls `/api/v1/*` on its own
+origin; Next proxies that to the API server-side; the API's `Set-Cookie` comes
+back through the proxy and lands as a **first-party cookie on the frontend
+domain**. Only WebSockets bypass the proxy (absolute `NEXT_PUBLIC_API_BASE`).
+
+Two consequences:
+
+1. Whatever hosts the frontend **must be able to proxy** `/api/v1/*` server-side.
+   A pure static/CDN deploy of these apps cannot work.
+2. The old "`*.onrender.com` breaks cookies" problem is **gone** — cookies are
+   scoped to the frontend origin now, not shared across subdomains. Custom
+   domains are still wanted, but they're no longer load-bearing for auth.
+
+---
+
+## 1. Topology
 
 ```
-                    Cloudflare (free plan)
-      DNS · CDN · WAF · TLS · R2 object storage
-   ┌───────────────────────────────────────────────┐
-   │ www.nethrasap.com   → Render storefront        │
-   │ ops.nethrasap.com   → Render dashboard         │
-   │ api.nethrasap.com   → Render API (REST + WS)   │
-   │ img.nethrasap.com   → R2 bucket (public files) │
-   └───────────────────────────────────────────────┘
-                          │
-              Render — Singapore region
-   ┌────────────────────────────────────────────────┐
-   │ nethrasap-api        web (Docker)  REST + WS   │
-   │ nethrasap-worker     worker        arq jobs    │
-   │ nethrasap-redis      Key Value     queue/pubsub│
-   │ nethrasap-storefront web (Docker)  Next SSR    │
-   │ nethrasap-dashboard  web (Docker)  Next SSR    │
-   └────────────────────────────────────────────────┘
-                          │
-        Supabase — Singapore (ap-southeast-1)
-              PostgreSQL 16, session pooler
+                    Cloudflare  (DNS · CDN · WAF · TLS · R2)
+   ┌──────────────────────────────────────────────────────────────┐
+   │  www.nethrasap.com   →  storefront (Next, SSR + /api proxy)  │
+   │  ops.nethrasap.com   →  dashboard  (Next, SSR + /api proxy)  │
+   │  api.nethrasap.com   →  Render API   (REST + WebSockets)     │
+   │  img.nethrasap.com   →  R2 bucket    (public product images) │
+   └──────────────────────────────────────────────────────────────┘
+                    │                              │
+     REST: browser → frontend → API        WS: browser → api.* directly
+                    │
+              Render — Singapore
+   ┌──────────────────────────────────────────────────────────────┐
+   │ nethrasap-api      web (Docker)   FastAPI REST + WS hub      │
+   │ nethrasap-worker   worker         arq: SMS, invoices, PDFs   │
+   │ nethrasap-redis    Key Value      queue · pub/sub · limits   │
+   └──────────────────────────────────────────────────────────────┘
+                    │
+        Supabase — Singapore · PostgreSQL 16 (session pooler)
 ```
 
-**Region rule:** everything computes in Singapore (Render's closest region to
-India) and the DB **must** be Supabase Singapore so API↔DB hops stay ~1ms.
-Indian users reach the edge via Cloudflare's Indian PoPs; dynamic requests pay
-~70–100ms to Singapore. Accepted trade-off of the managed path.
+**Region rule:** API, Redis and Postgres all in **Singapore** (Render's closest
+region to India, and Supabase has a matching one). API↔DB latency dominates
+request time; colocating them is worth more than anything else on this page.
 
-**Custom domains are mandatory, not cosmetic.** The guest-cart cookie is
-`SameSite=Lax`; `*.onrender.com` subdomains are different *sites* (Public
-Suffix List), so on default URLs the cookie is never sent and guest carts
-silently fail. `www.` / `ops.` / `api.nethrasap.com` share one registrable
-domain → same-site → cookies flow. Never test on the onrender.com URLs and
-assume cart behaviour is real.
+---
 
-## 2. Database — Supabase (as plain Postgres)
+## 2. Database — Supabase, not MongoDB
 
-- Create the project in **Singapore (ap-southeast-1)** — same region as Render.
-- Use **only** the Postgres database. Supabase Auth/Storage/Realtime/Edge
-  Functions are unused — the platform has its own auth (phone-first JWT),
-  storage (R2), and realtime (WS hub). No lock-in.
-- Connect via the **session pooler (port 5432)**, not the transaction pooler
-  (6543): the API holds its own SQLAlchemy pool (10+20), and `db.py`'s
-  statement-cache workaround only auto-detects Neon-style `-pooler` hostnames.
-  Session mode sidesteps the issue entirely.
-- `DATABASE_URL` = Supabase session-pooler string; `db.py` normalises the rest
-  (asyncpg dialect, sslmode) as-is.
-- Plan: free tier for staging; **Pro ($25/mo) at go-live** — the free tier
-  pauses on inactivity and has no PITR; a store taking orders needs backups.
-- Alternative already in hand: the existing **Neon** project (also Singapore-
-  capable, already provisioned, `-pooler` quirk already handled in code).
-  Either is fine; pick one and put it in the env group.
+**MongoDB is not an option here, and this isn't a preference.** The backend is
+relational to its foundations: 39 SQLAlchemy models, 17 Alembic migrations,
+row-locked stock reservations, a DB trigger maintaining product ratings,
+FK-snapshotted order lines, and PostgreSQL 16 as a locked owner decision.
+Moving to Mongo is a backend rewrite, not a connection-string swap.
 
-## 3. Render services (existing render.yaml, amended)
+**Supabase is managed PostgreSQL**, so it needs **zero code changes**. Use it
+purely as a database — its Auth, Storage, Realtime and Edge Functions stay
+unused (the platform has its own phone-first auth, R2 storage, and WS hub).
+No lock-in: it's a plain `DATABASE_URL`.
+
+Setup:
+
+- Create the project in **Singapore (ap-southeast-1)** — the region cannot be
+  changed later.
+- Connect via the **session pooler on port 5432**, *not* the transaction pooler
+  (6543). The API keeps its own SQLAlchemy pool; session mode avoids the
+  prepared-statement issues transaction pooling causes with asyncpg.
+- **Append `?sslmode=require`** — Supabase's copyable URI omits it.
+- Free tier for staging; **Pro ($25/mo) before real orders** — the free tier
+  pauses on inactivity and has no PITR.
+
+Alternative if preferred: **Neon** (also Postgres, Singapore, already known to
+`db.py`'s `-pooler` handling). Either works; pick one.
+
+---
+
+## 3. Storage — Cloudflare R2
+
+Uploads now go **browser → API → R2** (server-side `put_object`), not
+browser→storage. The API is the only thing holding storage credentials.
+
+- One bucket, e.g. `nethrasap`. Prefixes: `products/`, `categories/`, `cms/`
+  (public reads) and `kyc/`, `invoices/`, `payslips/` (private, served via
+  short-lived presigned GETs).
+- Public reads via a **custom domain** `img.nethrasap.com` bound to the bucket →
+  set as `STORAGE_PUBLIC_BASE_URL`. Cloudflare caches it at the edge; R2 has
+  **zero egress fees**.
+- Create an **R2 API token** (Object Read & Write, scoped to the bucket) →
+  `STORAGE_ENDPOINT` (`https://<account-id>.r2.cloudflarestorage.com`),
+  `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`.
+- Add `img.nethrasap.com` to the storefront's `images.remotePatterns` (it
+  currently only allows `images.unsplash.com`).
+
+⚠️ **The API refuses to boot in production without storage configured** —
+`config.py` raises rather than let the stub silently discard uploads. Set these
+before the first deploy.
+
+---
+
+## 4. Backend — Render
+
+`render.yaml` already defines the services; it needs amending for this topology.
 
 | Service | Type | Plan | Notes |
 |---|---|---|---|
-| nethrasap-api | web, Docker | Starter $7 | `healthCheckPath /api/v1/health`; preDeploy `alembic upgrade head && python -m scripts.seed_rbac` |
-| nethrasap-worker | worker, Docker | Starter $7 | same image, `arq app.worker.WorkerSettings` |
-| nethrasap-redis | Key Value | Starter $10 | persistence on; queue + pub/sub + rate limits (free 25MB tier loses queued jobs on restart — not for prod) |
-| nethrasap-storefront | web, Docker | Starter $7 | `APP=storefront` |
-| nethrasap-dashboard | web, Docker | Starter $7 | `APP=dashboard` |
+| nethrasap-api | web (Docker) | Starter $7 | health `/api/v1/health`; preDeploy runs `alembic upgrade head && seed_rbac && bootstrap_admin` |
+| nethrasap-worker | worker (Docker) | Starter $7 | same image, `arq app.worker.WorkerSettings` |
+| nethrasap-redis | Key Value | Starter $10 | persistence on — the free 25MB tier drops queued jobs on restart |
 
-**render.yaml amendments needed:**
-- `NEXT_PUBLIC_API_BASE=https://api.nethrasap.com` on both frontends
-  (build-time bake — set BEFORE first deploy of the frontends).
-- `CORS_ORIGINS=https://www.nethrasap.com,https://ops.nethrasap.com` on the API.
-- `NEXT_PUBLIC_DASHBOARD_URL=https://ops.nethrasap.com` on the storefront.
-- Free web services sleep after idle (~50s cold start) → production is paid;
-  a parallel free copy of the blueprint can serve as staging.
+**Amendments needed:**
+- `CORS_ORIGINS` → `https://www.nethrasap.com,https://ops.nethrasap.com`
+  (needed for the WebSocket handshake, since WS bypasses the proxy).
+- Remove the two frontend services **if** frontends move to Cloudflare (Option A
+  below); keep them for Option B.
 
-## 4. Cloudflare setup
+---
 
-1. Zone `nethrasap.com` on the Free plan; registrar nameservers → Cloudflare.
-2. DNS: CNAME `www`, `ops`, `api` → the Render services' `.onrender.com`
-   hosts, **proxied** (orange cloud). Add the domains in Render so it mints
-   certs; SSL mode **Full (strict)**.
-3. WebSockets are proxied on the free plan — `wss://api.nethrasap.com/api/v1/ws`
-   works through Cloudflare unchanged.
-4. **R2**: one bucket `nethrasap` — public prefix `products/` (catalogue
-   images) exposed via custom domain `img.nethrasap.com`; private prefixes
-   `kyc/`, `invoices/`, `payslips/` reachable only via presigned URLs
-   (already implemented in `integrations/storage.py`). R2 has zero egress
-   fees; Cloudflare caches `img.` at the edge. Free: 10GB storage.
-5. WAF: default managed rules; rate-limit rule on `/api/v1/auth/*` as a
-   second layer above the app's Redis limiter.
-6. Cache rule: bypass cache for `api.` (except let R2/img cache normally);
-   Next static assets get long-cache by default via `/_next/static`.
+## 5. Frontend — the one real decision
 
-## 5. Code fixes required before this deploy
+Both apps are `output: "standalone"` (a Node server) and **must proxy
+`/api/v1/*`**. There are two honest ways to get Cloudflare in front.
 
-| # | Fix | Why |
-|---|---|---|
-| 1 | **Commit + push everything** (work since 2026-07-12 is working-tree only) | Render deploys from GitHub |
-| 2 | Serializers return `storage.public_url(key)` instead of raw `image_key` (catalogue, categories, saved-items) | real R2 uploads otherwise render broken `<img>`; dev only works because seeds store absolute Unsplash URLs |
-| 3 | SMS provider (MSG91/Exotel) + **DLT registration** (client's entity docs; days–weeks lead time) | OTP login is console-only today — hard launch blocker |
-| 4 | Invoice/payslip PDF bytes (reportlab already a dep) | stubs store nothing in R2 |
-| 5 | Uvicorn flags in Dockerfile.backend: `--proxy-headers --forwarded-allow-ips '*'` (behind Cloudflare+Render proxies) | correct client IPs in audit log |
-| 6 | Security-headers middleware; consider gating `/docs` in prod | W0 hardening minimum |
-| 7 | (soon after launch) refresh token localStorage → httpOnly cookie | discovery W1 |
+### Option A — Next.js *on* Cloudflare Workers (OpenNext)
+
+Run the apps as Workers via `@opennextjs/cloudflare`.
+
+- **Work required:** add the OpenNext adapter + `wrangler.toml` per app, enable
+  `nodejs_compat`, switch the build from `output: "standalone"` to the adapter,
+  set up two Workers projects with build pipelines, and re-verify SSR, the
+  `/api/v1` rewrite, cookie flow, and the auth/checkout journeys end-to-end.
+- **In our favour:** no `next/image` anywhere (plain `<img>`), so the image
+  optimizer isn't a blocker; rewrites and SSR are supported by the adapter.
+- **Risks:** the adapter is comparatively young; Worker bundle-size limits;
+  the Docker images we've verified for weeks stop being what ships. Budget
+  ~1–2 days including verification, and expect some surprises.
+- **Gain:** ~$14/mo of Render services saved; static assets served at the edge.
+
+### Option B — Next.js on Render, Cloudflare in front (recommended for launch)
+
+Keep the two Docker frontends on Render exactly as they run today, and put
+Cloudflare in front as **proxied DNS** (orange cloud): DNS, CDN, WAF, TLS,
+caching, bot protection — plus R2.
+
+- **Work required:** DNS records + custom domains. Essentially zero code risk.
+- **Gain:** ships now, on images already verified end-to-end.
+- **Cost:** the $14/mo Option A would save.
+
+**Recommendation: launch on Option B, treat Option A as a later optimization.**
+Cloudflare is in the stack either way — the difference is whether it *executes*
+the frontend or *fronts* it. Doing the OpenNext migration during a launch, on
+the surface that carries auth and checkout, is risk taken for $14/mo.
+
+---
 
 ## 6. Environment variables (Render env group `nethrasap-shared`)
 
 | Var | Value |
 |---|---|
-| ENVIRONMENT | production |
-| DATABASE_URL | Supabase session-pooler string (Singapore) |
-| JWT_SECRET | Render `generateValue` (≥32 chars — boot check enforces) |
-| REDIS_URL | wired from Key Value service |
-| CORS_ORIGINS | https://www.nethrasap.com,https://ops.nethrasap.com |
-| SMS_PROVIDER / SMS_API_KEY / SMS_SENDER_ID | msg91 + key + DLT-approved ID |
-| STORAGE_ENDPOINT | R2 S3 endpoint (account-scoped) |
-| STORAGE_BUCKET / ACCESS_KEY_ID / SECRET_ACCESS_KEY | R2 credentials |
-| STORAGE_PUBLIC_BASE_URL | https://img.nethrasap.com |
-| PAYMENT_METHODS_ENABLED | cod |
-| RAZORPAY_* | empty until owner enables gateway payments |
+| ENVIRONMENT | `production` |
+| DATABASE_URL | Supabase session-pooler URI + `?sslmode=require` |
+| JWT_SECRET | Render `generateValue` (≥32 chars; boot refuses placeholders) |
+| REDIS_URL | wired from the Key Value service |
+| CORS_ORIGINS | `https://www.nethrasap.com,https://ops.nethrasap.com` |
+| STORAGE_ENDPOINT | `https://<account-id>.r2.cloudflarestorage.com` |
+| STORAGE_BUCKET | `nethrasap` |
+| STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY | R2 API token pair |
+| STORAGE_PUBLIC_BASE_URL | `https://img.nethrasap.com` |
+| SMS_PROVIDER / SMS_API_KEY / SMS_SENDER_ID | `msg91` + key + DLT-approved ID |
+| OTP_ENABLED | `true` once DLT clears — see §7 |
+| BOOTSTRAP_ADMIN_PHONE / BOOTSTRAP_ADMIN_PASSWORD | first ops login; remove after rotating |
+| PAYMENT_METHODS_ENABLED | `cod` |
+| RAZORPAY_* | empty until gateway payments are enabled |
 
-## 7. Accounts checklist (owner-owned unless noted)
+Frontend build/runtime vars (both apps):
 
-domain registrar · Cloudflare (zone + R2) · Supabase · Render (dev may own,
-transfer later) · MSG91 + DLT · GitHub (exists) · Sentry (free) · uptime
-monitor (free) · Razorpay (create + KYC now, dormant until enabled).
+| Var | Value |
+|---|---|
+| API_PROXY_TARGET | the API's URL — **load-bearing**, the proxy destination |
+| NEXT_PUBLIC_API_BASE | `https://api.nethrasap.com` — used for **WebSockets only** |
+| NEXT_PUBLIC_STOREFRONT_URL / NEXT_PUBLIC_DASHBOARD_URL | cross-links between apps |
+
+---
+
+## 7. Launch blocker: OTP / SMS
+
+`config.py` **refuses to start in production** with `SMS_PROVIDER=console` while
+OTP is enabled — console mode would print OTPs into production logs. So one of
+these must be true before go-live:
+
+- **MSG91 (or Exotel) live + DLT registration approved** → real OTP login; or
+- **`OTP_ENABLED=false`** → launch password-only, switch OTP on when DLT clears.
+
+**DLT registration (sender ID + template approval) takes days to weeks and needs
+the client's GST/PAN entity documents.** It is the single longest-lead item in
+this plan and should be started before anything else here.
+
+---
 
 ## 8. Go-live sequence
 
-| # | Step |
-|---|---|
-| 0 | Commit + push all pending work (logical commits) |
-| 1 | Start DLT registration + MSG91 account (longest lead time) |
-| 2 | Land code fixes §5 (2, 4, 5, 6) |
-| 3 | Cloudflare zone + R2 bucket + `img.` domain; Supabase project (Singapore) |
-| 4 | Amend render.yaml (§3) → deploy blueprint → attach custom domains |
-| 5 | Staging pass: full journey — OTP signup → KYC upload to R2 → quote → convert → COD order → invoice PDF from R2 → realtime updates on ops. |
-| 6 | Verify guest cart on the real domains (the SameSite fix) + WS through Cloudflare |
-| 7 | Supabase → Pro; backup/PITR confirmed; restore drill |
-| 8 | Sentry + uptime monitors; Cloudflare WAF rate rules |
-| 9 | Real catalogue via admin/CSV; DNS already live → launch |
+| # | Step | Owner |
+|---|---|---|
+| 1 | Start **MSG91 + DLT registration** (longest lead) | client |
+| 2 | Buy the domain; add the zone to **Cloudflare** | client |
+| 3 | Create **Supabase** project (Singapore) → grab session-pooler URI | client |
+| 4 | Create **R2** bucket + API token + `img.` custom domain | client |
+| 5 | Amend `render.yaml` (CORS, frontend decision), deploy the blueprint | me |
+| 6 | Fill env vars in Render; first deploy runs migrations + RBAC seed + admin bootstrap | client + me |
+| 7 | DNS: `www` / `ops` / `api` → proxied records; attach custom domains | me |
+| 8 | Add `img.nethrasap.com` to storefront `images.remotePatterns` | me |
+| 9 | **Staging walkthrough**: signup → KYC upload → verify → quote → order → dispatch → invoice PDF → realtime | me |
+| 10 | Supabase → Pro; confirm backups/PITR; restore drill | me |
+| 11 | Sentry + uptime monitors; Cloudflare WAF rate rules on `/api/v1/auth/*` | me |
+| 12 | Load the real catalogue (admin UI / CSV); publish CMS surfaces | client |
+
+---
 
 ## 9. Cost
 
 | Item | $/mo |
 |---|---|
-| Render (4 services + Key Value, Starter) | ~38 |
-| Supabase Pro (at launch; free until then) | 25 |
-| Cloudflare + R2 | ~0–1 |
-| MSG91 | pay-per-SMS (~₹0.20/OTP) + one-time DLT |
-| Domain | ~$1 (amortised) |
-| **Total** | **~$64/mo at launch; ~$39 pre-launch** |
+| Render — api + worker + Redis | ~24 |
+| Render — 2 frontends (Option B only) | ~14 |
+| Supabase Pro | 25 |
+| Cloudflare (DNS/CDN/WAF) + R2 (<10GB) | ~0–1 |
+| **Total** | **~$50 (Option A) · ~$64 (Option B)** |
 
-## 10. Exit path (kept for the record)
+Plus per-SMS (~₹0.20/OTP) and the domain. Razorpay only when gateway payments
+are switched on.
 
-If latency or cost bites later: one 4GB VPS in Mumbai (Vultr/DO/Lightsail)
-running the same Docker images behind Caddy, Postgres moved via pg_dump to a
-Mumbai-region managed instance. Everything is containerised and env-driven,
-so the move is an evening's work, not a rebuild. Nothing in this plan
-forecloses it.
+---
+
+## 10. Known gaps to close before/after launch
+
+- **Payslip PDFs** are still stubbed (invoices are real).
+- **Schedule (H/H1/X)** was removed from the product form (owner decision) — if
+  scheduled medicines are ever listed, the field must come back before launch;
+  the DB column is retained and defaulted.
+- Analytics "Prescription items" tiles now always read 0 (same reason).
+- The **staff-list pagination / coupon race / centralized exception handler**
+  items from `DISCOVERY.md` W0 remain open; none block launch.
