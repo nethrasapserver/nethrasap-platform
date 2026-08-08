@@ -60,6 +60,7 @@ const NAV: NavSection[] = [
   {
     title: "People",
     items: [
+      { href: "/team", label: "Team", icon: "team", perm: "users:read" },
       { href: "/hr/employees", label: "Employees", icon: "people", perm: "hr:manage" },
       { href: "/hr/leave", label: "Leave", icon: "leave", perm: "hr:manage" },
     ],
