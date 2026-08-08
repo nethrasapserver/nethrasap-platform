@@ -687,8 +687,14 @@ function ProductForm({
         toast("Product created with prices");
       }
       onDone();
-    } catch {
-      toast(editing ? "Could not update the product" : "Could not create the product", true);
+    } catch (e) {
+      // Surface the API's reason (unknown category, duplicate slug, …) —
+      // a bare "could not create" leaves the editor with nothing to act on.
+      const detail =
+        e instanceof ApiError && typeof (e.body as { detail?: unknown })?.detail === "string"
+          ? ((e.body as { detail: string }).detail)
+          : null;
+      toast(detail ?? (editing ? "Could not update the product" : "Could not create the product"), true);
       setBusy(false);
     }
   }
@@ -701,7 +707,7 @@ function ProductForm({
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn btn-primary" disabled={busy || !form.name || images.length === 0 || !pricingReady || incompleteTiers.length > 0} onClick={save}>
+          <button className="btn btn-primary" disabled={busy || !form.name || !form.category_slug || images.length === 0 || !pricingReady || incompleteTiers.length > 0} onClick={save}>
             {busy ? "Saving…" : editing ? "Save changes" : "Create product"}
           </button>
         </>
@@ -813,12 +819,21 @@ function ProductForm({
       </div>
       <div className="row">
         <div className="field grow">
-          <label>Category</label>
+          <label>Category<Req /></label>
           <select className="input" value={form.category_slug} onChange={(e) => set("category_slug", e.target.value)}>
+            {categories.length === 0 && <option value="">No categories yet</option>}
             {categories.map((c) => (
               <option key={c.id} value={c.slug}>{c.name}</option>
             ))}
           </select>
+          {categories.length === 0 && (
+            <p className="small" style={{ color: "var(--danger)", margin: "6px 0 0" }}>
+              Every product needs a category.{" "}
+              <a href="/categories" target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
+                Create one first →
+              </a>
+            </p>
+          )}
         </div>
         <div className="field grow">
           <label>Schedule</label>
